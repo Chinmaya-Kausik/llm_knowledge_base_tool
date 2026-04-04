@@ -244,14 +244,19 @@ async function expandCardContent(card, path) {
   body.innerHTML = '<em>Loading...</em>';
 
   try {
+    // PDFs: render with pdf.js directly (no text extraction)
+    if (path.endsWith('.pdf')) {
+      await renderPdfInElement(body, `/media/${path}`);
+      card.dataset.expanded = 'true';
+      return;
+    }
+
     const data = await api.page(path);
     const content = data.content || '';
     cardMeta.set(path, { frontmatter: data.frontmatter, content });
 
     if (category === 'code') {
       body.innerHTML = `<pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
-    } else if (category === 'papers') {
-      body.innerHTML = content ? marked.parse(content) : '<em>Binary file</em>';
     } else {
       body.innerHTML = `<pre>${content.replace(/</g, '&lt;')}</pre>`;
     }
@@ -946,10 +951,376 @@ function switchView(name) {
   if (name==='health') initHealth();
 }
 
+// ========================================
+// Chat Panel
+// ========================================
+let chatWs = null;
+let chatSessionId = null;
+let chatGenerating = false;
+let currentAssistantEl = null;
+let currentThinkingEl = null;
+
+function initChat() {
+  const panel = document.getElementById('chat-panel');
+  const toggle = document.getElementById('chat-toggle');
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send');
+  const stopBtn = document.getElementById('chat-stop');
+
+  // Toggle panel
+  toggle.onclick = () => {
+    if (panel.classList.contains('chat-collapsed')) {
+      panel.classList.remove('chat-collapsed');
+      panel.classList.add('chat-bottom');
+      connectChat();
+    } else {
+      panel.classList.remove('chat-bottom', 'chat-right', 'chat-float');
+      panel.classList.add('chat-collapsed');
+    }
+  };
+
+  // Dock buttons
+  document.getElementById('chat-dock-bottom').onclick = (e) => {
+    e.stopPropagation();
+    panel.classList.remove('chat-collapsed', 'chat-right', 'chat-float');
+    panel.classList.add('chat-bottom');
+  };
+  document.getElementById('chat-dock-right').onclick = (e) => {
+    e.stopPropagation();
+    panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-float');
+    panel.classList.add('chat-right');
+  };
+  document.getElementById('chat-dock-float').onclick = (e) => {
+    e.stopPropagation();
+    panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-right');
+    panel.classList.add('chat-float');
+  };
+
+  // Send message
+  sendBtn.onclick = () => sendChatMessage();
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  };
+
+  // Stop generation
+  stopBtn.onclick = () => {
+    if (chatWs && chatGenerating) {
+      chatWs.send(JSON.stringify({ type: 'stop' }));
+    }
+  };
+}
+
+function connectChat() {
+  if (chatWs && chatWs.readyState === WebSocket.OPEN) return;
+
+  const status = document.getElementById('chat-status');
+  const wsUrl = `ws://${location.host}/ws/chat`;
+  chatWs = new WebSocket(wsUrl);
+
+  chatWs.onopen = () => {
+    status.textContent = 'Connected';
+    status.className = 'connected';
+    chatSessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
+    sessionStorage.setItem('vault-chat-session', chatSessionId);
+
+    // Get current page path
+    const level = currentLevel();
+    const pagePath = level.parentPath || '';
+
+    chatWs.send(JSON.stringify({
+      type: 'init',
+      session_id: chatSessionId,
+      page_path: pagePath,
+    }));
+  };
+
+  chatWs.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleChatEvent(msg);
+  };
+
+  chatWs.onclose = () => {
+    status.textContent = 'Disconnected';
+    status.className = '';
+  };
+
+  chatWs.onerror = () => {
+    status.textContent = 'Error';
+    status.className = '';
+  };
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+
+  // Display user message
+  appendChatMessage('user', text);
+  input.value = '';
+
+  // Prepare context
+  const level = currentLevel();
+  const contextLevel = document.getElementById('chat-context-level').value;
+
+  chatWs.send(JSON.stringify({
+    type: 'message',
+    text: text,
+    context_level: contextLevel,
+    context: {
+      page_path: level.parentPath || '',
+      selection: pendingSelection?.text || null,
+      selection_file: pendingSelection?.file || null,
+    },
+  }));
+
+  pendingSelection = null;
+
+  // Show stop button
+  chatGenerating = true;
+  document.getElementById('chat-send').style.display = 'none';
+  document.getElementById('chat-stop').style.display = '';
+
+  // Prepare assistant message area
+  currentAssistantEl = document.createElement('div');
+  currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+  currentThinkingEl = null;
+  document.getElementById('chat-messages').appendChild(currentAssistantEl);
+}
+
+function handleChatEvent(msg) {
+  const messages = document.getElementById('chat-messages');
+
+  switch (msg.type) {
+    case 'thinking':
+      if (!currentThinkingEl) {
+        currentThinkingEl = document.createElement('div');
+        currentThinkingEl.className = 'chat-thinking';
+        currentThinkingEl.onclick = () => currentThinkingEl.classList.toggle('expanded');
+        currentAssistantEl?.appendChild(currentThinkingEl);
+      }
+      currentThinkingEl.textContent += msg.content;
+      break;
+
+    case 'text':
+      if (currentThinkingEl) {
+        // Thinking is done, start text
+        currentThinkingEl = null;
+      }
+      // Append text to current assistant message
+      if (currentAssistantEl) {
+        let textEl = currentAssistantEl.querySelector('.chat-text');
+        if (!textEl) {
+          textEl = document.createElement('div');
+          textEl.className = 'chat-text';
+          currentAssistantEl.appendChild(textEl);
+        }
+        textEl._rawText = (textEl._rawText || '') + msg.content;
+        textEl.innerHTML = marked.parse(textEl._rawText);
+        // Wire wiki-links
+        textEl.querySelectorAll('.wiki-link').forEach(el => {
+          el.onclick = () => focusCardByTitle(el.dataset.target);
+        });
+      }
+      break;
+
+    case 'tool_use':
+      if (currentAssistantEl) {
+        const toolEl = document.createElement('div');
+        toolEl.className = 'chat-tool-use';
+        toolEl.textContent = `${msg.tool}(${JSON.stringify(msg.input).slice(0, 80)})`;
+        toolEl.onclick = () => {
+          const result = toolEl.nextElementSibling;
+          if (result?.classList.contains('chat-tool-result')) {
+            result.style.display = result.style.display === 'none' ? '' : 'none';
+          }
+        };
+        currentAssistantEl.appendChild(toolEl);
+      }
+      break;
+
+    case 'tool_result':
+      if (currentAssistantEl) {
+        const resultEl = document.createElement('div');
+        resultEl.className = 'chat-tool-result';
+        resultEl.textContent = msg.output;
+        currentAssistantEl.appendChild(resultEl);
+      }
+      break;
+
+    case 'done':
+    case 'stopped':
+      chatGenerating = false;
+      document.getElementById('chat-send').style.display = '';
+      document.getElementById('chat-stop').style.display = 'none';
+      currentAssistantEl = null;
+      currentThinkingEl = null;
+      break;
+
+    case 'result':
+      if (currentAssistantEl && msg.content) {
+        let textEl = currentAssistantEl.querySelector('.chat-text');
+        if (!textEl) {
+          textEl = document.createElement('div');
+          textEl.className = 'chat-text';
+          currentAssistantEl.appendChild(textEl);
+        }
+        textEl.innerHTML = marked.parse(msg.content);
+      }
+      break;
+
+    case 'error':
+      appendChatMessage('system', `Error: ${msg.message}`);
+      chatGenerating = false;
+      document.getElementById('chat-send').style.display = '';
+      document.getElementById('chat-stop').style.display = 'none';
+      break;
+  }
+
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function appendChatMessage(role, text) {
+  const messages = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = `chat-msg chat-msg-${role}`;
+  el.textContent = text;
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+// ========================================
+// Text Selection → Ask Claude
+// ========================================
+let pendingSelection = null;
+
+function initSelectionTooltip() {
+  const tooltip = document.getElementById('selection-tooltip');
+  const askBtn = document.getElementById('selection-ask-btn');
+
+  document.addEventListener('mouseup', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.toString().trim().length < 5) {
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    // Only show on doc-body, fullpage-content, or pdf-text-layer
+    const anchor = sel.anchorNode?.parentElement;
+    if (!anchor) { tooltip.style.display = 'none'; return; }
+    const inContent = anchor.closest('.doc-body') || anchor.closest('.fullpage-content') || anchor.closest('.pdf-text-layer');
+    if (!inContent) { tooltip.style.display = 'none'; return; }
+
+    // Find the file path
+    const card = anchor.closest('.doc-card');
+    const fullpage = anchor.closest('#fullpage-overlay');
+    const filePath = card?.dataset.path || fullpage?.dataset.path || '';
+
+    // Position tooltip near selection
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    tooltip.style.left = (rect.left + rect.width / 2 - 40) + 'px';
+    tooltip.style.top = (rect.bottom + 4) + 'px';
+    tooltip.style.display = '';
+
+    pendingSelection = { text: sel.toString(), file: filePath };
+  });
+
+  askBtn.onclick = () => {
+    tooltip.style.display = 'none';
+    // Open chat panel if closed
+    const panel = document.getElementById('chat-panel');
+    if (panel.classList.contains('chat-collapsed')) {
+      panel.classList.remove('chat-collapsed');
+      panel.classList.add('chat-bottom');
+      connectChat();
+    }
+    // Focus input with prefilled context hint
+    const input = document.getElementById('chat-input');
+    input.placeholder = `Ask about: "${pendingSelection?.text?.slice(0, 50)}..."`;
+    input.focus();
+  };
+
+  // Hide tooltip on click elsewhere
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('#selection-tooltip')) {
+      tooltip.style.display = 'none';
+    }
+  });
+}
+
+// ========================================
+// PDF Rendering (lazy-loaded pdf.js)
+// ========================================
+let pdfjsLib = null;
+
+async function loadPdfJs() {
+  if (pdfjsLib) return pdfjsLib;
+  pdfjsLib = await import('/static/vendor/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/vendor/pdf.worker.min.mjs';
+  return pdfjsLib;
+}
+
+async function renderPdfInElement(container, pdfUrl) {
+  container.innerHTML = '<em>Loading PDF...</em>';
+  try {
+    const lib = await loadPdfJs();
+    const pdf = await lib.getDocument(pdfUrl).promise;
+    container.innerHTML = '';
+    container.className = 'pdf-container';
+
+    const numPages = Math.min(pdf.numPages, 50); // Cap at 50 pages for performance
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const scale = 1.2;
+      const viewport = page.getViewport({ scale });
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pdf-page-wrapper';
+      wrapper.style.width = viewport.width + 'px';
+      wrapper.style.height = viewport.height + 'px';
+
+      // Canvas for rendering
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      wrapper.appendChild(canvas);
+
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Text layer for selection
+      const textContent = await page.getTextContent();
+      const textLayer = document.createElement('div');
+      textLayer.className = 'pdf-text-layer';
+      textLayer.style.width = viewport.width + 'px';
+      textLayer.style.height = viewport.height + 'px';
+
+      for (const item of textContent.items) {
+        const span = document.createElement('span');
+        const tx = item.transform;
+        span.textContent = item.str;
+        span.style.left = tx[4] + 'px';
+        span.style.top = (viewport.height - tx[5] - item.height) + 'px';
+        span.style.fontSize = item.height + 'px';
+        textLayer.appendChild(span);
+      }
+
+      wrapper.appendChild(textLayer);
+      container.appendChild(wrapper);
+    }
+  } catch (e) {
+    container.innerHTML = `<em>Failed to load PDF: ${e.message}</em>`;
+  }
+}
+
 // --- Main init ---
 async function init() {
   initCanvas();
   initFilterDropdowns();
+  initChat();
+  initSelectionTooltip();
+
   document.querySelectorAll('.view-tab').forEach(tab => tab.onclick = () => switchView(tab.dataset.view));
 
   const searchInput = document.getElementById('search-input');
@@ -968,7 +1339,6 @@ async function init() {
   populateTagFilter();
 }
 
-// Make navigateToLevel accessible from inline onclick
 window.navigateToLevel = navigateToLevel;
 
 init();

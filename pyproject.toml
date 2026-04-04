@@ -25,6 +25,7 @@ complex-pdf = [
 web = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
+    "claude-agent-sdk>=0.1.50",
 ]
 
 [project.scripts]

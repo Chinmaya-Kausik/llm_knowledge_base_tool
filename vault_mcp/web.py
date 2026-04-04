@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -464,14 +464,26 @@ async def api_update_page(path: str, request: Request):
     return {"ok": True, "path": path}
 
 
+# --- Chat WebSocket ---
+
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    from vault_mcp.chat import ws_chat
+    await ws_chat(websocket, VAULT_ROOT)
+
+
 # --- Media serving (downloaded images) ---
 
-@app.get("/media/{filename:path}")
-def serve_media(filename: str):
-    media_path = VAULT_ROOT / "raw" / "media" / filename
-    if not media_path.exists():
-        raise HTTPException(status_code=404, detail="Media not found")
-    return FileResponse(str(media_path))
+@app.get("/media/{filepath:path}")
+def serve_media(filepath: str):
+    """Serve any file from the vault (for PDFs, images, etc.)."""
+    full_path = VAULT_ROOT / filepath
+    if not full_path.exists():
+        # Fallback to raw/media/ for backward compat
+        full_path = VAULT_ROOT / "raw" / "media" / filepath
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(full_path))
 
 
 # --- Static file serving ---
