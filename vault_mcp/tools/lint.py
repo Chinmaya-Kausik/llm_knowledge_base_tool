@@ -247,6 +247,57 @@ def generate_health_report(vault_root: Path) -> dict:
         lines.append("No missing concepts found.")
     lines.append("")
 
+    # --- Scaling trigger checks ---
+    scaling_alerts = []
+
+    # Count total pages (folders with READMEs + files)
+    total_pages = sum(1 for _ in (vault_root / "wiki").rglob("README.md")) if (vault_root / "wiki").exists() else 0
+    total_pages += sum(1 for _ in (vault_root / "projects").rglob("README.md")) if (vault_root / "projects").exists() else 0
+
+    # Master index size
+    index_path = vault_root / "wiki" / "meta" / "index.md"
+    if index_path.exists():
+        index_size = len(index_path.read_text(encoding="utf-8"))
+        index_tokens = index_size // 4  # Rough estimate
+        if index_tokens > 30000:
+            scaling_alerts.append(f"SCALING: Master index is ~{index_tokens} tokens (>30K). Consider adding sqlite-vec for semantic search.")
+
+    if total_pages > 800:
+        scaling_alerts.append(f"SCALING: {total_pages} pages approaching 1000-page threshold. Plan for vector search migration.")
+
+    # Git repo size
+    import subprocess
+    repo_size_result = subprocess.run(
+        ["du", "-sh", str(vault_root)], capture_output=True, text=True
+    )
+    if repo_size_result.returncode == 0:
+        size_str = repo_size_result.stdout.split()[0]
+        if size_str.endswith("G") and float(size_str[:-1]) > 1:
+            scaling_alerts.append(f"SCALING: Vault is {size_str}. Consider git-lfs for large binaries.")
+
+    # Stale READMEs count
+    from vault_mcp.tools.compile import get_stale_readmes
+    stale_readmes = get_stale_readmes(vault_root)
+    if len(stale_readmes) > 50:
+        scaling_alerts.append(f"SCALING: {len(stale_readmes)} stale READMEs. Consider batched compilation with priority queue.")
+
+    if scaling_alerts:
+        lines.append("## Scaling Alerts")
+        lines.append("")
+        for alert in scaling_alerts:
+            lines.append(f"- {alert}")
+        lines.append("")
+
+    # Stale READMEs section
+    lines.append(f"## Stale READMEs ({len(stale_readmes)})")
+    lines.append("")
+    if stale_readmes:
+        for sr in stale_readmes[:20]:
+            lines.append(f"- `{sr['folder']}` — {sr['reason']}: {', '.join(sr['changed_files'][:5])}")
+    else:
+        lines.append("All READMEs are up to date.")
+    lines.append("")
+
     content = "\n".join(lines)
     health_path = vault_root / "wiki" / "meta" / "health.md"
     health_metadata = {
@@ -263,5 +314,7 @@ def generate_health_report(vault_root: Path) -> dict:
         "stale_pages": len(stale_pages),
         "orphans": len(orphans),
         "missing_concepts": len(missing_concepts),
+        "stale_readmes": len(stale_readmes),
+        "scaling_alerts": scaling_alerts,
         "total_issues": total,
     }
