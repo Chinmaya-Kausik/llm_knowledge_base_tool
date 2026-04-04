@@ -317,3 +317,129 @@ def update_master_index(vault_root: Path) -> dict:
         "total_pages": sum(len(v) for v in categories.values()),
         "categories": {k: len(v) for k, v in categories.items()},
     }
+
+
+def detect_changes(vault_root: Path, since: str = "HEAD~1") -> list[dict]:
+    """Detect changed files using git diff.
+
+    Args:
+        since: Git ref to compare against (default: last commit).
+
+    Returns: [{path, status}] where status is "added", "modified", or "deleted".
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "diff", "--name-status", since],
+        cwd=str(vault_root), capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        # Fallback: if git fails, return empty (first commit, etc.)
+        return []
+
+    changes = []
+    status_map = {"A": "added", "M": "modified", "D": "deleted"}
+    for line in result.stdout.strip().split("\n"):
+        if not line:
+            continue
+        parts = line.split("\t", 1)
+        if len(parts) == 2:
+            status_code, filepath = parts
+            changes.append({
+                "path": filepath,
+                "status": status_map.get(status_code[0], "modified"),
+            })
+
+    return changes
+
+
+def get_stale_readmes(vault_root: Path) -> list[dict]:
+    """Find folders whose contents changed but README hasn't been updated.
+
+    Compares content hashes of folder children against the README's last_compiled timestamp.
+    Returns: [{folder, readme_path, changed_files}]
+    """
+    from vault_mcp.lib.pages import walk_pages, is_hidden
+
+    stale = []
+
+    for item in vault_root.rglob("*"):
+        if not item.is_dir() or is_hidden(item):
+            continue
+
+        readme = item / "README.md"
+        if not readme.exists():
+            # Folder without README — it's "stale" (needs one)
+            children = [f.name for f in item.iterdir() if not is_hidden(f) and f.name != "README.md"]
+            if children:
+                stale.append({
+                    "folder": str(item.relative_to(vault_root)),
+                    "readme_path": None,
+                    "reason": "missing",
+                    "changed_files": children[:10],
+                })
+            continue
+
+        # Check if README is older than any child file
+        try:
+            readme_mtime = readme.stat().st_mtime
+        except OSError:
+            continue
+
+        changed = []
+        for child in item.iterdir():
+            if child.name == "README.md" or is_hidden(child):
+                continue
+            try:
+                if child.stat().st_mtime > readme_mtime:
+                    changed.append(child.name)
+            except OSError:
+                continue
+
+        if changed:
+            stale.append({
+                "folder": str(item.relative_to(vault_root)),
+                "readme_path": str(readme.relative_to(vault_root)),
+                "reason": "outdated",
+                "changed_files": changed[:10],
+            })
+
+    return stale
+
+
+def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]) -> dict:
+    """Save a chat transcript to raw/chats/.
+
+    Args:
+        session_id: Chat session ID.
+        messages: List of {role, content} message dicts.
+
+    Returns: {path, message_count}
+    """
+    chats_dir = vault_root / "raw" / "chats"
+    chats_dir.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now(timezone.utc)
+    filename = f"{now.strftime('%Y-%m-%d')}_{session_id[:8]}.md"
+    path = chats_dir / filename
+
+    lines = [
+        f"# Chat Transcript — {now.strftime('%Y-%m-%d %H:%M')} UTC",
+        f"Session: {session_id}",
+        "",
+    ]
+
+    for msg in messages:
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        lines.append(f"## {role.title()}")
+        lines.append("")
+        lines.append(content)
+        lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+    return {
+        "path": str(path.relative_to(vault_root)),
+        "message_count": len(messages),
+    }

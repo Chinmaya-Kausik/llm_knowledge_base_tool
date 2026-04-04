@@ -199,6 +199,44 @@ def update_master_index() -> str:
     return json.dumps(result, indent=2)
 
 
+@mcp.tool()
+def detect_changes(since: str = "HEAD~1") -> str:
+    """Detect changed files since a git ref using git diff.
+
+    Returns JSON: [{path, status}] where status is added/modified/deleted.
+    """
+    from vault_mcp.tools.compile import detect_changes as _detect
+    result = _detect(VAULT_ROOT, since)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def get_stale_readmes() -> str:
+    """Find folders whose contents changed but README hasn't been updated.
+
+    Returns JSON: [{folder, readme_path, reason, changed_files}]
+    """
+    from vault_mcp.tools.compile import get_stale_readmes as _stale
+    result = _stale(VAULT_ROOT)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def save_chat_transcript(session_id: str, messages_json: str) -> str:
+    """Save a chat transcript to raw/chats/.
+
+    Args:
+        session_id: Chat session ID.
+        messages_json: JSON string of [{role, content}] messages.
+
+    Returns JSON: {path, message_count}
+    """
+    from vault_mcp.tools.compile import save_chat_transcript as _save
+    messages = json.loads(messages_json)
+    result = _save(VAULT_ROOT, session_id, messages)
+    return json.dumps(result, indent=2)
+
+
 # --- Lint Tools ---
 
 @mcp.tool()
