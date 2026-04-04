@@ -62,4 +62,19 @@ The data directories (`raw/`, `wiki/`, `outputs/`) are gitignored.
 - Type hints everywhere. Docstrings on public functions.
 - Prefer functions over classes. Composition over inheritance.
 - Each MCP tool: structured input → deterministic output.
-- No vector search. Ripgrep + LLM-maintained indexes + context windows.
+- No vector search at current scale. Ripgrep + LLM-maintained indexes + context windows.
+
+## Scaling Triggers
+
+Monitor these thresholds. When crossed, implement the corresponding upgrade:
+
+| Trigger | Threshold | Action |
+|---------|-----------|--------|
+| Master index too large for context | >30K tokens (~1000 pages) | Add sqlite-vec for semantic search. The master index becomes a summary; retrieval uses vector similarity. |
+| Ripgrep search too slow | >5s per query | Add search index (sqlite FTS5 or qmd). Pre-index on `/compile`. |
+| Too many edges on canvas | >200 visible edges | Switch to edge bundling or hierarchical edge routing. |
+| PDF rendering too slow | PDFs >50 pages | Add pagination / virtual scrolling to pdf.js renderer. |
+| Folder README compilation too expensive | >50 stale READMEs per `/compile` | Batch compilation with priority queue (most-viewed folders first). |
+| Chat context exceeds model limits | System prompt >100K tokens | Implement sliding window: inject recent messages + summaries of older ones. |
+| Git repo too large | >1GB vault | Split into submodules or use git-lfs for large binaries. |
+| Startup time too slow | >3s to first paint | Pre-compute and cache the page graph on disk (JSON). Invalidate on file changes. |

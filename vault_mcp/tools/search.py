@@ -13,19 +13,22 @@ def ripgrep_search(
     query: str,
     scope: str = "all",
     context_lines: int = 3,
+    file_glob: str = "*",
 ) -> list[dict]:
     """Search file contents using ripgrep.
 
     Args:
         query: Search pattern (supports regex).
-        scope: "raw", "wiki", or "all".
+        scope: "raw", "wiki", "projects", or "all".
         context_lines: Number of context lines around matches.
+        file_glob: File pattern to search (e.g., "*.py", "*.md", "*" for all).
 
     Returns: [{path, line, context}]
     """
     scope_map = {
         "raw": vault_root / "raw",
         "wiki": vault_root / "wiki",
+        "projects": vault_root / "projects",
         "all": vault_root,
     }
     search_path = scope_map.get(scope, vault_root)
@@ -34,7 +37,7 @@ def ripgrep_search(
         "rg",
         "--json",
         "-C", str(context_lines),
-        "--glob", "*.md",
+        "--glob", file_glob,
         query,
         str(search_path),
     ]

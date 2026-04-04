@@ -391,9 +391,9 @@ def api_tree():
 
 
 @app.get("/api/search")
-def api_search(q: str = Query(...), scope: str = Query("wiki")):
+def api_search(q: str = Query(...), scope: str = Query("all"), file_glob: str = Query("*")):
     try:
-        return search_tools.ripgrep_search(VAULT_ROOT, q, scope)
+        return search_tools.ripgrep_search(VAULT_ROOT, q, scope, file_glob=file_glob)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

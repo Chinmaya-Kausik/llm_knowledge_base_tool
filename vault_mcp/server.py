@@ -308,13 +308,19 @@ def generate_health_report() -> str:
 # --- Search Tools ---
 
 @mcp.tool()
-def ripgrep_search(query: str, scope: str = "all", context_lines: int = 3) -> str:
-    """Full-text search using ripgrep. Scope: "raw", "wiki", or "all".
+def ripgrep_search(query: str, scope: str = "all", context_lines: int = 3, file_glob: str = "*") -> str:
+    """Full-text search using ripgrep.
+
+    Args:
+        query: Search pattern (regex supported).
+        scope: "raw", "wiki", "projects", or "all".
+        context_lines: Lines of context around matches.
+        file_glob: File pattern (e.g., "*.py" for code, "*.md" for markdown, "*" for everything).
 
     Returns JSON: [{path, line, context}]
     """
     from vault_mcp.tools.search import ripgrep_search as _rg
-    result = _rg(VAULT_ROOT, query, scope, context_lines)
+    result = _rg(VAULT_ROOT, query, scope, context_lines, file_glob)
     return json.dumps(result, indent=2)
 
 
