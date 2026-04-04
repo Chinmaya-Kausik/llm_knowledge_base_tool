@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vault": {
+      "command": "uv",
+      "args": ["run", "--directory", "/Users/ckausik/Documents/GitHub/llm_knowledge_base_tool", "python", "-m", "vault_mcp.server"]
+    }
+  }
+}

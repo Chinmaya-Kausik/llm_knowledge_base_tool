@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+
+# Large binary files in raw/media
+raw/media/*.png
+raw/media/*.jpg
+raw/media/*.jpeg
+raw/media/*.gif
+raw/media/*.mp4
+raw/media/*.pdf
+!raw/papers/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# uv
+.python-version
+
+# pytest
+.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+
+# Knowledge base data directories (user content, not code)
+raw/
+wiki/
+outputs/

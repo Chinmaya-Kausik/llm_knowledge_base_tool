@@ -1,0 +1,32 @@
+vault:
+  root: "."
+  raw_dir: "raw"
+  wiki_dir: "wiki"
+  outputs_dir: "outputs"
+
+frontmatter:
+  wiki_required_fields:
+    - title
+    - type
+    - status
+    - created
+    - last_compiled
+    - source_hash
+    - compiler_model
+    - compiler_prompt_version
+    - sources
+    - tags
+    - related
+    - confidence
+  raw_required_fields:
+    - title
+    - captured
+    - content_type
+    - content_hash
+    - compiled
+
+compilation:
+  prompt_version: "v1.0"
+
+search:
+  default_context_lines: 3

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault — Knowledge Base</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Vendored locally — no CDN, instant load -->
+  <script src="/static/vendor/marked.min.js"></script>
+  <script src="/static/vendor/d3-dispatch.min.js"></script>
+  <script src="/static/vendor/d3-selection.min.js"></script>
+  <script src="/static/vendor/d3-timer.min.js"></script>
+  <script src="/static/vendor/d3-color.min.js"></script>
+  <script src="/static/vendor/d3-ease.min.js"></script>
+  <script src="/static/vendor/d3-interpolate.min.js"></script>
+  <script src="/static/vendor/d3-transition.min.js"></script>
+  <script src="/static/vendor/d3-drag.min.js"></script>
+  <script src="/static/vendor/d3-zoom.min.js"></script>
+</head>
+<body>
+  <!-- Toolbar -->
+  <header id="toolbar">
+    <div class="toolbar-left">
+      <span class="logo">Vault</span>
+      <div class="view-tabs">
+        <button class="view-tab active" data-view="graph">Canvas</button>
+        <button class="view-tab" data-view="tree">Tree</button>
+        <button class="view-tab" data-view="tags">Tags</button>
+        <button class="view-tab" data-view="health">Health</button>
+        <button class="view-tab" data-view="search">Search</button>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <input type="search" id="search-input" placeholder="Search... (Ctrl+F)">
+      <div class="filter-dropdown" id="filter-type-dropdown">
+        <button class="filter-btn" id="filter-type-btn">Type: All</button>
+        <div class="filter-menu" id="filter-type-menu">
+          <label><input type="checkbox" value="concept" checked> concept</label>
+          <label><input type="checkbox" value="summary" checked> summary</label>
+          <label><input type="checkbox" value="index" checked> index</label>
+          <label><input type="checkbox" value="answer" checked> answer</label>
+          <label><input type="checkbox" value="structure-note" checked> structure-note</label>
+          <hr>
+          <button id="filter-select-all">Select All</button>
+          <button id="filter-clear-all">Clear All</button>
+        </div>
+      </div>
+      <div class="filter-dropdown" id="filter-tag-dropdown">
+        <button class="filter-btn" id="filter-tag-btn">Tags: All</button>
+        <div class="filter-menu" id="filter-tag-menu">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <button id="btn-auto-layout" title="Auto-layout">Layout</button>
+      <button id="btn-fit" title="Fit all">Fit</button>
+    </div>
+  </header>
+
+  <!-- Main content area -->
+  <div id="main">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div id="sidebar-tree"></div>
+    </aside>
+
+    <!-- Canvas / views -->
+    <div id="canvas-container">
+      <!-- Graph canvas (default view) -->
+      <div id="view-graph" class="view active">
+        <div id="breadcrumb-bar"><span class="crumb crumb-root" data-level="root">Root</span></div>
+        <div id="infinite-canvas">
+          <svg id="edge-layer"></svg>
+          <div id="world" data-lod="readable"></div>
+        </div>
+      </div>
+
+      <!-- Other views -->
+      <div id="view-tree" class="view"><div id="tree-expanded"></div></div>
+      <div id="view-tags" class="view"><div id="tag-cloud"></div></div>
+      <div id="view-health" class="view"><div id="health-dashboard"></div></div>
+      <div id="view-search" class="view"><div id="search-results"></div></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
