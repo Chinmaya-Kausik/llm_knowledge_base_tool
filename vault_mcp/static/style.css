@@ -177,7 +177,7 @@ body {
   display: flex;
   flex-direction: column;
   transition: box-shadow 0.15s;
-  overflow: hidden;
+  overflow: visible;
 }
 .doc-card:hover { box-shadow: 0 6px 32px rgba(0,0,0,0.5); }
 .doc-card.focused { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(122,162,247,0.3); }
@@ -187,6 +187,30 @@ body {
 .doc-card[data-type="summary"]  { border-left: 3px solid var(--green); }
 .doc-card[data-type="index"]    { border-left: 3px solid var(--orange); }
 .doc-card[data-type="answer"]   { border-left: 3px solid var(--accent2); }
+.doc-card[data-type="project"]  { border-left: 3px solid var(--cyan); }
+
+/* Category-colored left border (for files) */
+.doc-card[data-category="code"]     { border-left: 3px solid var(--green); }
+.doc-card[data-category="papers"]   { border-left: 3px solid var(--orange); }
+.doc-card[data-category="data"]     { border-left: 3px solid var(--yellow); }
+
+/* Category badges */
+.badge-cat-code { background: #253a29; color: var(--green); }
+.badge-cat-papers { background: #3a3020; color: var(--orange); }
+.badge-cat-data { background: #3a3520; color: var(--yellow); }
+.badge-cat-markdown { background: #253555; color: var(--accent); }
+.badge-cat-misc { background: #2a2a3a; color: var(--text-muted); }
+
+/* File summary (collapsed state) */
+.file-summary {
+  color: var(--text-muted); font-size: 12px; font-style: italic;
+  cursor: pointer; padding: 4px 0;
+}
+.file-summary:hover { color: var(--text); }
+
+/* Compact file cards (non-expanded) */
+.doc-card[data-expanded="false"] { width: 300px; }
+.doc-card[data-expanded="false"] .doc-body { max-height: 60px; overflow: hidden; }
 
 /* Handle (title bar) */
 .doc-handle {
@@ -251,6 +275,21 @@ body {
   background: var(--bg); color: var(--text); border: none;
   font-family: var(--font); font-size: 12px; line-height: 1.55;
   padding: 10px 14px; resize: vertical; outline: none;
+}
+
+/* Resize handles — centered on card borders, extend equally inside and outside */
+.resize-handle { position: absolute; z-index: 10; }
+.resize-right {
+  top: 0; right: -8px; width: 16px; height: 100%;
+  cursor: ew-resize;
+}
+.resize-bottom {
+  bottom: -8px; left: 0; width: 100%; height: 16px;
+  cursor: ns-resize;
+}
+.resize-corner {
+  bottom: -14px; right: -14px; width: 28px; height: 28px;
+  cursor: nwse-resize;
 }
 
 /* Children badge */
@@ -392,6 +431,20 @@ body {
 .fullpage-content img { max-width: 100%; border-radius: var(--radius); }
 .fullpage-content .wiki-link { color: var(--accent); cursor: pointer; border-bottom: 1px dotted var(--accent); }
 .fullpage-content .wiki-link:hover { color: var(--cyan); }
+.fullpage-toggle {
+  background: var(--bg-surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 5px 14px; border-radius: var(--radius);
+  cursor: pointer; font-family: var(--font); font-size: 12px;
+}
+.fullpage-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.fullpage-edit-area {
+  width: 100%; flex: 1; background: var(--bg-surface); color: var(--text);
+  border: none; font-family: var(--font); font-size: 14px; line-height: 1.7;
+  padding: 24px 40px; max-width: 800px; resize: none; outline: none;
+}
+
+/* Card editing state */
+.doc-card.editing { border-color: var(--green); box-shadow: 0 0 0 2px rgba(158,206,106,0.3); }
 
 /* Empty state */
 .empty-state {

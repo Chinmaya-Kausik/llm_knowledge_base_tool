@@ -46,7 +46,7 @@ function nodeById(id) { return graphData?.nodes.find(n => n.data.id === id)?.dat
 
 function getChildIds(parentPath) {
   if (!graphData) return [];
-  return graphData.nodes.filter(n => n.data.parent === parentPath).map(n => n.data.id);
+  return graphData.nodes.filter(n => n.data.parent_id === parentPath).map(n => n.data.id);
 }
 
 // ========================================
@@ -81,6 +81,20 @@ function initCanvas() {
 
   zoomSelection = d3.select(container);
   zoomSelection.call(zoomBehavior);
+
+  // Click outside any card → dismiss active edit
+  document.addEventListener('pointerdown', (e) => {
+    if (activeEditCard && !e.target.closest('.doc-card')) {
+      exitCardEdit(activeEditCard);
+    }
+  });
+  // Also dismiss when clicking a different card
+  document.getElementById('world').addEventListener('pointerdown', (e) => {
+    const clickedCard = e.target.closest('.doc-card');
+    if (activeEditCard && clickedCard && clickedCard !== activeEditCard) {
+      exitCardEdit(activeEditCard);
+    }
+  });
 }
 
 function fitView() {
@@ -116,28 +130,46 @@ function fitView() {
 // ========================================
 function createDocCard(nodeData, content, pos, options = {}) {
   const card = document.createElement('div');
+  const isFolder = nodeData.is_folder;
+  const category = nodeData.category || 'misc';
+  const isMarkdown = category === 'markdown' || category === 'folder';
+
   card.className = 'doc-card' + (options.pinned ? ' pinned-parent' : '');
   card.dataset.path = nodeData.id;
   card.dataset.type = nodeData.type || 'unknown';
+  card.dataset.category = category;
+  card.dataset.isFolder = isFolder ? 'true' : 'false';
+  card.dataset.expanded = isMarkdown ? 'true' : 'false'; // Markdown always expanded
   card.style.left = pos.x + 'px';
   card.style.top = pos.y + 'px';
 
   const childCount = (nodeData.children || []).length;
-  const typeBadge = nodeData.type ? `<span class="badge badge-${nodeData.type}">${nodeData.type}</span>` : '';
-  const confBadge = nodeData.confidence ? `<span class="badge badge-${nodeData.confidence}">${nodeData.confidence}</span>` : '';
+  const catBadge = !isFolder ? `<span class="badge badge-cat-${category}">${category}</span>` : '';
+  const typeBadge = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== category ? `<span class="badge badge-${nodeData.type}">${nodeData.type}</span>` : '';
   const childBadge = childCount > 0 ? `<button class="btn-children" title="Drill into subpages">${childCount} sub</button>` : '';
+
+  // Body content: markdown gets full render, files get summary initially
+  let bodyHTML;
+  if (isMarkdown && content) {
+    bodyHTML = marked.parse(content);
+  } else if (!isFolder && !isMarkdown) {
+    // File: show summary placeholder (will be replaced on click)
+    const summary = nodeData.summary || nodeData.label;
+    bodyHTML = `<div class="file-summary">${summary}</div>`;
+  } else {
+    bodyHTML = content ? marked.parse(content) : '<em>Empty</em>';
+  }
 
   card.innerHTML = `
     <div class="doc-handle">
       <span class="doc-title">${nodeData.label}</span>
-      <span class="doc-badges">${typeBadge}${confBadge}</span>
+      <span class="doc-badges">${catBadge}${typeBadge}</span>
       <div class="doc-controls">
         ${childBadge}
-        <button class="btn-edit" title="Edit">E</button>
         <button class="btn-collapse" title="Collapse">-</button>
       </div>
     </div>
-    <div class="doc-body">${content ? marked.parse(content) : '<em>Loading...</em>'}</div>
+    <div class="doc-body">${bodyHTML}</div>
   `;
 
   wireCardDrag(card, options.pinned);
@@ -158,25 +190,41 @@ function wireWikiLinks(card) {
 
 function wireCardButtons(card, hasChildren) {
   const path = card.dataset.path;
+  const category = card.dataset.category;
+  const isMarkdown = category === 'markdown' || category === 'folder';
 
   // Double-click title → full page
   card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
     e.stopPropagation(); e.preventDefault(); expandCardFullPage(card);
   });
 
+  const body = card.querySelector('.doc-body');
+
+  // Single click body → expand content (for non-markdown files in summary mode)
+  if (!isMarkdown) {
+    body.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (card.dataset.expanded !== 'true' && card.dataset.editing !== 'true') {
+        expandCardContent(card, path);
+      }
+    });
+  }
+
+  // Double-click body → enter edit mode (for any expanded card)
+  body.addEventListener('dblclick', (e) => {
+    e.stopPropagation(); e.preventDefault();
+    if (card.dataset.editing !== 'true' && card.dataset.expanded === 'true') {
+      enterCardEdit(card, path);
+    }
+  });
+
   // Collapse
   card.querySelector('.btn-collapse').addEventListener('click', (e) => {
     e.stopPropagation();
-    const body = card.querySelector('.doc-body');
     const btn = e.currentTarget;
     body.style.display = body.style.display === 'none' ? '' : 'none';
     btn.textContent = body.style.display === 'none' ? '+' : '-';
     scheduleEdgeUpdate();
-  });
-
-  // Edit
-  card.querySelector('.btn-edit').addEventListener('click', (e) => {
-    e.stopPropagation(); toggleEdit(card, path);
   });
 
   // Drill into children
@@ -189,27 +237,83 @@ function wireCardButtons(card, hasChildren) {
   }
 }
 
-async function toggleEdit(card, path) {
+async function expandCardContent(card, path) {
+  // Fetch and display full content for a file card
   const body = card.querySelector('.doc-body');
-  const btn = card.querySelector('.btn-edit');
-  if (card.dataset.editing === 'true') {
-    const textarea = body.querySelector('.doc-edit-area');
-    const meta = cardMeta.get(path);
-    if (meta && textarea) {
-      try {
-        await api.savePage(path, meta.frontmatter, textarea.value);
-        meta.content = textarea.value;
-        body.innerHTML = marked.parse(textarea.value);
-        wireWikiLinks(card);
-      } catch (err) { body.innerHTML = `<p style="color:var(--red)">Save failed</p>`; return; }
+  const category = card.dataset.category;
+  body.innerHTML = '<em>Loading...</em>';
+
+  try {
+    const data = await api.page(path);
+    const content = data.content || '';
+    cardMeta.set(path, { frontmatter: data.frontmatter, content });
+
+    if (category === 'code') {
+      body.innerHTML = `<pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+    } else if (category === 'papers') {
+      body.innerHTML = content ? marked.parse(content) : '<em>Binary file</em>';
+    } else {
+      body.innerHTML = `<pre>${content.replace(/</g, '&lt;')}</pre>`;
     }
-    card.dataset.editing = 'false'; btn.textContent = 'E';
-  } else {
-    const meta = cardMeta.get(path);
-    body.innerHTML = `<textarea class="doc-edit-area">${(meta?.content||'').replace(/</g,'&lt;')}</textarea>`;
-    card.dataset.editing = 'true'; btn.textContent = 'S';
-    body.querySelector('.doc-edit-area')?.focus();
+    card.dataset.expanded = 'true';
+    wireWikiLinks(card);
+  } catch (e) {
+    body.innerHTML = `<em>Failed to load</em>`;
   }
+}
+
+let activeEditCard = null; // Currently editing card
+
+function enterCardEdit(card, path) {
+  // Exit any other active edit first
+  if (activeEditCard && activeEditCard !== card) exitCardEdit(activeEditCard);
+
+  const body = card.querySelector('.doc-body');
+  let rawContent = '';
+  const meta = cardMeta.get(path);
+
+  if (meta) {
+    rawContent = meta.content || '';
+  }
+
+  body.innerHTML = `<textarea class="doc-edit-area">${rawContent.replace(/</g,'&lt;')}</textarea>`;
+  card.dataset.editing = 'true';
+  card.classList.add('editing');
+  activeEditCard = card;
+  const textarea = body.querySelector('.doc-edit-area');
+  textarea?.focus();
+  textarea?.addEventListener('pointerdown', (e) => e.stopPropagation());
+}
+
+async function exitCardEdit(card) {
+  if (!card || card.dataset.editing !== 'true') return;
+  const path = card.dataset.path;
+  const body = card.querySelector('.doc-body');
+  const textarea = body.querySelector('.doc-edit-area');
+  const meta = cardMeta.get(path);
+  const category = card.dataset.category;
+
+  if (meta && textarea) {
+    const newContent = textarea.value;
+    if (newContent !== meta.content) {
+      try {
+        await api.savePage(path, meta.frontmatter, newContent);
+        meta.content = newContent;
+      } catch (err) { /* Save failed silently, content still updated locally */ }
+    }
+    // Re-render based on category
+    if (category === 'code') {
+      body.innerHTML = `<pre><code>${meta.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+    } else if (category === 'markdown' || category === 'folder') {
+      body.innerHTML = marked.parse(meta.content);
+    } else {
+      body.innerHTML = `<pre>${meta.content.replace(/</g, '&lt;')}</pre>`;
+    }
+    wireWikiLinks(card);
+  }
+  card.dataset.editing = 'false';
+  card.classList.remove('editing');
+  if (activeEditCard === card) activeEditCard = null;
 }
 
 // ========================================
@@ -244,48 +348,43 @@ function wireCardDrag(card, pinned) {
 // Card Border Resize (right, bottom, corner)
 // ========================================
 function wireCardBorderResize(card) {
-  const EDGE = 8; // px from border to trigger resize
-  let resizeAxis = null; // 'e', 's', 'se', or null
+  // Create invisible resize handles overlaid on the card borders
+  const handles = [
+    { cls: 'resize-right', axis: 'e' },
+    { cls: 'resize-bottom', axis: 's' },
+    { cls: 'resize-corner', axis: 'se' },
+  ];
 
-  card.addEventListener('pointermove', (e) => {
-    if (card.dataset.resizing) return;
-    const rect = card.getBoundingClientRect();
-    const dx = rect.right - e.clientX;
-    const dy = rect.bottom - e.clientY;
-    const nearRight = dx >= 0 && dx < EDGE;
-    const nearBottom = dy >= 0 && dy < EDGE;
-    if (nearRight && nearBottom) { card.style.cursor = 'nwse-resize'; resizeAxis = 'se'; }
-    else if (nearRight) { card.style.cursor = 'ew-resize'; resizeAxis = 'e'; }
-    else if (nearBottom) { card.style.cursor = 'ns-resize'; resizeAxis = 's'; }
-    else { card.style.cursor = ''; resizeAxis = null; }
-  });
+  for (const { cls, axis } of handles) {
+    const handle = document.createElement('div');
+    handle.className = `resize-handle ${cls}`;
+    card.appendChild(handle);
 
-  card.addEventListener('pointerdown', (e) => {
-    if (!resizeAxis) return;
-    if (e.target.closest('.doc-handle') || e.target.closest('.doc-body') || e.target.closest('.doc-controls')) return;
-    e.preventDefault(); e.stopPropagation();
-    card.dataset.resizing = 'true';
-    const startX = e.clientX, startY = e.clientY;
-    const startW = card.offsetWidth, startH = card.offsetHeight;
-    const axis = resizeAxis;
-    const k = currentTransform.k;
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startY = e.clientY;
+      const startW = card.offsetWidth;
+      const startBodyH = card.querySelector('.doc-body')?.offsetHeight || 200;
+      const k = currentTransform.k;
 
-    function onMove(e) {
-      if (axis === 'e' || axis === 'se') card.style.width = Math.max(200, startW + (e.clientX-startX)/k) + 'px';
-      if (axis === 's' || axis === 'se') {
-        const body = card.querySelector('.doc-body');
-        if (body) body.style.maxHeight = Math.max(60, body.offsetHeight + (e.clientY-startY)/k) + 'px';
+      function onMove(e) {
+        if (axis === 'e' || axis === 'se') {
+          card.style.width = Math.max(200, startW + (e.clientX - startX) / k) + 'px';
+        }
+        if (axis === 's' || axis === 'se') {
+          const body = card.querySelector('.doc-body');
+          if (body) body.style.maxHeight = Math.max(60, startBodyH + (e.clientY - startY) / k) + 'px';
+        }
+        scheduleEdgeUpdate();
       }
-      scheduleEdgeUpdate();
-    }
-    function onUp() {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      delete card.dataset.resizing;
-    }
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-  });
+      function onUp() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
 }
 
 // ========================================
@@ -514,26 +613,74 @@ function focusCard(card) {
 
 function expandCardFullPage(card) {
   if (expandedCard) collapseFullPage();
+  // Dismiss any canvas edit
+  if (activeEditCard) exitCardEdit(activeEditCard);
+
   const path = card.dataset.path;
   const meta = cardMeta.get(path);
   const title = card.querySelector('.doc-title')?.textContent || path;
   const content = meta ? marked.parse(meta.content) : '';
   const overlay = document.createElement('div');
   overlay.id = 'fullpage-overlay';
+  overlay.dataset.path = path;
+  overlay.dataset.mode = 'preview';
   overlay.innerHTML = `
     <div class="fullpage-header">
       <button class="fullpage-back" title="Back (Escape)">← Back</button>
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
+      <span style="flex:1"></span>
+      <button class="fullpage-toggle">Edit</button>
     </div>
     <div class="fullpage-content">${content}</div>
   `;
   document.getElementById('canvas-container').appendChild(overlay);
   expandedCard = overlay;
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
+  overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
+  wireFullPageLinks(overlay);
+}
+
+function wireFullPageLinks(overlay) {
   overlay.querySelectorAll('.wiki-link').forEach(el => {
     el.addEventListener('click', () => { collapseFullPage(); focusCardByTitle(el.dataset.target); });
   });
+}
+
+async function toggleFullPageEdit(overlay, path) {
+  const contentEl = overlay.querySelector('.fullpage-content');
+  const toggleBtn = overlay.querySelector('.fullpage-toggle');
+  const meta = cardMeta.get(path);
+
+  if (overlay.dataset.mode === 'preview') {
+    // Switch to edit
+    contentEl.innerHTML = `<textarea class="fullpage-edit-area">${(meta?.content||'').replace(/</g,'&lt;')}</textarea>`;
+    overlay.dataset.mode = 'edit';
+    toggleBtn.textContent = 'Preview';
+    contentEl.querySelector('.fullpage-edit-area')?.focus();
+  } else {
+    // Save and switch to preview
+    const textarea = contentEl.querySelector('.fullpage-edit-area');
+    if (meta && textarea) {
+      const newContent = textarea.value;
+      if (newContent !== meta.content) {
+        try {
+          await api.savePage(path, meta.frontmatter, newContent);
+          meta.content = newContent;
+        } catch (err) { /* silent */ }
+      }
+      contentEl.innerHTML = marked.parse(meta.content);
+      wireFullPageLinks(overlay);
+      // Also update the canvas card if it exists
+      const canvasCard = cardElements.get(path);
+      if (canvasCard && canvasCard.dataset.editing !== 'true') {
+        canvasCard.querySelector('.doc-body').innerHTML = marked.parse(meta.content);
+        wireWikiLinks(canvasCard);
+      }
+    }
+    overlay.dataset.mode = 'preview';
+    toggleBtn.textContent = 'Edit';
+  }
 }
 
 function collapseFullPage() { if (expandedCard) { expandedCard.remove(); expandedCard = null; } }
@@ -558,24 +705,37 @@ function getActiveTags() {
   if (checked.length===0 || checked.length===checks.length) return null;
   return new Set(checked.map(c=>c.value));
 }
+function getActiveFiletypes() {
+  return new Set([...document.querySelectorAll('#filter-filetype-menu input[type="checkbox"]')].filter(c=>c.checked).map(c=>c.value));
+}
 function applyFilters() {
-  const types = getActiveTypes(), tags = getActiveTags();
+  const types = getActiveTypes(), tags = getActiveTags(), filetypes = getActiveFiletypes();
+
+  // Update button labels
   const typeBtn = document.getElementById('filter-type-btn');
   const allT = document.querySelectorAll('#filter-type-menu input[type="checkbox"]');
   const checkedT = [...allT].filter(c=>c.checked);
   typeBtn.textContent = checkedT.length===allT.length?'Type: All':checkedT.length===0?'Type: None':`Type: ${checkedT.length}`;
   document.getElementById('filter-tag-btn').textContent = tags===null?'Tags: All':`Tags: ${tags.size}`;
+  const ftBtn = document.getElementById('filter-filetype-btn');
+  const allFt = document.querySelectorAll('#filter-filetype-menu input[type="checkbox"]');
+  const checkedFt = [...allFt].filter(c=>c.checked);
+  ftBtn.textContent = checkedFt.length===allFt.length?'Files: All':checkedFt.length===0?'Files: None':`Files: ${checkedFt.length}`;
 
   for (const [path,card] of cardElements) {
     const type = card.dataset.type||'unknown';
+    const category = card.dataset.category||'misc';
     const meta = cardMeta.get(path);
     const t = meta?.frontmatter?.tags||[];
-    card.style.display = (types.has(type) && (tags===null||t.some(x=>tags.has(x)))) ? '' : 'none';
+    const typeMatch = types.has(type) || types.has(category);
+    const tagMatch = tags===null || t.some(x=>tags.has(x));
+    const ftMatch = filetypes.has(category);
+    card.style.display = (typeMatch && tagMatch && ftMatch) ? '' : 'none';
   }
   // Sidebar
   document.querySelectorAll('#sidebar-tree .tree-item.file').forEach(item => {
     const meta = cardMeta.get(item.dataset.id);
-    if (!meta) return;
+    if (!meta) { item.style.opacity = ''; return; }
     const type = meta.frontmatter?.type||'unknown';
     const t = meta.frontmatter?.tags||[];
     item.style.opacity = (types.has(type) && (tags===null||t.some(x=>tags.has(x)))) ? '' : '0.3';
@@ -584,18 +744,33 @@ function applyFilters() {
 }
 
 function initFilterDropdowns() {
-  const typeBtn = document.getElementById('filter-type-btn');
+  const menus = ['filter-type-menu', 'filter-tag-menu', 'filter-filetype-menu'];
+
+  function closeAll() { menus.forEach(id => document.getElementById(id)?.classList.remove('open')); }
+  function toggleMenu(menuId, e) {
+    e.stopPropagation();
+    const menu = document.getElementById(menuId);
+    const wasOpen = menu.classList.contains('open');
+    closeAll();
+    if (!wasOpen) menu.classList.add('open');
+  }
+
+  document.getElementById('filter-type-btn').onclick = (e) => toggleMenu('filter-type-menu', e);
+  document.getElementById('filter-tag-btn').onclick = (e) => toggleMenu('filter-tag-menu', e);
+  document.getElementById('filter-filetype-btn').onclick = (e) => toggleMenu('filter-filetype-menu', e);
+  document.addEventListener('click', closeAll);
+
+  // Type filter
   const typeMenu = document.getElementById('filter-type-menu');
-  const tagBtn = document.getElementById('filter-tag-btn');
-  const tagMenu = document.getElementById('filter-tag-menu');
-
-  typeBtn.onclick = (e) => { e.stopPropagation(); typeMenu.classList.toggle('open'); tagMenu.classList.remove('open'); };
-  tagBtn.onclick = (e) => { e.stopPropagation(); tagMenu.classList.toggle('open'); typeMenu.classList.remove('open'); };
-  document.addEventListener('click', () => { typeMenu.classList.remove('open'); tagMenu.classList.remove('open'); });
-
   typeMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.onchange = applyFilters);
   document.getElementById('filter-select-all').onclick = () => { typeMenu.querySelectorAll('input').forEach(c=>c.checked=true); applyFilters(); };
   document.getElementById('filter-clear-all').onclick = () => { typeMenu.querySelectorAll('input').forEach(c=>c.checked=false); applyFilters(); };
+
+  // Filetype filter
+  const ftMenu = document.getElementById('filter-filetype-menu');
+  ftMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.onchange = applyFilters);
+  document.getElementById('filetype-select-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=true); applyFilters(); };
+  document.getElementById('filetype-clear-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=false); applyFilters(); };
 }
 
 function populateTagFilter() {

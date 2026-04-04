@@ -78,8 +78,13 @@ def test_graph_nodes_and_edges(vault_app):
     r = client.get("/api/graph")
     assert r.status_code == 200
     data = r.json()
-    assert len(data["nodes"]) == 2
-    assert len(data["edges"]) == 2
+    # New folder-as-page model: nodes include folders + files
+    assert len(data["nodes"]) > 0
+    assert len(data["edges"]) >= 2  # Alpha↔Beta links
+    # Check node structure
+    node_labels = {n["data"]["label"] for n in data["nodes"]}
+    assert "Alpha" in node_labels
+    assert "Beta" in node_labels
 
 
 def test_registry(vault_app):
@@ -102,7 +107,9 @@ def test_page_not_found(vault_app):
 def test_tree(vault_app):
     client, root = vault_app
     r = client.get("/api/tree")
-    assert r.json()["name"] == "wiki"
+    assert r.json()["name"] == "vault"
+    folder_names = {c["name"] for c in r.json()["children"] if c["type"] == "folder"}
+    assert "wiki" in folder_names
 
 
 def test_health(vault_app):

@@ -56,10 +56,10 @@ async def lifespan(app):
 app = FastAPI(title="Vault Knowledge Base", lifespan=lifespan)
 
 
-# --- Graph builder (new logic) ---
+# --- Graph builder (folder-as-page model) ---
 
-def build_graph(vault_root: Path) -> dict[str, Any]:
-    """Build a Cytoscape.js-compatible graph from the wiki."""
+def _old_build_graph(vault_root: Path) -> dict[str, Any]:
+    """DEPRECATED: old registry-based graph. Kept for reference."""
     registry_path = vault_root / "wiki" / "meta" / "page-registry.json"
     registry = load_registry(registry_path)
 
@@ -269,6 +269,62 @@ def build_provenance(vault_root: Path) -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
+# --- New graph builder (folder-as-page) ---
+
+def build_graph_v2(vault_root: Path) -> dict[str, Any]:
+    """Build page graph using folder-as-page model."""
+    from vault_mcp.lib.pages import build_page_graph, get_page_content, FILETYPE_CATEGORIES
+    graph = build_page_graph(vault_root)
+
+    # Convert to frontend-compatible format
+    def page_to_node(p):
+        return {"data": {
+            "id": p["id"], "label": p["title"], "path": p["path"],
+            "is_folder": p["is_folder"], "parent_id": p["parent_id"],
+            "children": p["children_ids"], "type": p["type"],
+            "category": p["category"], "status": p["status"],
+            "tags": p["tags"], "confidence": p["confidence"],
+            "has_readme": p.get("has_readme", False),
+        }}
+
+    return {
+        "nodes": [page_to_node(p) for p in graph["pages"]],
+        "edges": [{"data": e} for e in graph["edges"]],
+        "top_nodes": [page_to_node(p) for p in graph["top_pages"]],
+        "top_edges": [{"data": e} for e in graph["top_edges"]],
+        "filetype_categories": FILETYPE_CATEGORIES,
+    }
+
+
+def build_tree_v2(vault_root: Path) -> dict[str, Any]:
+    """Build folder tree using the new page model."""
+    from vault_mcp.lib.pages import walk_pages
+    pages = walk_pages(vault_root)
+
+    # Build nested tree from flat page list
+    page_map = {p["id"]: {**p, "children": []} for p in pages}
+    roots = []
+
+    for p in pages:
+        node = page_map[p["id"]]
+        if p["parent_id"] is None:
+            roots.append(node)
+        elif p["parent_id"] in page_map:
+            page_map[p["parent_id"]]["children"].append(node)
+
+    def simplify(node):
+        return {
+            "id": node["id"],
+            "name": Path(node["path"]).name,
+            "title": node["title"],
+            "type": "folder" if node["is_folder"] else "file",
+            "category": node["category"],
+            "children": [simplify(c) for c in node["children"]] if node["is_folder"] else [],
+        }
+
+    return {"id": "", "name": "vault", "type": "folder", "children": [simplify(r) for r in roots]}
+
+
 # --- Helpers ---
 
 def _serialize(obj: Any) -> Any:
@@ -288,7 +344,7 @@ def _serialize_dict(d: dict) -> dict:
 
 @app.get("/api/graph")
 def api_graph():
-    return build_graph(VAULT_ROOT)
+    return build_graph_v2(VAULT_ROOT)
 
 
 @app.get("/api/provenance")
@@ -303,32 +359,35 @@ def api_registry():
 
 @app.get("/api/page/{path:path}")
 def api_page(path: str):
-    try:
-        result = compile_tools.read_wiki_page(VAULT_ROOT, path)
-        result["frontmatter"] = _serialize_dict(result["frontmatter"])
-        return result
-    except FileNotFoundError:
+    from vault_mcp.lib.pages import get_page_content, get_page_metadata
+    full_path = VAULT_ROOT / path
+    if not full_path.exists():
         raise HTTPException(status_code=404, detail=f"Page not found: {path}")
+    content = get_page_content(full_path)
+    metadata = get_page_metadata(full_path)
+    return {"frontmatter": _serialize_dict(metadata), "content": content}
 
 
 @app.post("/api/pages/bulk")
 async def api_pages_bulk(request: Request):
     """Fetch multiple pages in a single request for faster loading."""
+    from vault_mcp.lib.pages import get_page_content, get_page_metadata
     paths = await request.json()
     result = {}
     for path in paths:
-        try:
-            data = compile_tools.read_wiki_page(VAULT_ROOT, path)
-            data["frontmatter"] = _serialize_dict(data["frontmatter"])
-            result[path] = data
-        except Exception:
+        full_path = VAULT_ROOT / path
+        if full_path.exists():
+            content = get_page_content(full_path)
+            metadata = get_page_metadata(full_path)
+            result[path] = {"frontmatter": _serialize_dict(metadata), "content": content}
+        else:
             result[path] = None
     return result
 
 
 @app.get("/api/tree")
 def api_tree():
-    return build_tree(VAULT_ROOT)
+    return build_tree_v2(VAULT_ROOT)
 
 
 @app.get("/api/search")

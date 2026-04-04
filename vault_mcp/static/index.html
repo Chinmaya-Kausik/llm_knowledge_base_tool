@@ -51,6 +51,20 @@
           <!-- Populated by JS -->
         </div>
       </div>
+      <div class="filter-dropdown" id="filter-filetype-dropdown">
+        <button class="filter-btn" id="filter-filetype-btn">Files: All</button>
+        <div class="filter-menu" id="filter-filetype-menu">
+          <label><input type="checkbox" value="folder" checked> Folders</label>
+          <label><input type="checkbox" value="markdown" checked> Markdown</label>
+          <label><input type="checkbox" value="code" checked> Code</label>
+          <label><input type="checkbox" value="papers" checked> Papers</label>
+          <label><input type="checkbox" value="data" checked> Data</label>
+          <label><input type="checkbox" value="misc" checked> Misc</label>
+          <hr>
+          <button id="filetype-select-all">Select All</button>
+          <button id="filetype-clear-all">Clear All</button>
+        </div>
+      </div>
       <button id="btn-auto-layout" title="Auto-layout">Layout</button>
       <button id="btn-fit" title="Fit all">Fit</button>
     </div>
