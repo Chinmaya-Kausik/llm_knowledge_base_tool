@@ -1129,7 +1129,7 @@ function initChat() {
 
     function onMove(e) {
       const dx = e.clientX - startX, dy = e.clientY - startY;
-      if (!dragging && Math.abs(dx) + Math.abs(dy) < 8) return; // Dead zone
+      if (!dragging && Math.abs(dx) + Math.abs(dy) < 4) return; // Dead zone
       dragging = true;
 
       // Detach to float if not already floating
