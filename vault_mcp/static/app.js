@@ -189,9 +189,14 @@ function wireCardButtons(card, hasChildren) {
   const category = card.dataset.category || 'misc';
   const isMarkdown = category === 'markdown' || category === 'folder';
 
-  // Double-click title → full page
+  // Double-click title: folders → drill into canvas, files → full page
   card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
-    e.stopPropagation(); e.preventDefault(); expandCardFullPage(card);
+    e.stopPropagation(); e.preventDefault();
+    if (card.dataset.isFolder === 'true' && hasChildren) {
+      drillInto(path);
+    } else {
+      expandCardFullPage(card);
+    }
   });
 
   const body = card.querySelector('.doc-body');
@@ -562,15 +567,14 @@ function updateBreadcrumb() {
 }
 
 // ========================================
-// Layout
+// Layout (WebCoLa — constraint-based with non-overlap)
 // ========================================
 function computeLayout(nodes, saved) {
-  // Use saved positions for nodes that have them
-  // For unsaved nodes, use force-directed placement
   const positions = {};
-  const unsaved = [];
-  const cardW = 420, cardH = 300, gap = 60;
+  const cardW = 400, cardH = 280, pad = 30;
 
+  // Use saved positions where available
+  const unsaved = [];
   for (const node of nodes) {
     if (saved[node.data.id]) {
       positions[node.data.id] = saved[node.data.id];
@@ -578,117 +582,87 @@ function computeLayout(nodes, saved) {
       unsaved.push(node.data.id);
     }
   }
-
   if (unsaved.length === 0) return positions;
 
-  // Build adjacency for force layout
-  const edges = (graphData?.top_edges || graphData?.edges || []);
-  const nodeSet = new Set(nodes.map(n => n.data.id));
-  const adj = {};
-  for (const id of nodeSet) adj[id] = [];
-  for (const e of edges) {
-    const s = e.data.source, t = e.data.target;
-    if (nodeSet.has(s) && nodeSet.has(t)) {
-      adj[s].push(t);
-      adj[t].push(s);
-    }
-  }
+  // If WebCoLa not available, fall back to grid
+  if (typeof cola === 'undefined') return computeLayoutGrid(nodes, saved);
 
-  // Initialize unsaved nodes in a grid as starting positions
-  const cols = Math.max(1, Math.ceil(Math.sqrt(unsaved.length)));
-  unsaved.forEach((id, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    positions[id] = { x: col * (cardW + gap), y: row * (cardH + gap) };
+  // Build CoLa node and edge arrays
+  const idToIndex = {};
+  const colaNodes = nodes.map((node, i) => {
+    idToIndex[node.data.id] = i;
+    const s = saved[node.data.id];
+    return {
+      x: s ? s.x + cardW/2 : (i % 5) * (cardW + pad) + cardW/2,
+      y: s ? s.y + cardH/2 : Math.floor(i / 5) * (cardH + pad) + cardH/2,
+      width: cardW + pad,
+      height: cardH + pad,
+      fixed: !!saved[node.data.id],  // Don't move saved nodes
+    };
   });
 
-  // Force-directed layout with gravity and capped repulsion
-  const allIds = nodes.map(n => n.data.id);
-  const n = allIds.length;
-  if (n <= 1) return positions;
-
-  const k = (cardW + gap) * 1.2; // Ideal spacing between nodes
-  const maxRepDist = k * 3;      // Repulsion range cap — beyond this, no force
-  const gravity = 0.05;           // Pull toward center
-  const iterations = 60;
-
-  // Compute center of mass
-  function centerOfMass() {
-    let cx = 0, cy = 0;
-    for (const id of allIds) { cx += positions[id].x; cy += positions[id].y; }
-    return { x: cx / n, y: cy / n };
-  }
-
-  for (let iter = 0; iter < iterations; iter++) {
-    const temp = k * 0.5 * (1 - iter / iterations); // Cooling
-    const disp = {};
-    for (const id of allIds) disp[id] = { x: 0, y: 0 };
-
-    // Repulsion — capped at maxRepDist
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = allIds[i], b = allIds[j];
-        const dx = positions[a].x - positions[b].x;
-        const dy = positions[a].y - positions[b].y;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        if (dist > maxRepDist) continue; // Skip distant pairs
-        const force = (k * k) / dist;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        disp[a].x += fx; disp[a].y += fy;
-        disp[b].x -= fx; disp[b].y -= fy;
-      }
-    }
-
-    // Attraction along edges
-    for (const e of edges) {
-      const s = e.data.source, t = e.data.target;
-      if (!(s in positions) || !(t in positions)) continue;
-      const dx = positions[s].x - positions[t].x;
-      const dy = positions[s].y - positions[t].y;
-      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-      const force = dist / k; // Linear attraction (weaker than quadratic)
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      disp[s].x -= fx * k; disp[s].y -= fy * k;
-      disp[t].x += fx * k; disp[t].y += fy * k;
-    }
-
-    // Gravity — pull toward center
-    const center = centerOfMass();
-    for (const id of allIds) {
-      const dx = center.x - positions[id].x;
-      const dy = center.y - positions[id].y;
-      disp[id].x += dx * gravity;
-      disp[id].y += dy * gravity;
-    }
-
-    // Apply displacements (only to unsaved nodes)
-    for (const id of unsaved) {
-      const d = disp[id];
-      const dist = Math.max(Math.sqrt(d.x * d.x + d.y * d.y), 1);
-      const scale = Math.min(dist, temp) / dist;
-      positions[id].x += d.x * scale;
-      positions[id].y += d.y * scale;
+  const edges = (graphData?.top_edges || graphData?.edges || []);
+  const nodeSet = new Set(nodes.map(n => n.data.id));
+  const colaLinks = [];
+  for (const e of edges) {
+    const si = idToIndex[e.data.source], ti = idToIndex[e.data.target];
+    if (si !== undefined && ti !== undefined) {
+      colaLinks.push({ source: si, target: ti });
     }
   }
 
-  // Round positions
-  for (const id of allIds) {
-    positions[id].x = Math.round(positions[id].x);
-    positions[id].y = Math.round(positions[id].y);
+  // Run CoLa layout (synchronous, fixed iterations)
+  try {
+    const layout = new cola.Layout()
+      .size([nodes.length * (cardW + pad), nodes.length * (cardH + pad)])
+      .nodes(colaNodes)
+      .links(colaLinks)
+      .avoidOverlaps(true)
+      .linkDistance(cardW + pad)
+      .start(30, 20, 10, 0, false);  // 30 unconstrained, 20 overlap removal, 10 user constraints, no async
+
+    // Extract positions (CoLa gives center coords, we need top-left)
+    for (const node of nodes) {
+      const i = idToIndex[node.data.id];
+      const cn = colaNodes[i];
+      positions[node.data.id] = {
+        x: Math.round(cn.x - cardW/2),
+        y: Math.round(cn.y - cardH/2),
+      };
+    }
+  } catch (e) {
+    console.warn('CoLa layout failed, falling back to grid:', e);
+    return computeLayoutGrid(nodes, saved);
   }
 
   return positions;
 }
 
+// Fallback grid layout
+function computeLayoutGrid(nodes, saved) {
+  const positions = {};
+  const cardW = 400, cardH = 280, pad = 30;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
+  nodes.forEach((node, i) => {
+    if (saved[node.data.id]) {
+      positions[node.data.id] = saved[node.data.id];
+    } else {
+      positions[node.data.id] = {
+        x: (i % cols) * (cardW + pad),
+        y: Math.floor(i / cols) * (cardH + pad),
+      };
+    }
+  });
+  return positions;
+}
+
 function autoLayout() {
-  // Re-run force layout for all nodes (ignore saved positions)
   const level = currentLevel();
   const nodes = level.parentPath === null ? (graphData?.top_nodes || []) :
     graphData?.nodes.filter(n => n.data.parent_id === level.parentPath) || [];
   if (nodes.length === 0) return;
 
-  const positions = computeLayout(nodes, {}); // Empty saved = force all
+  const positions = computeLayout(nodes, {}); // Empty saved = layout all
 
   for (const [path, card] of cardElements) {
     if (positions[path]) {
