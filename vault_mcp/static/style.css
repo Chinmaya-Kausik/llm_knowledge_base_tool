@@ -472,8 +472,31 @@ body {
   display: flex; flex-direction: column; flex-shrink: 0;
   transition: height 0.2s;
 }
+/* Chat collapsed states */
 #chat-panel.chat-collapsed { height: 36px; overflow: hidden; }
-#chat-panel.chat-bottom { height: 300px; resize: vertical; overflow: hidden; min-height: 36px; }
+#chat-panel.chat-collapsed-right {
+  position: fixed; right: 0; top: 50%; width: 36px; height: auto;
+  border: 1px solid var(--border); border-radius: var(--radius) 0 0 var(--radius);
+  z-index: 200; writing-mode: vertical-rl; overflow: hidden;
+}
+#chat-panel.chat-collapsed-right #chat-header { flex-direction: column; padding: 10px 6px; }
+#chat-panel.chat-collapsed-right #chat-messages,
+#chat-panel.chat-collapsed-right #chat-input-area,
+#chat-panel.chat-collapsed-right .chat-context-dropdown,
+#chat-panel.chat-collapsed-right #chat-status,
+#chat-panel.chat-collapsed-right #chat-dock-right,
+#chat-panel.chat-collapsed-right #chat-dock-bottom,
+#chat-panel.chat-collapsed-right #chat-dock-float { display: none; }
+#chat-panel.chat-collapsed-float {
+  position: fixed; right: 40px; bottom: 40px; width: auto; height: 36px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); z-index: 200; overflow: hidden;
+}
+#chat-panel.chat-collapsed-float #chat-messages,
+#chat-panel.chat-collapsed-float #chat-input-area { display: none; }
+
+/* Chat open states */
+#chat-panel.chat-bottom { height: 300px; resize: vertical; overflow: hidden; min-height: 60px; }
 #chat-panel.chat-right {
   position: fixed; right: 0; top: 36px; bottom: 0; width: 380px;
   height: auto; border-top: none; border-left: 1px solid var(--border); z-index: 200;
@@ -483,6 +506,7 @@ body {
   position: fixed; right: 40px; bottom: 40px; width: 420px; height: 500px;
   border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); z-index: 200; resize: both; overflow: auto;
+  min-width: 280px; min-height: 200px;
 }
 
 #chat-header {

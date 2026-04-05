@@ -176,11 +176,13 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         mcp_config = vault_root / ".claude" / "mcp.json"
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
+        from claude_agent_sdk import ThinkingConfigAdaptive
+
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
             system_prompt=system_prompt,
             include_partial_messages=True,
-            thinking=True,
+            thinking=ThinkingConfigAdaptive(),
             permission_mode="auto",
             resume=session_id if session_id in sessions and sessions[session_id].get("has_run") else None,
             session_id=session_id,

@@ -1071,67 +1071,99 @@ function initChat() {
   const sendBtn = document.getElementById('chat-send');
   const stopBtn = document.getElementById('chat-stop');
 
-  // Toggle: click header bar to collapse/expand (not just the button)
-  function toggleChatPanel() {
-    if (panel.classList.contains('chat-collapsed')) {
-      panel.classList.remove('chat-collapsed');
-      panel.classList.add('chat-bottom');
-      connectChat();
+  const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
+    'chat-bottom', 'chat-right', 'chat-float'];
+  let chatDockMode = 'bottom'; // 'bottom', 'right', 'float'
+
+  function clearChatClasses() {
+    allChatClasses.forEach(c => panel.classList.remove(c));
+  }
+
+  function setChatMode(mode, collapsed) {
+    clearChatClasses();
+    chatDockMode = mode;
+    if (collapsed) {
+      if (mode === 'bottom') panel.classList.add('chat-collapsed');
+      else if (mode === 'right') panel.classList.add('chat-collapsed-right');
+      else panel.classList.add('chat-collapsed-float');
     } else {
-      panel.classList.remove('chat-bottom', 'chat-right', 'chat-float');
-      panel.classList.add('chat-collapsed');
-      panel.style.left = ''; panel.style.top = '';
+      panel.classList.add('chat-' + mode);
+      connectChat();
+    }
+    if (mode !== 'float') { panel.style.left = ''; panel.style.top = ''; panel.style.right = ''; panel.style.bottom = ''; }
+  }
+
+  function isChatOpen() {
+    return panel.classList.contains('chat-bottom') || panel.classList.contains('chat-right') || panel.classList.contains('chat-float');
+  }
+
+  function toggleChat() {
+    if (isChatOpen()) {
+      setChatMode(chatDockMode, true);
+    } else {
+      setChatMode(chatDockMode, false);
     }
   }
-  toggle.onclick = toggleChatPanel;
 
-  // Click on header bar (not buttons/selects inside it) also toggles
+  toggle.onclick = (e) => { e.stopPropagation(); toggleChat(); };
+
+  // Header click toggles collapse (except on interactive elements)
   document.getElementById('chat-header').addEventListener('click', (e) => {
-    // Don't toggle if clicking on buttons, selects, or dock controls
-    if (e.target.closest('button') || e.target.closest('select')) return;
-    // Don't toggle if in float mode (header is for dragging there)
-    if (panel.classList.contains('chat-float')) return;
-    toggleChatPanel();
+    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    toggleChat();
   });
 
   // Dock buttons
-  document.getElementById('chat-dock-bottom').onclick = (e) => {
-    e.stopPropagation();
-    panel.classList.remove('chat-collapsed', 'chat-right', 'chat-float');
-    panel.classList.add('chat-bottom');
-    panel.style.left = ''; panel.style.top = ''; // Reset float position
-  };
-  document.getElementById('chat-dock-right').onclick = (e) => {
-    e.stopPropagation();
-    panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-float');
-    panel.classList.add('chat-right');
-    panel.style.left = ''; panel.style.top = '';
-  };
-  document.getElementById('chat-dock-float').onclick = (e) => {
-    e.stopPropagation();
-    panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-right');
-    panel.classList.add('chat-float');
-  };
+  document.getElementById('chat-dock-bottom').onclick = (e) => { e.stopPropagation(); setChatMode('bottom', false); };
+  document.getElementById('chat-dock-right').onclick = (e) => { e.stopPropagation(); setChatMode('right', false); };
+  document.getElementById('chat-dock-float').onclick = (e) => { e.stopPropagation(); setChatMode('float', false); };
 
-  // Drag floating chat by its header
+  // Drag header: in float mode → move; from bottom/right → detach to float
   const chatHeader = document.getElementById('chat-header');
   chatHeader.addEventListener('pointerdown', (e) => {
-    if (!panel.classList.contains('chat-float')) return;
-    if (e.target.closest('button') || e.target.closest('select')) return;
-    e.preventDefault();
+    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
     const startX = e.clientX, startY = e.clientY;
+    let dragging = false;
     const rect = panel.getBoundingClientRect();
     const origX = rect.left, origY = rect.top;
 
     function onMove(e) {
-      panel.style.left = (origX + e.clientX - startX) + 'px';
-      panel.style.top = (origY + e.clientY - startY) + 'px';
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!dragging && Math.abs(dx) + Math.abs(dy) < 8) return; // Dead zone
+      dragging = true;
+
+      // Detach to float if not already floating
+      if (!panel.classList.contains('chat-float') && !panel.classList.contains('chat-collapsed-float')) {
+        clearChatClasses();
+        panel.classList.add('chat-float');
+        chatDockMode = 'float';
+      }
+
+      panel.style.left = (origX + dx) + 'px';
+      panel.style.top = (origY + dy) + 'px';
       panel.style.right = 'auto'; panel.style.bottom = 'auto';
     }
-    function onUp() {
+
+    function onUp(e) {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+
+      if (!dragging) return; // Was a click, not a drag — let click handler deal with it
+
+      // Snap to dock zones
+      const endX = e.clientX, endY = e.clientY;
+      const winW = window.innerWidth, winH = window.innerHeight;
+
+      if (endY > winH - 80) {
+        // Dragged to bottom → dock bottom
+        setChatMode('bottom', false);
+      } else if (endX > winW - 60) {
+        // Dragged to right edge → dock right
+        setChatMode('right', false);
+      }
+      // Otherwise stays floating at current position
     }
+
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
   });
