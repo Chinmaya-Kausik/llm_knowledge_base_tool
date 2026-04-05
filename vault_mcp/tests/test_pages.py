@@ -132,6 +132,40 @@ def test_page_content_file():
         assert "def train" in content
 
 
+def test_page_content_md_file_strips_frontmatter():
+    """Markdown files with frontmatter should return only the content body, not the YAML."""
+    with tempfile.TemporaryDirectory() as tmp:
+        vault = _make_vault(tmp)
+        # The attention README has frontmatter — content should NOT include ---
+        content = get_page_content(vault / "wiki" / "attention" / "README.md")
+        assert "---" not in content
+        assert "Attention" in content
+
+
+def test_page_content_folder_strips_frontmatter():
+    """Folder content (from README) should not include frontmatter."""
+    with tempfile.TemporaryDirectory() as tmp:
+        vault = _make_vault(tmp)
+        content = get_page_content(vault / "wiki" / "attention")
+        assert "---" not in content
+        assert "Attention" in content
+
+
+def test_page_content_md_standalone():
+    """Standalone .md file with frontmatter returns content body only."""
+    with tempfile.TemporaryDirectory() as tmp:
+        vault = _make_vault(tmp)
+        # Create a standalone md file with frontmatter
+        write_frontmatter(vault / "wiki" / "standalone.md", {
+            "title": "Standalone", "type": "concept",
+        }, "# Standalone Page\n\nThis is the body.\n")
+        content = get_page_content(vault / "wiki" / "standalone.md")
+        assert "# Standalone Page" in content
+        assert "This is the body" in content
+        assert "---" not in content
+        assert "title:" not in content
+
+
 # --- walk_pages ---
 
 def test_walk_excludes_hidden():

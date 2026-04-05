@@ -95,6 +95,13 @@ def get_page_content(path: Path) -> str:
         return ""
     else:
         try:
+            # For markdown files: parse frontmatter and return content body only
+            if path.suffix == ".md":
+                try:
+                    _, content = read_frontmatter(path)
+                    return content
+                except Exception:
+                    pass
             return path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             return ""
