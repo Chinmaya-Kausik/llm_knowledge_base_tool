@@ -229,8 +229,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
 
         sessions.setdefault(session_id, {})["has_run"] = True
 
-        streamed_text = False  # Track if we've sent text via streaming deltas
-        sent_tool_ids = set()  # Deduplicate tool_use events
+        streamed_text = False
+        sent_tool_ids = set()
+        current_subagent_task_id = None  # Track which subagent is active
 
         async for event in query(prompt=prompt, options=options):
             try:
@@ -250,12 +251,14 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                             if dtype == "thinking_delta":
                                 await websocket.send_json({
                                     "type": "thinking",
+                                    "subagent_id": current_subagent_task_id,
                                     "content": delta.get("thinking", ""),
                                 })
                             elif dtype == "text_delta":
                                 streamed_text = True
                                 await websocket.send_json({
                                     "type": "text",
+                                    "subagent_id": current_subagent_task_id,
                                     "content": delta.get("text", ""),
                                 })
                             elif dtype == "input_json_delta":
@@ -269,15 +272,16 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                         if block_cls == 'ToolUseBlock':
                             await websocket.send_json({
                                 "type": "tool_use",
+                                "subagent_id": current_subagent_task_id,
                                 "tool": getattr(block, 'name', 'unknown'),
                                 "input": getattr(block, 'input', {}),
                             })
                         elif block_cls == 'ThinkingBlock':
-                            # Only send if we didn't stream thinking deltas
                             thinking = getattr(block, 'thinking', '')
                             if thinking:
                                 await websocket.send_json({
                                     "type": "thinking",
+                                    "subagent_id": current_subagent_task_id,
                                     "content": thinking,
                                 })
                         # Skip TextBlock — already sent via text_delta streaming
@@ -295,6 +299,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                                 )
                             await websocket.send_json({
                                 "type": "tool_result",
+                                "subagent_id": current_subagent_task_id,
                                 "output": str(content)[:3000],
                             })
 
@@ -304,9 +309,10 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                         await websocket.send_json({"type": "result", "content": result})
 
                 elif isinstance(event, TaskStartedMessage):
+                    current_subagent_task_id = getattr(event, 'task_id', '')
                     await websocket.send_json({
                         "type": "subagent_started",
-                        "task_id": getattr(event, 'task_id', ''),
+                        "task_id": current_subagent_task_id,
                         "description": getattr(event, 'description', ''),
                         "task_type": getattr(event, 'task_type', ''),
                     })
@@ -326,6 +332,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                         "status": getattr(event, 'status', ''),
                         "summary": getattr(event, 'summary', ''),
                     })
+                    current_subagent_task_id = None  # Back to parent
 
                 elif isinstance(event, SystemMessage):
                     subtype = getattr(event, 'subtype', '')

@@ -432,10 +432,31 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
     for msg in messages:
         role = msg.get("role", "unknown")
         content = msg.get("content", "")
-        lines.append(f"## {role.title()}")
-        lines.append("")
-        lines.append(content)
-        lines.append("")
+        if role == "user":
+            lines.append("## User")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
+        elif role == "assistant":
+            lines.append("## Assistant")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
+        elif role == "thinking":
+            lines.append(f"> *Thinking: {content[:200]}{'...' if len(content) > 200 else ''}*")
+            lines.append("")
+        elif role == "tool":
+            lines.append(f"- **Tool**: {content}")
+        elif role == "tool_result":
+            lines.append(f"  - Result: {content[:200]}{'...' if len(content) > 200 else ''}")
+        elif role == "subagent":
+            lines.append(f"- **Subagent**: {content}")
+            lines.append("")
+        else:
+            lines.append(f"## {role.title()}")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
