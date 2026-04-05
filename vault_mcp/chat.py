@@ -36,9 +36,15 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
     try:
         while True:
             raw = await websocket.receive_text()
-            msg = json.loads(raw)
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
 
-            if msg["type"] == "init":
+            msg_type = msg.get("type")
+
+            if msg_type == "init":
                 session_id = msg.get("session_id") or str(uuid.uuid4())
                 sessions[session_id] = {
                     "page_path": msg.get("page_path"),
@@ -46,12 +52,16 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                 }
                 await websocket.send_json({"type": "init", "session_id": session_id})
 
-            elif msg["type"] == "message":
+            elif msg_type == "message":
                 if not session_id:
                     await websocket.send_json({"type": "error", "message": "Not initialized"})
                     continue
 
-                text = msg["text"]
+                text = msg.get("text", "")
+                if not text:
+                    await websocket.send_json({"type": "error", "message": "Empty message"})
+                    continue
+
                 context = msg.get("context", {})
                 context_level = msg.get("context_level", "page")
 
@@ -59,15 +69,13 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                 if context.get("page_path"):
                     sessions[session_id]["page_path"] = context["page_path"]
 
-                # Build prompt with context
                 prompt = build_prompt(text, context, session_id, vault_root)
 
-                # Start streaming query in background
                 query_task = asyncio.create_task(
                     stream_query(websocket, prompt, session_id, vault_root, context_level)
                 )
 
-            elif msg["type"] == "stop":
+            elif msg_type == "stop":
                 # Cancel active generation
                 if query_task and not query_task.done():
                     query_task.cancel()
@@ -245,6 +253,12 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         await websocket.send_json({"type": "done"})
 
     except asyncio.CancelledError:
-        await websocket.send_json({"type": "stopped"})
+        try:
+            await websocket.send_json({"type": "stopped"})
+        except Exception:
+            pass
     except Exception as e:
-        await websocket.send_json({"type": "error", "message": str(e)})
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass

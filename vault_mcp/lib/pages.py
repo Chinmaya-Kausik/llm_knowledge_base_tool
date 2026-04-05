@@ -142,10 +142,15 @@ def walk_pages(vault_root: Path, include_hidden: bool = False) -> list[dict[str,
         if not directory.exists() or not directory.is_dir():
             return
 
-        items = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        try:
+            items = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except (PermissionError, OSError):
+            return
 
         for item in items:
             if not include_hidden and is_hidden(item):
+                continue
+            if item.is_symlink():
                 continue
 
             # Skip README.md files — they're represented by their parent folder

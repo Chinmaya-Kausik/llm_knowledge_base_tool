@@ -387,6 +387,8 @@ async def api_pages_bulk(request: Request):
     """Fetch multiple pages in a single request for faster loading."""
     from vault_mcp.lib.pages import get_page_content, get_page_metadata
     paths = await request.json()
+    if not isinstance(paths, list):
+        raise HTTPException(status_code=400, detail="Expected JSON array")
     result = {}
     for path in paths:
         full_path = VAULT_ROOT / path

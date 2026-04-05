@@ -693,8 +693,8 @@ function focusCardByTitle(title) {
     return d.label.toLowerCase() === tl || (d.aliases||[]).some(a => a.toLowerCase() === tl);
   });
   if (targetNode) {
-    if (targetNode.data.parent) {
-      drillInto(targetNode.data.parent);
+    if (targetNode.data.parent_id) {
+      drillInto(targetNode.data.parent_id);
       setTimeout(() => {
         const c = cardElements.get(targetNode.data.id);
         if (c) focusCard(c);
@@ -1228,7 +1228,8 @@ function connectChat() {
   };
 
   chatWs.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
+    let msg;
+    try { msg = JSON.parse(e.data); } catch (err) { console.error('Chat parse error:', err); return; }
     // Mark as connected only after successful init response
     if (msg.type === 'init') {
       status.textContent = 'Connected';
@@ -1299,16 +1300,12 @@ function handleChatEvent(msg) {
         currentThinkingEl.onclick = () => currentThinkingEl.classList.toggle('expanded');
         currentAssistantEl?.appendChild(currentThinkingEl);
       }
-      currentThinkingEl.textContent += msg.content;
+      if (msg.content) currentThinkingEl.textContent += msg.content;
       break;
 
     case 'text':
-      if (currentThinkingEl) {
-        // Thinking is done, start text
-        currentThinkingEl = null;
-      }
-      // Append text to current assistant message
-      if (currentAssistantEl) {
+      if (currentThinkingEl) currentThinkingEl = null;
+      if (currentAssistantEl && msg.content) {
         let textEl = currentAssistantEl.querySelector('.chat-text');
         if (!textEl) {
           textEl = document.createElement('div');
@@ -1317,7 +1314,6 @@ function handleChatEvent(msg) {
         }
         textEl._rawText = (textEl._rawText || '') + msg.content;
         textEl.innerHTML = marked.parse(textEl._rawText);
-        // Wire wiki-links
         textEl.querySelectorAll('.wiki-link').forEach(el => {
           el.onclick = () => focusCardByTitle(el.dataset.target);
         });
@@ -1328,7 +1324,7 @@ function handleChatEvent(msg) {
       if (currentAssistantEl) {
         const toolEl = document.createElement('div');
         toolEl.className = 'chat-tool-use';
-        toolEl.textContent = `${msg.tool}(${JSON.stringify(msg.input).slice(0, 80)})`;
+        toolEl.textContent = `${msg.tool || 'tool'}(${JSON.stringify(msg.input || {}).slice(0, 80)})`;
         toolEl.onclick = () => {
           const result = toolEl.nextElementSibling;
           if (result?.classList.contains('chat-tool-result')) {
@@ -1343,7 +1339,7 @@ function handleChatEvent(msg) {
       if (currentAssistantEl) {
         const resultEl = document.createElement('div');
         resultEl.className = 'chat-tool-result';
-        resultEl.textContent = msg.output;
+        resultEl.textContent = msg.output || '';
         currentAssistantEl.appendChild(resultEl);
       }
       break;
