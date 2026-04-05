@@ -496,18 +496,26 @@ body {
 #chat-panel.chat-collapsed-float #chat-input-area { display: none; }
 
 /* Chat open states */
-#chat-panel.chat-bottom { height: 300px; resize: vertical; overflow: hidden; min-height: 60px; }
+#chat-panel.chat-bottom { height: 300px; overflow: hidden; min-height: 60px; position: relative; }
 #chat-panel.chat-right {
   position: fixed; right: 0; top: 36px; bottom: 0; width: 380px;
   height: auto; border-top: none; border-left: 1px solid var(--border); z-index: 200;
-  resize: horizontal; overflow: hidden; min-width: 200px;
+  overflow: hidden; min-width: 200px;
 }
 #chat-panel.chat-float {
   position: fixed; right: 40px; bottom: 40px; width: 420px; height: 500px;
   border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); z-index: 200; resize: both; overflow: auto;
+  box-shadow: var(--shadow); z-index: 200; overflow: hidden;
   min-width: 280px; min-height: 200px;
 }
+
+/* Chat resize handles */
+.chat-resize { position: absolute; z-index: 10; }
+.chat-resize-top { top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+.chat-resize-left { left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.chat-resize-right { right: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.chat-resize-bottom { bottom: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+.chat-resize-corner { bottom: -4px; right: -4px; width: 16px; height: 16px; cursor: nwse-resize; }
 
 #chat-header {
   display: flex; align-items: center; gap: 6px;
@@ -564,14 +572,31 @@ body {
 .chat-msg-assistant pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; }
 .chat-msg-assistant .wiki-link { color: var(--accent); cursor: pointer; border-bottom: 1px dotted var(--accent); }
 
-.chat-thinking {
-  color: var(--text-muted); font-size: 12px; font-style: italic;
-  border-left: 2px solid var(--accent2); padding-left: 8px; margin: 4px 0;
-  max-height: 60px; overflow: hidden; cursor: pointer;
-  transition: max-height 0.3s;
+/* Thinking trace */
+.chat-thinking-wrapper { margin: 6px 0; }
+.chat-thinking-header {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 11px; color: var(--accent2); padding: 3px 0;
 }
-.chat-thinking.expanded { max-height: none; }
-.chat-thinking::before { content: "Thinking... "; color: var(--accent2); font-style: normal; font-weight: 500; }
+.chat-thinking-header:hover { color: var(--text); }
+.chat-thinking-toggle { font-size: 10px; transition: transform 0.2s; }
+.chat-thinking-toggle.open { transform: rotate(90deg); }
+.chat-thinking-body {
+  display: none; color: var(--text-muted); font-size: 12px; font-style: italic;
+  border-left: 2px solid var(--accent2); padding: 4px 8px; margin: 2px 0;
+  max-height: 300px; overflow-y: auto; white-space: pre-wrap;
+}
+.chat-thinking-body.open { display: block; }
+
+/* Status bar (elapsed time, tokens) */
+.chat-status-bar {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; color: var(--text-muted); padding: 2px 8px;
+}
+.chat-status-bar .pondering {
+  color: var(--accent2); animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 .chat-tool-use {
   font-size: 11px; color: var(--text-muted); padding: 3px 8px;

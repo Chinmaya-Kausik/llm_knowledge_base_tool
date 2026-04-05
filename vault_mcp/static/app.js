@@ -1062,7 +1062,11 @@ let chatSessionId = null;
 let chatGenerating = false;
 let currentAssistantEl = null;
 let currentThinkingEl = null;
+let currentThinkingWrapper = null;
 let chatContextLevel = 'page';
+let chatStartTime = null;
+let chatTokenCount = 0;
+let chatTimerInterval = null;
 
 function initChat() {
   const panel = document.getElementById('chat-panel');
@@ -1219,6 +1223,55 @@ function initChat() {
 
   document.addEventListener('click', () => { ctxMenu.classList.remove('open'); modelMenu.classList.remove('open'); });
 
+  // Chat panel resize handles
+  panel.querySelectorAll('.chat-resize').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const dir = handle.dataset.dir;
+      const rect = panel.getBoundingClientRect();
+      const startX = e.clientX, startY = e.clientY;
+      const startW = rect.width, startH = rect.height;
+      const startL = rect.left, startT = rect.top;
+
+      function onMove(e) {
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+
+        if (panel.classList.contains('chat-bottom')) {
+          // Bottom dock: only resize height from top edge
+          if (dir === 'top') {
+            panel.style.height = Math.max(60, startH - dy) + 'px';
+          }
+        } else if (panel.classList.contains('chat-right')) {
+          // Right dock: only resize width from left edge
+          if (dir === 'left') {
+            panel.style.width = Math.max(200, startW - dx) + 'px';
+          }
+        } else if (panel.classList.contains('chat-float')) {
+          // Float: resize from any edge
+          if (dir === 'right' || dir === 'corner') panel.style.width = Math.max(280, startW + dx) + 'px';
+          if (dir === 'bottom' || dir === 'corner') panel.style.height = Math.max(200, startH + dy) + 'px';
+          if (dir === 'left') {
+            const newW = Math.max(280, startW - dx);
+            panel.style.width = newW + 'px';
+            panel.style.left = (startL + startW - newW) + 'px';
+          }
+          if (dir === 'top') {
+            const newH = Math.max(200, startH - dy);
+            panel.style.height = newH + 'px';
+            panel.style.top = (startT + startH - newH) + 'px';
+          }
+        }
+      }
+
+      function onUp() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  });
+
   // Stop generation
   stopBtn.onclick = () => {
     if (chatWs && chatGenerating) {
@@ -1304,8 +1357,10 @@ function sendChatMessage() {
 
   pendingSelection = null;
 
-  // Show stop button
+  // Show stop button + start timer
   chatGenerating = true;
+  chatStartTime = Date.now();
+  chatTokenCount = 0;
   document.getElementById('chat-send').style.display = 'none';
   document.getElementById('chat-stop').style.display = '';
 
@@ -1313,7 +1368,27 @@ function sendChatMessage() {
   currentAssistantEl = document.createElement('div');
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
   currentThinkingEl = null;
+  currentThinkingWrapper = null;
+
+  // Status bar with elapsed time
+  const statusBar = document.createElement('div');
+  statusBar.className = 'chat-status-bar';
+  statusBar.id = 'chat-active-status';
+  statusBar.innerHTML = '<span class="pondering">Pondering</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>';
+  currentAssistantEl.appendChild(statusBar);
+
   document.getElementById('chat-messages').appendChild(currentAssistantEl);
+
+  // Update elapsed timer
+  clearInterval(chatTimerInterval);
+  chatTimerInterval = setInterval(() => {
+    const el = document.getElementById('chat-elapsed');
+    if (el && chatStartTime) {
+      el.textContent = ((Date.now() - chatStartTime) / 1000).toFixed(1) + 's';
+    }
+    const tokEl = document.getElementById('chat-tokens');
+    if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
+  }, 100);
 }
 
 function handleChatEvent(msg) {
@@ -1321,20 +1396,47 @@ function handleChatEvent(msg) {
 
   if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
 
+  // Ensure we have an assistant element for content
+  if (!currentAssistantEl && ['thinking', 'text', 'tool_use', 'tool_result', 'result'].includes(msg.type)) {
+    currentAssistantEl = document.createElement('div');
+    currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+    document.getElementById('chat-messages').appendChild(currentAssistantEl);
+  }
+
   switch (msg.type) {
     case 'thinking':
-      if (!currentThinkingEl) {
+      if (!currentThinkingWrapper) {
+        currentThinkingWrapper = document.createElement('div');
+        currentThinkingWrapper.className = 'chat-thinking-wrapper';
+        const header = document.createElement('div');
+        header.className = 'chat-thinking-header';
+        header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering">Thinking...</span>';
         currentThinkingEl = document.createElement('div');
-        currentThinkingEl.className = 'chat-thinking';
-        currentThinkingEl.onclick = () => currentThinkingEl.classList.toggle('expanded');
-        currentAssistantEl?.appendChild(currentThinkingEl);
+        currentThinkingEl.className = 'chat-thinking-body';
+        header.onclick = () => {
+          currentThinkingEl.classList.toggle('open');
+          header.querySelector('.chat-thinking-toggle').classList.toggle('open');
+        };
+        currentThinkingWrapper.appendChild(header);
+        currentThinkingWrapper.appendChild(currentThinkingEl);
+        currentAssistantEl.appendChild(currentThinkingWrapper);
       }
-      if (msg.content) currentThinkingEl.textContent += msg.content;
+      if (msg.content) {
+        currentThinkingEl.textContent += msg.content;
+        chatTokenCount += Math.ceil(msg.content.length / 4); // Rough token estimate
+      }
       break;
 
     case 'text':
-      if (currentThinkingEl) currentThinkingEl = null;
+      // Close thinking section when text starts
+      if (currentThinkingWrapper) {
+        const header = currentThinkingWrapper.querySelector('.chat-thinking-header');
+        if (header) header.querySelector('.pondering').textContent = 'Thought';
+        currentThinkingWrapper = null;
+        currentThinkingEl = null;
+      }
       if (currentAssistantEl && msg.content) {
+        chatTokenCount += Math.ceil(msg.content.length / 4);
         let textEl = currentAssistantEl.querySelector('.chat-text');
         if (!textEl) {
           textEl = document.createElement('div');
@@ -1376,10 +1478,20 @@ function handleChatEvent(msg) {
     case 'done':
     case 'stopped':
       chatGenerating = false;
+      clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
+      // Finalize status bar
+      const activeStatus = document.getElementById('chat-active-status');
+      if (activeStatus && chatStartTime) {
+        const elapsed = ((Date.now() - chatStartTime) / 1000).toFixed(1);
+        activeStatus.innerHTML = `<span>${elapsed}s</span> <span>${chatTokenCount} tokens</span>`;
+        activeStatus.id = ''; // Remove id so next message gets a fresh one
+      }
       currentAssistantEl = null;
       currentThinkingEl = null;
+      currentThinkingWrapper = null;
+      chatStartTime = null;
       break;
 
     case 'result':
@@ -1395,10 +1507,15 @@ function handleChatEvent(msg) {
       break;
 
     case 'error':
-      appendChatMessage('system', `Error: ${msg.message}`);
+      appendChatMessage('system', `Error: ${msg.message || 'Unknown error'}`);
       chatGenerating = false;
+      clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
+      currentAssistantEl = null;
+      currentThinkingEl = null;
+      currentThinkingWrapper = null;
+      chatStartTime = null;
       break;
   }
 
