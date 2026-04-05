@@ -1183,6 +1183,7 @@ function initChat() {
   ctxBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     ctxMenu.classList.toggle('open');
+    document.getElementById('chat-model-menu').classList.remove('open');
   });
   ctxMenu.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1193,7 +1194,30 @@ function initChat() {
       ctxMenu.classList.remove('open');
     }
   });
-  document.addEventListener('click', () => ctxMenu.classList.remove('open'));
+
+  // Model selector dropdown
+  const modelBtn = document.getElementById('chat-model-btn');
+  const modelMenu = document.getElementById('chat-model-menu');
+  modelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    modelMenu.classList.toggle('open');
+    ctxMenu.classList.remove('open');
+  });
+  modelMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opt = e.target.closest('.chat-context-opt');
+    if (opt) {
+      const model = opt.dataset.value;
+      modelBtn.textContent = opt.textContent.split(' ')[0]; // Just the name
+      modelMenu.classList.remove('open');
+      // Tell server to switch model
+      if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+        chatWs.send(JSON.stringify({ type: 'set_model', model }));
+      }
+    }
+  });
+
+  document.addEventListener('click', () => { ctxMenu.classList.remove('open'); modelMenu.classList.remove('open'); });
 
   // Stop generation
   stopBtn.onclick = () => {

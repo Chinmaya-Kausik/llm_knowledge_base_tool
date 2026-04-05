@@ -49,8 +49,14 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                 sessions[session_id] = {
                     "page_path": msg.get("page_path"),
                     "history": [],
+                    "model": msg.get("model"),
                 }
                 await websocket.send_json({"type": "init", "session_id": session_id})
+
+            elif msg_type == "set_model":
+                if session_id and session_id in sessions:
+                    sessions[session_id]["model"] = msg.get("model")
+                    await websocket.send_json({"type": "model_set", "model": msg.get("model")})
 
             elif msg_type == "message":
                 if not session_id:
@@ -187,6 +193,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         # Use the SDK's session ID for resume (not our browser session ID)
         sdk_sid = sessions.get(session_id, {}).get("sdk_session_id")
         has_run = sessions.get(session_id, {}).get("has_run", False)
+        model = sessions.get(session_id, {}).get("model")
 
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
@@ -194,6 +201,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             include_partial_messages=True,
             thinking={"type": "enabled", "budget_tokens": 10000},
             resume=sdk_sid if has_run and sdk_sid else None,
+            model=model,
         )
 
         sessions.setdefault(session_id, {})["has_run"] = True
