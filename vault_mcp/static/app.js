@@ -1069,6 +1069,26 @@ let chatTokenCount = 0;
 let chatTimerInterval = null;
 let currentActivityGroup = null; // Groups consecutive tool uses
 
+// Claude Code-style pondering words
+const ponderingWords = ['Thinking', 'Pondering', 'Reasoning', 'Analyzing', 'Considering', 'Reflecting', 'Examining', 'Evaluating'];
+let ponderingIndex = 0;
+let ponderingInterval = null;
+
+function startPonderingCycle() {
+  stopPonderingCycle();
+  ponderingIndex = 0;
+  ponderingInterval = setInterval(() => {
+    ponderingIndex = (ponderingIndex + 1) % ponderingWords.length;
+    document.querySelectorAll('.pondering-word').forEach(el => {
+      el.textContent = ponderingWords[ponderingIndex] + '...';
+    });
+  }, 2000);
+}
+
+function stopPonderingCycle() {
+  if (ponderingInterval) { clearInterval(ponderingInterval); ponderingInterval = null; }
+}
+
 function initChat() {
   const panel = document.getElementById('chat-panel');
   const toggle = document.getElementById('chat-toggle');
@@ -1435,7 +1455,8 @@ function sendChatMessage() {
   const statusBar = document.createElement('div');
   statusBar.className = 'chat-status-bar';
   statusBar.id = 'chat-active-status';
-  statusBar.innerHTML = '<span class="pondering">Pondering</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>';
+  statusBar.innerHTML = '<span class="pondering pondering-word">Thinking...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>';
+  startPonderingCycle();
   currentAssistantEl.appendChild(statusBar);
 
   document.getElementById('chat-messages').appendChild(currentAssistantEl);
@@ -1515,7 +1536,8 @@ function handleChatEvent(msg) {
         currentThinkingWrapper._tokens = 0;
         const header = document.createElement('div');
         header.className = 'chat-thinking-header';
-        header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering">Thinking...</span> <span class="thinking-time"></span>';
+        header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering pondering-word">Thinking...</span> <span class="thinking-time"></span>';
+        startPonderingCycle();
         currentThinkingEl = document.createElement('div');
         currentThinkingEl.className = 'chat-thinking-body';
         const thinkBody = currentThinkingEl; // Capture in closure
@@ -1674,6 +1696,7 @@ function handleChatEvent(msg) {
     case 'stopped':
       chatGenerating = false;
       clearInterval(chatTimerInterval);
+      stopPonderingCycle();
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
       // Finalize status bar
