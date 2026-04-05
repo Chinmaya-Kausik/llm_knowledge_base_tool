@@ -278,18 +278,18 @@ body {
 }
 
 /* Resize handles — centered on card borders, extend equally inside and outside */
-.resize-handle { position: absolute; z-index: 10; }
+.resize-handle { position: absolute; z-index: 10; pointer-events: auto !important; }
 .resize-right {
   top: 0; right: -8px; width: 16px; height: 100%;
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 .resize-bottom {
   bottom: -8px; left: 0; width: 100%; height: 16px;
-  cursor: ns-resize;
+  cursor: ns-resize !important;
 }
 .resize-corner {
   bottom: -14px; right: -14px; width: 28px; height: 28px;
-  cursor: nwse-resize;
+  cursor: nwse-resize !important;
 }
 
 /* Children badge */
@@ -331,16 +331,15 @@ body {
 /* === SVG Edges === */
 #edge-layer path {
   fill: none;
-  stroke: var(--border);
+  stroke: #3b3f57;
   stroke-width: 1.5;
   opacity: 0.5;
 }
 #edge-layer path.highlighted {
-  stroke: var(--cyan);
+  stroke: #7dcfff;
   stroke-width: 2;
   opacity: 1;
 }
-#edge-layer marker { fill: var(--border); }
 
 /* === Other Views === */
 #tree-expanded, #tag-cloud, #health-dashboard, #search-results {
@@ -461,7 +460,7 @@ body {
 #chat-panel.chat-float {
   position: fixed; right: 40px; bottom: 40px; width: 420px; height: 500px;
   border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); z-index: 200; resize: both; overflow: hidden;
+  box-shadow: var(--shadow); z-index: 200; resize: both; overflow: auto;
 }
 
 #chat-header {

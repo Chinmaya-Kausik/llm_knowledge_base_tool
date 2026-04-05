@@ -186,7 +186,7 @@ function wireWikiLinks(card) {
 
 function wireCardButtons(card, hasChildren) {
   const path = card.dataset.path;
-  const category = card.dataset.category;
+  const category = card.dataset.category || 'misc';
   const isMarkdown = category === 'markdown' || category === 'folder';
 
   // Double-click title → full page
@@ -252,7 +252,7 @@ function wireCardButtons(card, hasChildren) {
 async function expandCardContent(card, path) {
   // Fetch and display full content for a file card
   const body = card.querySelector('.doc-body');
-  const category = card.dataset.category;
+  const category = card.dataset.category || 'misc';
   body.innerHTML = '<em>Loading...</em>';
 
   try {
@@ -302,35 +302,46 @@ function enterCardEdit(card, path) {
   textarea?.addEventListener('pointerdown', (e) => e.stopPropagation());
 }
 
+let editSaving = false;
 async function exitCardEdit(card) {
-  if (!card || card.dataset.editing !== 'true') return;
+  if (!card || card.dataset.editing !== 'true' || editSaving) return;
+  editSaving = true;
   const path = card.dataset.path;
   const body = card.querySelector('.doc-body');
   const textarea = body.querySelector('.doc-edit-area');
-  const meta = cardMeta.get(path);
-  const category = card.dataset.category;
+  const category = card.dataset.category || 'misc';
 
-  if (meta && textarea) {
-    const newContent = textarea.value;
+  // Get content from textarea
+  const newContent = textarea ? textarea.value : '';
+
+  // Save if changed
+  let meta = cardMeta.get(path);
+  if (textarea && newContent) {
+    if (!meta) meta = { frontmatter: {}, content: '' };
     if (newContent !== meta.content) {
+      meta.content = newContent;
+      cardMeta.set(path, meta);
       try {
         await api.savePage(path, meta.frontmatter, newContent);
-        meta.content = newContent;
-      } catch (err) { /* Save failed silently, content still updated locally */ }
+      } catch (err) { /* Save failed, content updated locally */ }
     }
-    // Re-render based on category
-    if (category === 'code') {
-      body.innerHTML = `<pre><code>${meta.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
-    } else if (category === 'markdown' || category === 'folder') {
-      body.innerHTML = marked.parse(meta.content);
-    } else {
-      body.innerHTML = `<pre>${meta.content.replace(/</g, '&lt;')}</pre>`;
-    }
-    wireWikiLinks(card);
   }
+
+  // Re-render based on category
+  const content = meta?.content || newContent || '';
+  if (category === 'code') {
+    body.innerHTML = `<pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+  } else if (category === 'markdown' || category === 'folder') {
+    body.innerHTML = marked.parse(content);
+  } else {
+    body.innerHTML = `<pre>${content.replace(/</g, '&lt;')}</pre>`;
+  }
+  wireWikiLinks(card);
+
   card.dataset.editing = 'false';
   card.classList.remove('editing');
   if (activeEditCard === card) activeEditCard = null;
+  editSaving = false;
 }
 
 // ========================================
@@ -426,7 +437,7 @@ function updateEdges() {
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   defs.innerHTML = `<marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
     markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border)"/>
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b3f57"/>
   </marker>`;
   svg.appendChild(defs);
 
