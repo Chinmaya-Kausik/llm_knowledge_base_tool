@@ -1420,35 +1420,65 @@ async function renderPdfInElement(container, pdfUrl) {
 // ========================================
 // Settings
 // ========================================
-async function showSettings() {
-  const resp = await fetch('/api/settings').then(r => r.json());
-  const authStatus = resp.claude_authenticated ? 'Logged in' : 'Not logged in';
+function initSettings() {
+  const btn = document.getElementById('btn-settings');
+  const menu = document.getElementById('settings-menu');
 
-  const action = prompt(
-    `Vault Settings\n\n` +
-    `Vault root: ${resp.vault_root}\n` +
-    `Claude auth: ${authStatus}\n\n` +
-    `Enter:\n` +
-    `  1 — Change vault root\n` +
-    `  2 — Login to Claude\n` +
-    `  (or Cancel)`,
-    ''
-  );
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    // Close other dropdowns
+    ['filter-type-menu', 'filter-tag-menu', 'filter-filetype-menu'].forEach(id =>
+      document.getElementById(id)?.classList.remove('open'));
 
-  if (action === '1') {
-    const newRoot = prompt('Enter new vault root path:', resp.vault_root);
-    if (newRoot && newRoot !== resp.vault_root) {
-      const result = await fetch('/api/settings', {
-        method: 'PUT', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ vault_root: newRoot }),
-      }).then(r => r.json());
-      if (result.ok) alert('Vault root updated. Restart the server for changes to take effect.');
-      else alert('Failed: ' + (result.error || 'unknown'));
+    const wasOpen = menu.classList.contains('open');
+    menu.classList.toggle('open');
+
+    if (!wasOpen) {
+      // Load current settings
+      try {
+        const resp = await fetch('/api/settings').then(r => r.json());
+        document.getElementById('settings-vault-root').value = resp.vault_root || '';
+        document.getElementById('settings-auth-status').textContent =
+          resp.claude_authenticated ? 'Logged in' : 'Not logged in';
+        document.getElementById('settings-auth-status').style.color =
+          resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
+      } catch { }
     }
-  } else if (action === '2') {
+  });
+
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => menu.classList.remove('open'));
+
+  // Save vault root
+  document.getElementById('settings-save-root').addEventListener('click', async () => {
+    const newRoot = document.getElementById('settings-vault-root').value.trim();
+    if (!newRoot) return;
+    const result = await fetch('/api/settings', {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ vault_root: newRoot }),
+    }).then(r => r.json());
+    if (result.ok) {
+      document.getElementById('settings-save-root').textContent = 'Saved! Restart server.';
+      setTimeout(() => document.getElementById('settings-save-root').textContent = 'Save & Restart', 3000);
+    }
+  });
+
+  // Claude login
+  document.getElementById('settings-login').addEventListener('click', async () => {
+    document.getElementById('settings-login').textContent = 'Starting...';
     const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
-    alert(result.message || result.error || 'Auth attempt completed');
-  }
+    document.getElementById('settings-auth-status').textContent = result.message || result.error || '';
+    document.getElementById('settings-login').textContent = 'Login';
+  });
+
+  // Code font size slider
+  const slider = document.getElementById('settings-code-font');
+  const valDisplay = document.getElementById('settings-code-font-val');
+  slider.addEventListener('input', () => {
+    const size = slider.value + 'px';
+    valDisplay.textContent = size;
+    document.documentElement.style.setProperty('--code-font-size', size);
+  });
 }
 
 // --- Main init ---
@@ -1466,7 +1496,7 @@ async function init() {
 
   document.getElementById('btn-auto-layout').onclick = autoLayout;
   document.getElementById('btn-fit').onclick = fitView;
-  document.getElementById('btn-settings').onclick = showSettings;
+  initSettings();
 
   document.addEventListener('keydown', (e) => {
     if (e.key==='Escape') { if(expandedCard){collapseFullPage();return;} if(canvasStack.length>1){navigateToLevel(canvasStack.length-2);return;} }

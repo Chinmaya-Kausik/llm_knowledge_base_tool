@@ -92,6 +92,26 @@ body {
 }
 .filter-menu button:hover { text-decoration: underline; }
 
+/* Settings dropdown specifics */
+.settings-menu { min-width: 260px; right: 0; }
+.settings-section { display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
+.settings-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.settings-value { font-size: 11px; color: var(--text); }
+.settings-input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--font); font-size: 11px; padding: 4px 6px;
+  border-radius: 3px; outline: none; width: 100%;
+}
+.settings-input:focus { border-color: var(--accent); }
+.settings-action {
+  background: var(--bg-surface2) !important; border: 1px solid var(--border) !important;
+  color: var(--text) !important; padding: 4px 8px !important; border-radius: 3px !important;
+  cursor: pointer; font-size: 11px !important; text-decoration: none !important;
+  text-align: center; display: inline-block !important;
+}
+.settings-action:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+.settings-range { width: 100%; }
+
 #btn-auto-layout, #btn-fit {
   background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
   padding: 4px 10px; border-radius: var(--radius); cursor: pointer;
@@ -259,9 +279,9 @@ body {
 .doc-body p { margin: 6px 0; }
 .doc-body a { color: var(--accent); text-decoration: none; }
 .doc-body a:hover { text-decoration: underline; }
-.doc-body code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
-.doc-body pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; }
-.doc-body pre code { padding: 0; background: none; }
+.doc-body code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: var(--code-font-size, 13px); }
+.doc-body pre { background: var(--bg); padding: 10px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; font-size: var(--code-font-size, 13px); line-height: 1.5; }
+.doc-body pre code { padding: 0; background: none; font-size: inherit; }
 .doc-body ul, .doc-body ol { padding-left: 18px; margin: 6px 0; }
 .doc-body blockquote { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--text-muted); margin: 6px 0; }
 .doc-body img { max-width: 100%; border-radius: var(--radius); }
