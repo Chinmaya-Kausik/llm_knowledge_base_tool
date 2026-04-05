@@ -188,6 +188,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             cwd=str(vault_root),
             system_prompt=system_prompt,
             include_partial_messages=True,
+            thinking={"type": "enabled", "budget_tokens": 10000},
             resume=session_id if session_id in sessions and sessions[session_id].get("has_run") else None,
             session_id=session_id,
         )
