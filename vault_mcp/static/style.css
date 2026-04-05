@@ -598,22 +598,33 @@ body {
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-/* Tool use blocks */
-.chat-tool-wrapper { margin: 4px 0; }
-.chat-tool-use {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--text-muted); padding: 4px 8px;
-  background: var(--bg); border-radius: var(--radius);
-  cursor: pointer;
+/* Activity group (consecutive tool uses) */
+.chat-activity-group { margin: 6px 0; background: var(--bg); border-radius: var(--radius); overflow: hidden; }
+.chat-activity-header {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
 }
-.chat-tool-use:hover { color: var(--text); }
-.tool-input { color: var(--text-muted); font-size: 10px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.chat-activity-header:hover { color: var(--text); }
+.activity-summary { font-size: 10px; color: var(--text-muted); margin-left: auto; }
+.chat-activity-body { display: none; padding: 0 8px 4px; }
+.chat-activity-body.open { display: block; }
+
+/* Individual tool entries inside activity group */
+.chat-tool-entry {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-muted); padding: 3px 0;
+  cursor: pointer; border-bottom: 1px solid var(--border);
+}
+.chat-tool-entry:last-of-type { border-bottom: none; }
+.chat-tool-entry:hover { color: var(--text); }
+.tool-name { font-weight: 500; color: var(--cyan); }
+.tool-input { font-size: 10px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
 .tool-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 .chat-tool-result {
-  display: none; font-size: 11px; color: var(--text-muted);
-  padding: 4px 8px; background: var(--bg); border-radius: var(--radius);
-  max-height: 150px; overflow-y: auto; margin: 2px 0 4px;
-  border-left: 2px solid var(--green); white-space: pre-wrap;
+  display: none; font-size: 10px; color: var(--text-muted);
+  padding: 4px 0; max-height: 120px; overflow-y: auto;
+  border-left: 2px solid var(--green); padding-left: 8px; margin: 2px 0;
+  white-space: pre-wrap; word-break: break-all;
 }
 .chat-tool-result.open { display: block; }
 .thinking-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }

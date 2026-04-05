@@ -1067,6 +1067,7 @@ let chatContextLevel = 'page';
 let chatStartTime = null;
 let chatTokenCount = 0;
 let chatTimerInterval = null;
+let currentActivityGroup = null; // Groups consecutive tool uses
 
 function initChat() {
   const panel = document.getElementById('chat-panel');
@@ -1497,6 +1498,13 @@ function handleChatEvent(msg) {
       break;
 
     case 'text':
+      // Finalize any open activity group
+      if (currentActivityGroup) {
+        const agHdr = currentActivityGroup.querySelector('.chat-activity-header');
+        const agElapsed = ((Date.now() - currentActivityGroup._startTime) / 1000).toFixed(1);
+        if (agHdr) { const p = agHdr.querySelector('.pondering'); if (p) { p.textContent = `Done (${agElapsed}s)`; p.classList.remove('pondering'); } }
+        currentActivityGroup = null;
+      }
       // Finalize any open thinking block (but allow new ones later)
       if (currentThinkingWrapper) {
         const hdr = currentThinkingWrapper.querySelector('.chat-thinking-header');
@@ -1524,51 +1532,90 @@ function handleChatEvent(msg) {
       }
       break;
 
-    case 'tool_use':
-      // Finalize any open thinking block before tool use
+    case 'tool_use': {
+      // Finalize any open thinking block
       if (currentThinkingWrapper) {
-        const header = currentThinkingWrapper.querySelector('.chat-thinking-header');
-        const elapsed = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
-        if (header) header.querySelector('.pondering').textContent = `Thought (${elapsed}s)`;
-        currentThinkingWrapper = null;
-        currentThinkingEl = null;
+        const hdr2 = currentThinkingWrapper.querySelector('.chat-thinking-header');
+        const el2 = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        if (hdr2) { const p = hdr2.querySelector('.pondering'); if (p) { p.textContent = `Thought (${el2}s)`; p.classList.remove('pondering'); } }
+        currentThinkingWrapper = null; currentThinkingEl = null;
       }
-      if (currentAssistantEl) {
-        const toolWrapper = document.createElement('div');
-        toolWrapper.className = 'chat-tool-wrapper';
-        toolWrapper._startTime = Date.now();
-        const toolEl = document.createElement('div');
-        toolEl.className = 'chat-tool-use';
-        toolEl.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">${msg.tool || 'tool'}</span> <span class="tool-input">${JSON.stringify(msg.input || {}).slice(0, 60)}</span> <span class="tool-time"></span>`;
-        const resultEl = document.createElement('div');
-        resultEl.className = 'chat-tool-result';
-        toolEl.onclick = () => {
-          resultEl.classList.toggle('open');
-          toolEl.querySelector('.chat-thinking-toggle').classList.toggle('open');
-        };
-        toolWrapper.appendChild(toolEl);
-        toolWrapper.appendChild(resultEl);
-        currentAssistantEl.appendChild(toolWrapper);
+
+      if (!currentAssistantEl) break;
+      const toolName = msg.tool || 'tool';
+
+      // Skip empty/permission tool uses
+      if (!toolName || toolName === 'unknown') break;
+
+      // Create or reuse activity group for consecutive tools
+      if (!currentActivityGroup) {
+        currentActivityGroup = document.createElement('div');
+        currentActivityGroup.className = 'chat-activity-group';
+        currentActivityGroup._tools = [];
+        currentActivityGroup._startTime = Date.now();
+        // Group header
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'chat-activity-header';
+        groupHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Working...</span> <span class="activity-summary"></span>`;
+        const groupBody = document.createElement('div');
+        groupBody.className = 'chat-activity-body open';
+        groupHeader.addEventListener('click', (e) => {
+          e.stopPropagation();
+          groupBody.classList.toggle('open');
+          groupHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
+        });
+        currentActivityGroup.appendChild(groupHeader);
+        currentActivityGroup.appendChild(groupBody);
+        currentAssistantEl.appendChild(currentActivityGroup);
+      }
+
+      // Add this tool to the group
+      const toolEntry = document.createElement('div');
+      toolEntry.className = 'chat-tool-entry';
+      toolEntry._startTime = Date.now();
+      const inputStr = JSON.stringify(msg.input || {}).slice(0, 80);
+      toolEntry.innerHTML = `<span class="tool-name pondering">${toolName}</span> <span class="tool-input">${inputStr}</span> <span class="tool-time"></span>`;
+      const toolResult = document.createElement('div');
+      toolResult.className = 'chat-tool-result';
+      toolEntry.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toolResult.classList.toggle('open');
+      });
+      const groupBody2 = currentActivityGroup.querySelector('.chat-activity-body');
+      groupBody2.appendChild(toolEntry);
+      groupBody2.appendChild(toolResult);
+
+      // Update group header summary
+      currentActivityGroup._tools.push(toolName);
+      const summary = currentActivityGroup.querySelector('.activity-summary');
+      if (summary) {
+        const unique = [...new Set(currentActivityGroup._tools)];
+        summary.textContent = `${unique.join(', ')} (${currentActivityGroup._tools.length} calls)`;
       }
       break;
+    }
 
-    case 'tool_result':
-      if (currentAssistantEl) {
-        // Find the last tool wrapper and fill in the result
-        const wrappers = currentAssistantEl.querySelectorAll('.chat-tool-wrapper');
-        const lastWrapper = wrappers[wrappers.length - 1];
-        if (lastWrapper) {
-          const resultEl = lastWrapper.querySelector('.chat-tool-result');
-          if (resultEl) resultEl.textContent = msg.output || '';
-          const elapsed = ((Date.now() - (lastWrapper._startTime || Date.now())) / 1000).toFixed(1);
-          const timeEl = lastWrapper.querySelector('.tool-time');
-          if (timeEl) timeEl.textContent = `${elapsed}s`;
-          // Stop the pondering animation
-          const pondering = lastWrapper.querySelector('.pondering');
-          if (pondering) pondering.classList.remove('pondering');
+    case 'tool_result': {
+      if (!currentAssistantEl) break;
+      // Find the last tool entry and fill in result
+      const group = currentActivityGroup;
+      if (group) {
+        const entries = group.querySelectorAll('.chat-tool-entry');
+        const lastEntry = entries[entries.length - 1];
+        if (lastEntry) {
+          const resultEl = lastEntry.nextElementSibling;
+          if (resultEl?.classList.contains('chat-tool-result')) {
+            resultEl.textContent = msg.output || '';
+          }
+          const elapsed = ((Date.now() - (lastEntry._startTime || Date.now())) / 1000).toFixed(1);
+          const timeEl = lastEntry.querySelector('.tool-time');
+          if (timeEl) timeEl.textContent = elapsed + 's';
+          const pond = lastEntry.querySelector('.pondering');
+          if (pond) pond.classList.remove('pondering');
         }
       }
       break;
+    }
 
     case 'done':
     case 'stopped':
@@ -1586,6 +1633,7 @@ function handleChatEvent(msg) {
       currentAssistantEl = null;
       currentThinkingEl = null;
       currentThinkingWrapper = null;
+      currentActivityGroup = null;
       chatStartTime = null;
       break;
 

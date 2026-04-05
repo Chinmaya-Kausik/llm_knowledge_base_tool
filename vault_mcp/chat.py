@@ -219,6 +219,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             system_prompt=system_prompt,
             include_partial_messages=True,
             thinking={"type": "enabled", "budget_tokens": 10000},
+            permission_mode="auto",
             resume=sdk_sid if has_run and sdk_sid else None,
             model=model,
         )
