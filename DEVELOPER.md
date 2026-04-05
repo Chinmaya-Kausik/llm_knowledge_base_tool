@@ -24,12 +24,12 @@ vault_mcp/
     git.py           Auto-commit, recent changes
 
   static/
-    index.html       Single-page app shell
+    index.html       Single-page app shell (includes settings dropdown, chat panel)
     style.css        All styles (dark theme, canvas, cards, chat, PDF)
-    app.js           All frontend logic (~1000 lines)
-    vendor/          Vendored JS libs (marked, d3-zoom, pdf.js)
+    app.js           All frontend logic (~2100 lines)
+    vendor/          Vendored JS libs (marked, d3-zoom, d3-drag, pdf.js, cola.min.js)
 
-  tests/             pytest tests (144 total)
+  tests/             pytest tests (180 total across 19 files)
 
 src-tauri/           Tauri native app wrapper
   src/main.rs        Starts Python server sidecar, Tauri commands for settings
