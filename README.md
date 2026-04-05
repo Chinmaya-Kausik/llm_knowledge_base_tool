@@ -48,20 +48,26 @@ ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Va
 
 ### Canvas
 - Infinite pan/zoom canvas with document cards
-- Cards show rendered markdown, code, or PDF content
+- WebCoLa constraint-based layout (replaces force-directed) with non-overlap constraints
+- Cards show rendered markdown, code, or PDF content (pdf.js with text layer for selection)
 - Click to expand file content, double-click to edit
 - Drag title bar to reposition, drag borders to resize
+- Multi-select cards with Cmd+click, drag selected group together
 - Drill into folders to see subpages
-- Edges show `[[wiki-link]]` connections between pages
+- Edges show `[[wiki-link]]` connections between pages, aggregated at top level
 - Filetype filter (Markdown, Code, Papers, Data, Misc)
+- Keyboard shortcuts: Cmd+=/- zoom, Cmd+[/] back/drill, Enter drill, Escape back/collapse, Cmd+F search
 
 ### Chat Panel
-- Full Claude Code agent (your Max subscription)
-- Context levels: Page (current file), Folder (README), Global (master index)
-- Streaming responses with thinking trace (collapsible)
-- Tool use display (collapsible blocks)
-- Highlight text in any page → "Ask Claude" floating button
+- Full Claude Code agent via claude-agent-sdk subprocess (your Max subscription)
+- Context levels: Page (current file + parent README), Folder (folder README with children), Global (master index)
+- Custom system prompt that enhances Claude Code with vault conventions (does not replace its default behavior)
+- Streaming responses with thinking trace (collapsible, configurable budget)
+- Tool use display (collapsible blocks showing MCP tool calls)
+- Text selection in any card → "Ask Claude" floating button with context injection
 - Stop generation, highlight partial response, give feedback
+- Auto-saves chat transcripts to raw/chats/ on page close (toggle with Temp button)
+- Model selection per session
 
 ### MCP Server (28 tools)
 - Ingestion: `ingest_url`, `ingest_pdf`, `ingest_text` (with image downloading)
@@ -106,12 +112,14 @@ src-tauri/               ← Native app wrapper (optional)
 
 ## Configuration
 
-- **`VAULT_ROOT`** env var or Settings gear icon in the UI
+- **`VAULT_ROOT`** env var, `~/.vault-app-config.json`, or Settings dropdown in the UI
+- **Settings dropdown**: vault root path, Claude auth status/login, code font size slider
 - **`.claude/mcp.json`** registers the vault MCP server for Claude Code
 - **`config.yaml`** for frontmatter schema and compilation settings
+- **Demo vault** at `~/Documents/vault-demo` is created by bootstrap if no vault exists
 
 ## Tests
 
 ```bash
-uv run pytest  # 144 tests
+uv run pytest  # 180 tests across 19 test files
 ```

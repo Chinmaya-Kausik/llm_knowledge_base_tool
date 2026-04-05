@@ -1141,6 +1141,8 @@ let currentAssistantEl = null;
 let currentThinkingEl = null;
 let currentThinkingWrapper = null;
 let chatContextLevel = 'page';
+let chatMessages = []; // Track messages for auto-save
+let chatIsTemporary = false; // Temporary chats don't get saved
 let chatStartTime = null;
 let chatTokenCount = 0;
 let chatTimerInterval = null;
@@ -1419,10 +1421,23 @@ function initChat() {
   });
 
   // Stop generation
-  // Clear chat / new conversation
-  document.getElementById('chat-clear').addEventListener('click', (e) => {
+  // Temporary toggle
+  const tempBtn = document.getElementById('chat-temp');
+  tempBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    chatIsTemporary = !chatIsTemporary;
+    tempBtn.style.opacity = chatIsTemporary ? '1' : '0.6';
+    tempBtn.style.color = chatIsTemporary ? 'var(--red)' : '';
+    tempBtn.title = chatIsTemporary ? 'Temporary — will not be saved' : 'Toggle temporary (won\'t save)';
+  });
+
+  // Clear chat / new conversation — save existing chat first
+  document.getElementById('chat-clear').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await saveChatTranscript(); // Save before clearing
     document.getElementById('chat-messages').innerHTML = '';
+    chatMessages = [];
+    chatIsTemporary = false;
     chatSessionId = crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
     currentAssistantEl = null; currentThinkingEl = null; currentThinkingWrapper = null; currentActivityGroup = null;
@@ -1500,7 +1515,8 @@ function sendChatMessage() {
   const text = input.value.trim();
   if (!text || !chatWs || chatWs.readyState !== WebSocket.OPEN) return;
 
-  // Display user message
+  // Track and display user message
+  chatMessages.push({ role: 'user', content: text });
   appendChatMessage('user', text);
   input.value = '';
 
@@ -1778,6 +1794,11 @@ function handleChatEvent(msg) {
 
     case 'done':
     case 'stopped':
+      // Track assistant response
+      if (currentAssistantEl) {
+        const textEl = currentAssistantEl.querySelector('.chat-text');
+        if (textEl?._rawText) chatMessages.push({ role: 'assistant', content: textEl._rawText });
+      }
       chatGenerating = false;
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
@@ -1828,6 +1849,16 @@ function handleChatEvent(msg) {
   }
 
   messages.scrollTop = messages.scrollHeight;
+}
+
+async function saveChatTranscript() {
+  if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
+  try {
+    await fetch('/api/chat/save', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages }),
+    });
+  } catch { /* silent — don't block UI on save failure */ }
 }
 
 function appendChatMessage(role, text) {
@@ -2095,6 +2126,17 @@ async function init() {
         const focused = document.querySelector('.doc-card.focused') || document.querySelector('.doc-card.selected');
         if (focused && focused.dataset.isFolder === 'true') { drillInto(focused.dataset.path); return; }
       }
+    }
+  });
+
+  // Save chat on page close
+  window.addEventListener('beforeunload', () => {
+    if (chatMessages.length > 0 && !chatIsTemporary) {
+      // Use sendBeacon for reliable save on close
+      navigator.sendBeacon('/api/chat/save', JSON.stringify({
+        session_id: chatSessionId || 'unknown',
+        messages: chatMessages,
+      }));
     }
   });
 

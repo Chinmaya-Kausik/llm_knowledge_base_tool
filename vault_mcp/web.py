@@ -521,6 +521,22 @@ async def api_update_settings(request: Request):
     return {"ok": False, "error": "No vault_root provided"}
 
 
+# --- Chat transcript saving ---
+
+@app.post("/api/chat/save")
+async def api_save_chat(request: Request):
+    """Save a chat transcript to raw/chats/."""
+    body = await request.json()
+    session_id = body.get("session_id", "unknown")
+    messages = body.get("messages", [])
+    if not messages:
+        return {"ok": False, "error": "No messages to save"}
+
+    from vault_mcp.tools.compile import save_chat_transcript
+    result = save_chat_transcript(VAULT_ROOT, session_id, messages)
+    return {"ok": True, **result}
+
+
 # --- Chat WebSocket ---
 
 @app.websocket("/ws/chat")
