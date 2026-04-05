@@ -141,12 +141,15 @@ def walk_pages(vault_root: Path, include_hidden: bool = False) -> list[dict[str,
             if not include_hidden and is_hidden(item):
                 continue
 
+            # Skip README.md files — they're represented by their parent folder
+            if item.name == "README.md" and item.is_file():
+                continue
+
             rel = str(item.relative_to(vault_root))
 
             # Skip the meta directory internals from canvas (but not from tree)
-            if rel.startswith("wiki/meta/") and item.name not in ("README.md",):
-                if item.is_file():
-                    continue
+            if rel.startswith("wiki/meta/") and item.is_file():
+                continue
 
             title = get_page_title(item, vault_root)
             meta = get_page_metadata(item)

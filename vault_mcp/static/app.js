@@ -83,15 +83,11 @@ function initCanvas() {
   zoomSelection.call(zoomBehavior);
 
   // Click outside any card → dismiss active edit
+  // Use capture phase to catch before other handlers
   document.addEventListener('pointerdown', (e) => {
-    if (activeEditCard && !e.target.closest('.doc-card')) {
-      exitCardEdit(activeEditCard);
-    }
-  });
-  // Also dismiss when clicking a different card
-  document.getElementById('world').addEventListener('pointerdown', (e) => {
+    if (!activeEditCard) return;
     const clickedCard = e.target.closest('.doc-card');
-    if (activeEditCard && clickedCard && clickedCard !== activeEditCard) {
+    if (!clickedCard || clickedCard !== activeEditCard) {
       exitCardEdit(activeEditCard);
     }
   });
@@ -218,12 +214,28 @@ function wireCardButtons(card, hasChildren) {
     }
   });
 
-  // Collapse
+  // Collapse button cycles: expanded → summary → hidden → expanded
   card.querySelector('.btn-collapse').addEventListener('click', (e) => {
     e.stopPropagation();
     const btn = e.currentTarget;
-    body.style.display = body.style.display === 'none' ? '' : 'none';
-    btn.textContent = body.style.display === 'none' ? '+' : '-';
+    const state = card.dataset.collapseState || 'expanded';
+
+    if (state === 'expanded') {
+      card.dataset.expanded = 'false';
+      card.dataset.collapseState = 'summary';
+      body.style.display = '';
+      btn.textContent = '~';
+    } else if (state === 'summary') {
+      body.style.display = 'none';
+      card.dataset.collapseState = 'hidden';
+      btn.textContent = '+';
+    } else {
+      card.dataset.expanded = 'true';
+      card.dataset.collapseState = 'expanded';
+      body.style.display = '';
+      btn.textContent = '-';
+      if (!isMarkdown && !cardMeta.has(path)) expandCardContent(card, path);
+    }
     scheduleEdgeUpdate();
   });
 
@@ -1314,6 +1326,25 @@ async function renderPdfInElement(container, pdfUrl) {
   }
 }
 
+// ========================================
+// Settings
+// ========================================
+async function showSettings() {
+  const resp = await fetch('/api/settings').then(r => r.json());
+  const newRoot = prompt(`Vault root directory:\n\nCurrent: ${resp.vault_root}\n\nEnter new path (or cancel):`, resp.vault_root);
+  if (newRoot && newRoot !== resp.vault_root) {
+    const result = await fetch('/api/settings', {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ vault_root: newRoot }),
+    }).then(r => r.json());
+    if (result.ok) {
+      alert('Vault root updated. Restart the server for changes to take effect.');
+    } else {
+      alert('Failed: ' + (result.error || 'unknown error'));
+    }
+  }
+}
+
 // --- Main init ---
 async function init() {
   initCanvas();
@@ -1329,6 +1360,7 @@ async function init() {
 
   document.getElementById('btn-auto-layout').onclick = autoLayout;
   document.getElementById('btn-fit').onclick = fitView;
+  document.getElementById('btn-settings').onclick = showSettings;
 
   document.addEventListener('keydown', (e) => {
     if (e.key==='Escape') { if(expandedCard){collapseFullPage();return;} if(canvasStack.length>1){navigateToLevel(canvasStack.length-2);return;} }

@@ -464,6 +464,25 @@ async def api_update_page(path: str, request: Request):
     return {"ok": True, "path": path}
 
 
+# --- Settings ---
+
+@app.get("/api/settings")
+def api_get_settings():
+    return {"vault_root": str(VAULT_ROOT)}
+
+
+@app.put("/api/settings")
+async def api_update_settings(request: Request):
+    body = await request.json()
+    new_root = body.get("vault_root")
+    if new_root:
+        # Write to config file so it persists across restarts
+        config_path = Path.home() / ".vault-app-config.json"
+        config_path.write_text(json.dumps({"vault_root": new_root}), encoding="utf-8")
+        return {"ok": True, "vault_root": new_root, "note": "Restart the server for changes to take effect."}
+    return {"ok": False, "error": "No vault_root provided"}
+
+
 # --- Chat WebSocket ---
 
 @app.websocket("/ws/chat")
