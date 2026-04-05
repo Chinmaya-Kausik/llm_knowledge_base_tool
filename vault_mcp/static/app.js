@@ -1111,17 +1111,25 @@ function initChat() {
 
   toggle.onclick = (e) => { e.stopPropagation(); toggleChat(); };
 
-  // Header click toggles collapse (except on interactive elements or after drag)
+  // Header click/dblclick handling with timer to distinguish
   let chatDragOccurred = false;
+  let chatClickTimer = null;
+
   document.getElementById('chat-header').addEventListener('click', (e) => {
     if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
     if (chatDragOccurred) { chatDragOccurred = false; return; }
-    toggleChat();
+    // Delay click to allow double-click detection
+    if (chatClickTimer) return; // Already waiting
+    chatClickTimer = setTimeout(() => {
+      chatClickTimer = null;
+      toggleChat();
+    }, 250);
   });
 
-  // Double-click header → fullscreen chat
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    // Cancel pending single-click
+    if (chatClickTimer) { clearTimeout(chatClickTimer); chatClickTimer = null; }
     e.stopPropagation();
     clearChatClasses();
     panel.classList.add('chat-float');
@@ -1445,10 +1453,12 @@ function handleChatEvent(msg) {
         header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering">Thinking...</span> <span class="thinking-time"></span>';
         currentThinkingEl = document.createElement('div');
         currentThinkingEl.className = 'chat-thinking-body';
-        header.onclick = () => {
-          currentThinkingEl.classList.toggle('open');
+        const thinkBody = currentThinkingEl; // Capture in closure
+        header.addEventListener('click', (e) => {
+          e.stopPropagation();
+          thinkBody.classList.toggle('open');
           header.querySelector('.chat-thinking-toggle').classList.toggle('open');
-        };
+        });
         currentThinkingWrapper.appendChild(header);
         currentThinkingWrapper.appendChild(currentThinkingEl);
         currentAssistantEl.appendChild(currentThinkingWrapper);
@@ -1464,11 +1474,14 @@ function handleChatEvent(msg) {
       break;
 
     case 'text':
-      // Finalize any open thinking block
+      // Finalize any open thinking block (but allow new ones later)
       if (currentThinkingWrapper) {
-        const header = currentThinkingWrapper.querySelector('.chat-thinking-header');
-        const elapsed = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
-        if (header) header.querySelector('.pondering').textContent = `Thought (${elapsed}s)`;
+        const hdr = currentThinkingWrapper.querySelector('.chat-thinking-header');
+        const el = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        if (hdr) {
+          const pond = hdr.querySelector('.pondering');
+          if (pond) { pond.textContent = `Thought (${el}s)`; pond.classList.remove('pondering'); }
+        }
         currentThinkingWrapper = null;
         currentThinkingEl = null;
       }
@@ -1554,14 +1567,19 @@ function handleChatEvent(msg) {
       break;
 
     case 'result':
+      // Only render result if we haven't already streamed the text
       if (currentAssistantEl && msg.content) {
         let textEl = currentAssistantEl.querySelector('.chat-text');
         if (!textEl) {
           textEl = document.createElement('div');
           textEl.className = 'chat-text';
           currentAssistantEl.appendChild(textEl);
+          textEl.innerHTML = marked.parse(msg.content);
+          textEl.querySelectorAll('.wiki-link').forEach(el => {
+            el.onclick = () => focusCardByTitle(el.dataset.target);
+          });
         }
-        textEl.innerHTML = marked.parse(msg.content);
+        // If textEl exists, we already have streamed content — don't overwrite
       }
       break;
 
