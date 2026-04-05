@@ -565,36 +565,120 @@ function updateBreadcrumb() {
 // Layout
 // ========================================
 function computeLayout(nodes, saved) {
+  // Use saved positions for nodes that have them
+  // For unsaved nodes, use force-directed placement
   const positions = {};
-  const folders = {};
+  const unsaved = [];
+  const cardW = 420, cardH = 300, gap = 60;
+
   for (const node of nodes) {
-    const folder = node.data.folder || 'wiki';
-    if (!folders[folder]) folders[folder] = [];
-    folders[folder].push(node.data.id);
-  }
-  let col = 0;
-  const cardW = 420, cardH = 400, gap = 40;
-  for (const [, ids] of Object.entries(folders).sort()) {
-    let row = 0;
-    for (const id of ids) {
-      positions[id] = saved[id] || { x: col, y: row * (cardH + gap) };
-      row++;
+    if (saved[node.data.id]) {
+      positions[node.data.id] = saved[node.data.id];
+    } else {
+      unsaved.push(node.data.id);
     }
-    col += cardW + gap * 2;
   }
+
+  if (unsaved.length === 0) return positions;
+
+  // Build adjacency for force layout
+  const edges = (graphData?.top_edges || graphData?.edges || []);
+  const nodeSet = new Set(nodes.map(n => n.data.id));
+  const adj = {};
+  for (const id of nodeSet) adj[id] = [];
+  for (const e of edges) {
+    const s = e.data.source, t = e.data.target;
+    if (nodeSet.has(s) && nodeSet.has(t)) {
+      adj[s].push(t);
+      adj[t].push(s);
+    }
+  }
+
+  // Initialize unsaved nodes in a grid as starting positions
+  const cols = Math.max(1, Math.ceil(Math.sqrt(unsaved.length)));
+  unsaved.forEach((id, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    positions[id] = { x: col * (cardW + gap), y: row * (cardH + gap) };
+  });
+
+  // Simple Fruchterman-Reingold force-directed layout (fixed iterations)
+  const allIds = nodes.map(n => n.data.id);
+  const n = allIds.length;
+  if (n <= 1) return positions;
+
+  const area = n * (cardW + gap) * (cardH + gap);
+  const k = Math.sqrt(area / n); // Ideal edge length
+  const iterations = 50;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const temp = k * (1 - iter / iterations); // Cooling
+    const disp = {};
+    for (const id of allIds) disp[id] = { x: 0, y: 0 };
+
+    // Repulsion between all pairs
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = allIds[i], b = allIds[j];
+        const dx = positions[a].x - positions[b].x;
+        const dy = positions[a].y - positions[b].y;
+        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+        const force = (k * k) / dist;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        disp[a].x += fx; disp[a].y += fy;
+        disp[b].x -= fx; disp[b].y -= fy;
+      }
+    }
+
+    // Attraction along edges
+    for (const e of edges) {
+      const s = e.data.source, t = e.data.target;
+      if (!(s in positions) || !(t in positions)) continue;
+      const dx = positions[s].x - positions[t].x;
+      const dy = positions[s].y - positions[t].y;
+      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+      const force = (dist * dist) / k;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      disp[s].x -= fx; disp[s].y -= fy;
+      disp[t].x += fx; disp[t].y += fy;
+    }
+
+    // Apply displacements (only to unsaved nodes)
+    for (const id of unsaved) {
+      const d = disp[id];
+      const dist = Math.max(Math.sqrt(d.x * d.x + d.y * d.y), 1);
+      const scale = Math.min(dist, temp) / dist;
+      positions[id].x += d.x * scale;
+      positions[id].y += d.y * scale;
+    }
+  }
+
+  // Round positions and ensure minimum spacing
+  for (const id of allIds) {
+    positions[id].x = Math.round(positions[id].x);
+    positions[id].y = Math.round(positions[id].y);
+  }
+
   return positions;
 }
 
 function autoLayout() {
-  const topCards = [...cardElements.entries()].filter(([,c]) => c.style.left);
-  const n = topCards.length; if (n === 0) return;
-  const cols = Math.ceil(Math.sqrt(n));
-  const cardW = 420, cardH = 400, gap = 60;
-  topCards.forEach(([path, card], i) => {
-    const x = (i % cols) * (cardW + gap), y = Math.floor(i / cols) * (cardH + gap);
-    card.style.left = x + 'px'; card.style.top = y + 'px';
-    layoutData[path] = { x, y };
-  });
+  // Re-run force layout for all nodes (ignore saved positions)
+  const level = currentLevel();
+  const nodes = level.parentPath === null ? (graphData?.top_nodes || []) :
+    graphData?.nodes.filter(n => n.data.parent_id === level.parentPath) || [];
+  if (nodes.length === 0) return;
+
+  const positions = computeLayout(nodes, {}); // Empty saved = force all
+
+  for (const [path, card] of cardElements) {
+    if (positions[path]) {
+      card.style.left = positions[path].x + 'px';
+      card.style.top = positions[path].y + 'px';
+      layoutData[path] = positions[path];
+    }
+  }
   scheduleEdgeUpdate(); debounceSaveLayout(); setTimeout(fitView, 100);
 }
 
