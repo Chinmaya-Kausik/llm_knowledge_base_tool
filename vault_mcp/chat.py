@@ -202,6 +202,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             ResultMessage,
             StreamEvent,
             SystemMessage,
+            UserMessage,
             query,
         )
 
@@ -224,6 +225,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
 
         sessions.setdefault(session_id, {})["has_run"] = True
 
+        streamed_text = False  # Track if we've sent text via streaming deltas
+        sent_tool_ids = set()  # Deduplicate tool_use events
+
         async for event in query(prompt=prompt, options=options):
             try:
                 if isinstance(event, StreamEvent):
@@ -231,45 +235,76 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                     if isinstance(ev, dict):
                         ev_type = ev.get("type", "")
                         delta = ev.get("delta", {})
+                        content_block = ev.get("content_block", {})
 
+                        # Handle content_block_start for tool_use
+                        if ev_type == "content_block_start" and isinstance(content_block, dict):
+                            cb_type = content_block.get("type")
+                            if cb_type == "tool_use":
+                                tool_id = content_block.get("id", "")
+                                if tool_id not in sent_tool_ids:
+                                    sent_tool_ids.add(tool_id)
+                                    await websocket.send_json({
+                                        "type": "tool_use",
+                                        "tool": content_block.get("name", "unknown"),
+                                        "input": content_block.get("input", {}),
+                                    })
+
+                        # Handle deltas
                         if isinstance(delta, dict):
-                            if delta.get("type") == "thinking_delta":
+                            dtype = delta.get("type", "")
+                            if dtype == "thinking_delta":
                                 await websocket.send_json({
                                     "type": "thinking",
                                     "content": delta.get("thinking", ""),
                                 })
-                            elif delta.get("type") == "text_delta":
+                            elif dtype == "text_delta":
+                                streamed_text = True
                                 await websocket.send_json({
                                     "type": "text",
                                     "content": delta.get("text", ""),
                                 })
+                            elif dtype == "input_json_delta":
+                                # Tool input being streamed — we already sent tool_use on block_start
+                                pass
 
                 elif isinstance(event, AssistantMessage):
+                    # Full message — only use for tool_use blocks (text already streamed)
                     for block in getattr(event, 'content', []):
-                        block_type = getattr(block, 'type', None)
-                        if block_type == 'text':
-                            await websocket.send_json({
-                                "type": "text",
-                                "content": getattr(block, 'text', ''),
-                            })
-                        elif block_type == 'tool_use':
-                            await websocket.send_json({
-                                "type": "tool_use",
-                                "tool": getattr(block, 'name', 'unknown'),
-                                "input": getattr(block, 'input', {}),
-                            })
-                        elif block_type == 'tool_result':
-                            output = getattr(block, 'content', '')
-                            if isinstance(output, list):
-                                output = ' '.join(str(x) for x in output)
+                        block_cls = type(block).__name__
+                        if block_cls == 'ToolUseBlock':
+                            tool_id = getattr(block, 'id', '')
+                            if tool_id not in sent_tool_ids:
+                                sent_tool_ids.add(tool_id)
+                                await websocket.send_json({
+                                    "type": "tool_use",
+                                    "tool": getattr(block, 'name', 'unknown'),
+                                    "input": getattr(block, 'input', {}),
+                                })
+                        elif block_cls == 'ThinkingBlock':
+                            # Only send if we didn't stream thinking deltas
+                            thinking = getattr(block, 'thinking', '')
+                            if thinking:
+                                await websocket.send_json({
+                                    "type": "thinking",
+                                    "content": thinking,
+                                })
+                        # Skip TextBlock — already sent via text_delta streaming
+
+                elif isinstance(event, UserMessage):
+                    # Tool results come as UserMessage with ToolResultBlock content
+                    for block in getattr(event, 'content', []):
+                        block_cls = type(block).__name__
+                        if block_cls == 'ToolResultBlock':
+                            content = getattr(block, 'content', '')
+                            if isinstance(content, list):
+                                content = '\n'.join(
+                                    getattr(item, 'text', str(item))
+                                    for item in content
+                                )
                             await websocket.send_json({
                                 "type": "tool_result",
-                                "output": str(output)[:2000],
-                            })
-                        elif block_type == 'thinking':
-                            await websocket.send_json({
-                                "type": "thinking",
-                                "content": getattr(block, 'thinking', ''),
+                                "output": str(content)[:3000],
                             })
 
                 elif isinstance(event, ResultMessage):
@@ -285,7 +320,6 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                             sessions[session_id]["sdk_session_id"] = data["session_id"]
 
             except Exception as send_err:
-                # Don't let a single event parsing error kill the stream
                 continue
 
         try:
