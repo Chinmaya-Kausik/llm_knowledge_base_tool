@@ -510,7 +510,8 @@ body {
 }
 
 /* Chat resize handles */
-.chat-resize { position: absolute; z-index: 10; }
+.chat-resize { position: absolute; z-index: 10; transition: background 0.15s; }
+.chat-resize:hover { background: rgba(122,162,247,0.15); }
 .chat-resize-top { top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
 .chat-resize-left { left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
 .chat-resize-right { right: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
@@ -631,6 +632,20 @@ body {
 .chat-tool-result.open { display: block; }
 .thinking-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 
+/* Chat text content */
+.chat-text { line-height: 1.55; }
+.chat-text p { margin: 4px 0; }
+.chat-text code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.chat-text pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; }
+.chat-text pre code { padding: 0; background: none; }
+.chat-text ul, .chat-text ol { padding-left: 18px; margin: 4px 0; }
+.chat-text a { color: var(--accent); }
+.chat-text h1, .chat-text h2, .chat-text h3 { color: var(--text-bright); margin: 8px 0 4px; }
+.chat-text blockquote { border-left: 2px solid var(--accent); padding-left: 8px; color: var(--text-muted); }
+.chat-text table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+.chat-text th, .chat-text td { border: 1px solid var(--border); padding: 4px 8px; }
+.chat-text th { background: var(--bg-surface2); }
+
 #chat-input-area {
   display: flex; gap: 6px; padding: 8px 10px;
   border-top: 1px solid var(--border); flex-shrink: 0;
@@ -677,7 +692,7 @@ body {
 #selection-ask-btn:hover { color: var(--cyan); }
 
 /* === PDF Viewer === */
-.pdf-container { width: 100%; overflow-y: auto; background: #525659; }
+.pdf-container { width: 100%; overflow-y: auto; background: var(--bg-surface2); }
 .pdf-page-wrapper { position: relative; margin: 8px auto; }
 .pdf-page-wrapper canvas { display: block; margin: 0 auto; }
 .pdf-text-layer {
