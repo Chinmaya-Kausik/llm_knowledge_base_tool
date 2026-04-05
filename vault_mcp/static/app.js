@@ -353,23 +353,56 @@ async function exitCardEdit(card) {
 // Card Drag
 // ========================================
 function wireCardDrag(card, pinned) {
-  if (pinned) return; // Pinned parent cards can't be dragged
+  if (pinned) return;
   const handle = card.querySelector('.doc-handle');
   handle.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.doc-controls')) return;
     e.preventDefault(); e.stopPropagation();
+
+    // Cmd+click toggles multi-select
+    if (e.metaKey || e.ctrlKey) {
+      if (selectedCards.has(card)) {
+        selectedCards.delete(card);
+        card.classList.remove('selected');
+      } else {
+        selectedCards.add(card);
+        card.classList.add('selected');
+      }
+      return;
+    }
+
+    // Click without Cmd clears selection (unless dragging a selected card)
+    if (!selectedCards.has(card)) {
+      selectedCards.forEach(c => c.classList.remove('selected'));
+      selectedCards.clear();
+    }
+
     const startX = e.clientX, startY = e.clientY;
-    const origX = parseInt(card.style.left)||0, origY = parseInt(card.style.top)||0;
     const k = currentTransform.k;
+
+    // Capture start positions for all selected cards + this card
+    const dragCards = selectedCards.size > 0 && selectedCards.has(card) ? [...selectedCards] : [card];
+    const startPositions = dragCards.map(c => ({
+      card: c,
+      x: parseInt(c.style.left) || 0,
+      y: parseInt(c.style.top) || 0,
+    }));
+
     function onMove(e) {
-      card.style.left = (origX + (e.clientX - startX)/k) + 'px';
-      card.style.top = (origY + (e.clientY - startY)/k) + 'px';
+      const dx = (e.clientX - startX) / k;
+      const dy = (e.clientY - startY) / k;
+      for (const sp of startPositions) {
+        sp.card.style.left = (sp.x + dx) + 'px';
+        sp.card.style.top = (sp.y + dy) + 'px';
+      }
       scheduleEdgeUpdate();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
-      layoutData[card.dataset.path] = { x: parseInt(card.style.left), y: parseInt(card.style.top) };
+      for (const sp of startPositions) {
+        layoutData[sp.card.dataset.path] = { x: parseInt(sp.card.style.left), y: parseInt(sp.card.style.top) };
+      }
       debounceSaveLayout();
     }
     document.addEventListener('pointermove', onMove);
@@ -773,12 +806,23 @@ async function toggleFullPageEdit(overlay, path) {
           meta.content = newContent;
         } catch (err) { /* silent */ }
       }
-      contentEl.innerHTML = marked.parse(meta.content);
+      // Render based on file type
+      const isCode = path.endsWith('.py') || path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.rs') || path.endsWith('.go') || path.endsWith('.java') || path.endsWith('.c') || path.endsWith('.cpp') || path.endsWith('.sh');
+      if (isCode) {
+        contentEl.innerHTML = `<pre><code>${meta.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`;
+      } else {
+        contentEl.innerHTML = marked.parse(meta.content);
+      }
       wireFullPageLinks(overlay);
       // Also update the canvas card if it exists
       const canvasCard = cardElements.get(path);
       if (canvasCard && canvasCard.dataset.editing !== 'true') {
-        canvasCard.querySelector('.doc-body').innerHTML = marked.parse(meta.content);
+        const cardBody = canvasCard.querySelector('.doc-body');
+        if (isCode) {
+          cardBody.innerHTML = `<pre><code>${meta.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`;
+        } else {
+          cardBody.innerHTML = marked.parse(meta.content);
+        }
         wireWikiLinks(canvasCard);
       }
     }
@@ -977,18 +1021,51 @@ function renderTree(items, depth) {
 async function initTreeView() {
   const treeData = await api.tree();
   const c = document.getElementById('tree-expanded'); c.innerHTML = '';
-  for (const folder of (treeData.children||[]).filter(c=>c.type==='folder')) {
-    const files = folder.children?.filter(c=>c.type==='file')||[];
-    if (!files.length) continue;
-    const s = document.createElement('div'); s.className='tree-folder-section';
-    s.innerHTML = `<h3>${folder.name} (${files.length})</h3>`;
-    for (const f of files) {
-      const item = document.createElement('div'); item.className='tree-file-item'; item.textContent=f.title||f.name;
-      item.onclick = () => { switchView('graph'); const card = cardElements.get(f.id); if(card) expandCardFullPage(card); };
-      s.appendChild(item);
+
+  function renderTreeExpanded(items, depth) {
+    for (const item of items) {
+      if (item.type === 'folder') {
+        const hasContent = item.children && item.children.length > 0;
+        if (!hasContent) continue;
+        const section = document.createElement('div');
+        section.style.marginLeft = (depth * 16) + 'px';
+        section.innerHTML = `<h3 style="font-size:${Math.max(11,13-depth)}px;color:var(--text-muted);margin:8px 0 4px;cursor:pointer">${item.title || item.name}</h3>`;
+        section.querySelector('h3').onclick = () => {
+          switchView('graph');
+          const card = cardElements.get(item.id);
+          if (card) expandCardFullPage(card);
+        };
+        c.appendChild(section);
+        renderTreeExpanded(item.children, depth + 1);
+      } else {
+        const el = document.createElement('div');
+        el.className = 'tree-file-item';
+        el.style.marginLeft = (depth * 16) + 'px';
+        el.textContent = item.title || item.name;
+        el.onclick = () => {
+          switchView('graph');
+          const card = cardElements.get(item.id);
+          if (card) expandCardFullPage(card);
+          else {
+            const nd = nodeById(item.id);
+            if (nd) {
+              const meta = cardMeta.get(item.id);
+              if (meta) {
+                const fakeCard = document.createElement('div');
+                fakeCard.dataset.path = item.id;
+                fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
+                expandCardFullPage(fakeCard);
+              }
+            }
+          }
+        };
+        c.appendChild(el);
+      }
     }
-    c.appendChild(s);
   }
+
+  renderTreeExpanded(treeData.children || [], 0);
+  if (!c.children.length) c.innerHTML = '<div class="empty-state">No pages yet</div>';
 }
 async function initTagCloud() {
   const c = document.getElementById('tag-cloud'); c.innerHTML='';
@@ -1068,6 +1145,7 @@ let chatStartTime = null;
 let chatTokenCount = 0;
 let chatTimerInterval = null;
 let currentActivityGroup = null; // Groups consecutive tool uses
+let selectedCards = new Set(); // Multi-select with Cmd+click
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1341,6 +1419,24 @@ function initChat() {
   });
 
   // Stop generation
+  // Clear chat / new conversation
+  document.getElementById('chat-clear').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('chat-messages').innerHTML = '';
+    chatSessionId = crypto.randomUUID();
+    sessionStorage.setItem('vault-chat-session', chatSessionId);
+    currentAssistantEl = null; currentThinkingEl = null; currentThinkingWrapper = null; currentActivityGroup = null;
+    if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+      chatWs.send(JSON.stringify({ type: 'init', session_id: chatSessionId, page_path: currentLevel().parentPath || '' }));
+    }
+  });
+
+  // Auto-grow input
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
   stopBtn.onclick = () => {
     if (chatWs && chatGenerating) {
       chatWs.send(JSON.stringify({ type: 'stop' }));
@@ -1424,6 +1520,7 @@ function sendChatMessage() {
   }));
 
   pendingSelection = null;
+  document.getElementById('chat-context-preview').style.display = 'none';
 
   // Show stop button + start timer
   chatGenerating = true;
@@ -1725,6 +1822,7 @@ function handleChatEvent(msg) {
       currentAssistantEl = null;
       currentThinkingEl = null;
       currentThinkingWrapper = null;
+      currentActivityGroup = null;
       chatStartTime = null;
       break;
   }
@@ -1760,7 +1858,7 @@ function initSelectionTooltip() {
     // Only show on doc-body, fullpage-content, or pdf-text-layer
     const anchor = sel.anchorNode?.parentElement;
     if (!anchor) { tooltip.style.display = 'none'; return; }
-    const inContent = anchor.closest('.doc-body') || anchor.closest('.fullpage-content') || anchor.closest('.pdf-text-layer');
+    const inContent = anchor.closest('.doc-body') || anchor.closest('.fullpage-content') || anchor.closest('.pdf-text-layer') || anchor.closest('.chat-msg-assistant') || anchor.closest('.chat-thinking-body');
     if (!inContent) { tooltip.style.display = 'none'; return; }
 
     // Find the file path
@@ -1782,15 +1880,22 @@ function initSelectionTooltip() {
     tooltip.style.display = 'none';
     // Open chat panel if closed
     const panel = document.getElementById('chat-panel');
-    if (panel.classList.contains('chat-collapsed')) {
-      panel.classList.remove('chat-collapsed');
+    if (panel.classList.contains('chat-collapsed') || panel.classList.contains('chat-collapsed-right') || panel.classList.contains('chat-collapsed-float')) {
+      const allC = ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
+      allC.forEach(c => panel.classList.remove(c));
       panel.classList.add('chat-bottom');
       connectChat();
     }
-    // Focus input with prefilled context hint
-    const input = document.getElementById('chat-input');
-    input.placeholder = `Ask about: "${pendingSelection?.text?.slice(0, 50)}..."`;
-    input.focus();
+    // Show context preview block above input
+    if (pendingSelection?.text) {
+      const preview = document.getElementById('chat-context-preview');
+      const fileName = pendingSelection.file ? pendingSelection.file.split('/').pop() : '';
+      const textSnip = pendingSelection.text.slice(0, 80).replace(/\n/g, ' ');
+      preview.innerHTML = `<span class="ctx-file">${fileName || 'selection'}</span><span class="ctx-text">"${textSnip}${pendingSelection.text.length > 80 ? '...' : ''}"</span><span class="ctx-remove" title="Remove context">✕</span>`;
+      preview.style.display = 'flex';
+      preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
+    }
+    document.getElementById('chat-input').focus();
   };
 
   // Hide tooltip on click elsewhere
@@ -1940,7 +2045,7 @@ async function init() {
   document.querySelectorAll('.view-tab').forEach(tab => tab.onclick = () => switchView(tab.dataset.view));
 
   const searchInput = document.getElementById('search-input');
-  let st; searchInput.oninput = () => { clearTimeout(st); st=setTimeout(()=>doSearch(searchInput.value),300); };
+  let st; searchInput.oninput = () => { clearTimeout(st); if(!searchInput.value.trim()) { switchView('graph'); return; } st=setTimeout(()=>doSearch(searchInput.value),300); };
   searchInput.onkeydown = e => { if(e.key==='Enter') doSearch(searchInput.value); };
 
   document.getElementById('btn-auto-layout').onclick = autoLayout;
@@ -1948,8 +2053,49 @@ async function init() {
   initSettings();
 
   document.addEventListener('keydown', (e) => {
-    if (e.key==='Escape') { if(expandedCard){collapseFullPage();return;} if(canvasStack.length>1){navigateToLevel(canvasStack.length-2);return;} }
-    if ((e.ctrlKey||e.metaKey) && e.key==='f') { e.preventDefault(); searchInput.focus(); }
+    const mod = e.ctrlKey || e.metaKey;
+    // Don't intercept when typing in input/textarea
+    const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
+    if (e.key === 'Escape') {
+      if (expandedCard) { collapseFullPage(); return; }
+      if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
+    }
+    if (mod && e.key === 'f') { e.preventDefault(); searchInput.focus(); return; }
+
+    // Canvas shortcuts (only when not typing)
+    if (!inInput) {
+      // Cmd+= / Cmd+- zoom
+      if (mod && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        const container = document.getElementById('infinite-canvas');
+        zoomSelection.transition().duration(200).call(zoomBehavior.scaleBy, 1.3);
+        return;
+      }
+      if (mod && e.key === '-') {
+        e.preventDefault();
+        zoomSelection.transition().duration(200).call(zoomBehavior.scaleBy, 0.7);
+        return;
+      }
+      // Cmd+[ go back
+      if (mod && e.key === '[') {
+        e.preventDefault();
+        if (canvasStack.length > 1) navigateToLevel(canvasStack.length - 2);
+        return;
+      }
+      // Cmd+] drill into focused card
+      if (mod && e.key === ']') {
+        e.preventDefault();
+        const focused = document.querySelector('.doc-card.focused') || document.querySelector('.doc-card.selected');
+        if (focused && focused.dataset.isFolder === 'true') drillInto(focused.dataset.path);
+        return;
+      }
+      // Enter drills into focused card
+      if (e.key === 'Enter') {
+        const focused = document.querySelector('.doc-card.focused') || document.querySelector('.doc-card.selected');
+        if (focused && focused.dataset.isFolder === 'true') { drillInto(focused.dataset.path); return; }
+      }
+    }
   });
 
   await Promise.all([initGraphView(), initSidebar()]);

@@ -635,12 +635,25 @@ body {
   display: flex; gap: 6px; padding: 8px 10px;
   border-top: 1px solid var(--border); flex-shrink: 0;
 }
+#chat-context-preview {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 4px 8px; margin-bottom: 4px; font-size: 11px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 6px; max-width: 100%;
+}
+#chat-context-preview .ctx-file { color: var(--accent); font-weight: 500; }
+#chat-context-preview .ctx-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+#chat-context-preview .ctx-remove { cursor: pointer; color: var(--text-muted); font-size: 14px; }
+#chat-context-preview .ctx-remove:hover { color: var(--red); }
 #chat-input {
   flex: 1; background: var(--bg); border: 1px solid var(--border);
   color: var(--text); font-family: var(--font); font-size: 12px;
   padding: 6px 8px; border-radius: var(--radius); resize: none; outline: none;
+  min-height: 28px; max-height: 120px; overflow-y: auto;
 }
 #chat-input:focus { border-color: var(--accent); }
+
+/* Multi-select card highlight */
+.doc-card.selected { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(125,207,255,0.3); }
 #chat-input-controls { display: flex; flex-direction: column; gap: 4px; }
 #chat-send, #chat-stop {
   background: var(--bg-surface2); border: 1px solid var(--border);

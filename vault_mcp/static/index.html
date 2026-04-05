@@ -146,13 +146,15 @@
       </div>
       <span id="chat-status">Disconnected</span>
       <span style="flex:1"></span>
+      <button id="chat-clear" title="New conversation">⟳</button>
       <button id="chat-dock-right" title="Dock right">→</button>
       <button id="chat-dock-bottom" title="Dock bottom">↓</button>
       <button id="chat-dock-float" title="Float">◻</button>
     </div>
     <div id="chat-messages"></div>
     <div id="chat-input-area">
-      <textarea id="chat-input" placeholder="Ask about your vault... (Enter to send)" rows="2"></textarea>
+      <div id="chat-context-preview" style="display:none"></div>
+      <textarea id="chat-input" placeholder="Message Claude... (Enter to send)" rows="1"></textarea>
       <div id="chat-input-controls">
         <button id="chat-send">Send</button>
         <button id="chat-stop" style="display:none">Stop</button>
@@ -162,7 +164,7 @@
 
   <!-- Floating "Ask Claude" tooltip (appears on text selection) -->
   <div id="selection-tooltip" style="display:none">
-    <button id="selection-ask-btn">Ask Claude</button>
+    <button id="selection-ask-btn">Chat with Claude</button>
   </div>
 
   <script src="/static/app.js"></script>
