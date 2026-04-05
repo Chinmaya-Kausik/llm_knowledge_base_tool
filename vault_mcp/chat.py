@@ -87,6 +87,77 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                     query_task.cancel()
                     await websocket.send_json({"type": "stopped"})
 
+            elif msg_type == "pause_subagent":
+                # Pause a specific subagent at its next tool call
+                agent_id = msg.get("agent_id", "")
+                controller = sessions.get(session_id, {}).get("controller")
+                if controller and agent_id:
+                    controller.pause_agent(agent_id)
+                    await websocket.send_json({"type": "subagent_pausing", "agent_id": agent_id})
+
+            elif msg_type == "resume_subagent":
+                # Resume a paused subagent
+                agent_id = msg.get("agent_id", "")
+                controller = sessions.get(session_id, {}).get("controller")
+                if controller and agent_id:
+                    controller.resume_agent(agent_id)
+                    await websocket.send_json({"type": "subagent_resumed", "agent_id": agent_id})
+
+            elif msg_type == "redirect_subagent":
+                # Rollback to checkpoint + cancel subagent + send redirect instructions
+                agent_id = msg.get("agent_id", "")
+                checkpoint_id = msg.get("checkpoint_id", "")
+                instructions = msg.get("instructions", "")
+                controller = sessions.get(session_id, {}).get("controller")
+                client = sessions.get(session_id, {}).get("client")
+
+                if controller and agent_id:
+                    state = controller.agents.get(agent_id)
+                    if state:
+                        # Find checkpoint
+                        target_ckpt = None
+                        for ckpt in state.checkpoints:
+                            if ckpt.id == checkpoint_id:
+                                target_ckpt = ckpt
+                                break
+
+                        # Rollback if checkpoint found
+                        reverted = []
+                        if target_ckpt:
+                            reverted = controller.rollback_to_checkpoint(target_ckpt)
+                            # Trim checkpoints after this one
+                            idx = state.checkpoints.index(target_ckpt)
+                            state.checkpoints = state.checkpoints[:idx + 1]
+
+                        # Resume the paused hook with stop signal
+                        controller.resume_agent(agent_id, {"continue_": False, "stopReason": "User redirected"})
+
+                        await websocket.send_json({
+                            "type": "redirect_started",
+                            "agent_id": agent_id,
+                            "checkpoint_id": checkpoint_id,
+                            "files_reverted": reverted,
+                        })
+
+                        # Send redirect as follow-up message to parent
+                        if client and instructions:
+                            redirect_msg = f"The subagent was stopped and files were reverted. Please try again with these corrected instructions: {instructions}"
+                            try:
+                                await client.query(redirect_msg)
+                            except Exception:
+                                pass
+
+            elif msg_type == "stop_subagent":
+                # Stop a specific subagent via stop_task
+                task_id = msg.get("task_id", "")
+                client = sessions.get(session_id, {}).get("client")
+                if client and task_id:
+                    try:
+                        client.stop_task(task_id)
+                        await websocket.send_json({"type": "subagent_stopping", "task_id": task_id})
+                    except Exception:
+                        pass
+
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -194,11 +265,13 @@ You have MCP vault tools available: ripgrep_search, write_index, update_master_i
 
 
 async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault_root: Path, context_level: str = "page"):
-    """Stream a Claude Code query response to the WebSocket."""
+    """Stream a Claude Code query response to the WebSocket using ClaudeSDKClient."""
     try:
         from claude_agent_sdk import (
             AssistantMessage,
             ClaudeAgentOptions,
+            ClaudeSDKClient,
+            HookMatcher,
             ResultMessage,
             StreamEvent,
             SystemMessage,
@@ -206,16 +279,18 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             TaskProgressMessage,
             TaskStartedMessage,
             UserMessage,
-            query,
         )
+        from vault_mcp.subagent_control import SubagentController
 
-        mcp_config = vault_root / ".claude" / "mcp.json"
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
-        # Use the SDK's session ID for resume (not our browser session ID)
         sdk_sid = sessions.get(session_id, {}).get("sdk_session_id")
         has_run = sessions.get(session_id, {}).get("has_run", False)
         model = sessions.get(session_id, {}).get("model")
+
+        # Subagent controller with hooks
+        controller = SubagentController(vault_root)
+        sessions.setdefault(session_id, {})["controller"] = controller
 
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
@@ -225,15 +300,32 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             permission_mode="auto",
             resume=sdk_sid if has_run and sdk_sid else None,
             model=model,
+            hooks={
+                "PreToolUse": [HookMatcher(matcher=None, hooks=[controller.pre_tool_use_hook], timeout=300)],
+                "SubagentStart": [HookMatcher(matcher=None, hooks=[controller.subagent_start_hook])],
+                "SubagentStop": [HookMatcher(matcher=None, hooks=[controller.subagent_stop_hook])],
+            },
         )
 
-        sessions.setdefault(session_id, {})["has_run"] = True
+        # Use ClaudeSDKClient for bidirectional control
+        client = ClaudeSDKClient(options)
+        sessions[session_id]["client"] = client
+        sessions[session_id]["has_run"] = True
 
         streamed_text = False
         sent_tool_ids = set()
-        current_subagent_task_id = None  # Track which subagent is active
+        current_subagent_task_id = None
 
-        async for event in query(prompt=prompt, options=options):
+        # Connect and stream
+        if has_run and sdk_sid:
+            await client.connect()
+            await client.query(prompt)
+            event_stream = client.receive_response()
+        else:
+            await client.connect(prompt)
+            event_stream = client.receive_messages()
+
+        async for event in event_stream:
             try:
                 if isinstance(event, StreamEvent):
                     ev = getattr(event, 'event', None) or {}
@@ -348,13 +440,27 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             await websocket.send_json({"type": "done"})
         except Exception:
             pass
+        finally:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
 
     except asyncio.CancelledError:
+        try:
+            client.interrupt()
+            await client.disconnect()
+        except Exception:
+            pass
         try:
             await websocket.send_json({"type": "stopped"})
         except Exception:
             pass
     except Exception as e:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
         try:
             await websocket.send_json({"type": "error", "message": str(e)})
         except Exception:
