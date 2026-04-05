@@ -1126,17 +1126,40 @@ function initChat() {
     }, 250);
   });
 
+  let chatMaximized = false;
+  let chatPreMaxState = null; // {dockMode, left, top, width, height}
+
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
-    // Cancel pending single-click
     if (chatClickTimer) { clearTimeout(chatClickTimer); chatClickTimer = null; }
     e.stopPropagation();
-    clearChatClasses();
-    panel.classList.add('chat-float');
-    chatDockMode = 'float';
-    panel.style.left = '0'; panel.style.top = '0';
-    panel.style.right = '0'; panel.style.bottom = '0';
-    panel.style.width = '100vw'; panel.style.height = '100vh';
+
+    if (chatMaximized) {
+      // Restore previous state
+      clearChatClasses();
+      chatDockMode = chatPreMaxState.dockMode;
+      panel.classList.add('chat-' + chatDockMode);
+      panel.style.left = chatPreMaxState.left;
+      panel.style.top = chatPreMaxState.top;
+      panel.style.width = chatPreMaxState.width;
+      panel.style.height = chatPreMaxState.height;
+      panel.style.right = ''; panel.style.bottom = '';
+      chatMaximized = false;
+    } else {
+      // Save current state and maximize
+      chatPreMaxState = {
+        dockMode: chatDockMode,
+        left: panel.style.left, top: panel.style.top,
+        width: panel.style.width, height: panel.style.height,
+      };
+      clearChatClasses();
+      panel.classList.add('chat-float');
+      chatDockMode = 'float';
+      panel.style.left = '0'; panel.style.top = '0';
+      panel.style.right = '0'; panel.style.bottom = '0';
+      panel.style.width = '100vw'; panel.style.height = '100vh';
+      chatMaximized = true;
+    }
     connectChat();
   });
 
