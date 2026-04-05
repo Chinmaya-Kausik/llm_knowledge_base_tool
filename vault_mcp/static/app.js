@@ -601,27 +601,36 @@ function computeLayout(nodes, saved) {
     positions[id] = { x: col * (cardW + gap), y: row * (cardH + gap) };
   });
 
-  // Simple Fruchterman-Reingold force-directed layout (fixed iterations)
+  // Force-directed layout with gravity and capped repulsion
   const allIds = nodes.map(n => n.data.id);
   const n = allIds.length;
   if (n <= 1) return positions;
 
-  const area = n * (cardW + gap) * (cardH + gap);
-  const k = Math.sqrt(area / n); // Ideal edge length
-  const iterations = 50;
+  const k = (cardW + gap) * 1.2; // Ideal spacing between nodes
+  const maxRepDist = k * 3;      // Repulsion range cap — beyond this, no force
+  const gravity = 0.05;           // Pull toward center
+  const iterations = 60;
+
+  // Compute center of mass
+  function centerOfMass() {
+    let cx = 0, cy = 0;
+    for (const id of allIds) { cx += positions[id].x; cy += positions[id].y; }
+    return { x: cx / n, y: cy / n };
+  }
 
   for (let iter = 0; iter < iterations; iter++) {
-    const temp = k * (1 - iter / iterations); // Cooling
+    const temp = k * 0.5 * (1 - iter / iterations); // Cooling
     const disp = {};
     for (const id of allIds) disp[id] = { x: 0, y: 0 };
 
-    // Repulsion between all pairs
+    // Repulsion — capped at maxRepDist
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const a = allIds[i], b = allIds[j];
         const dx = positions[a].x - positions[b].x;
         const dy = positions[a].y - positions[b].y;
         const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+        if (dist > maxRepDist) continue; // Skip distant pairs
         const force = (k * k) / dist;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -637,11 +646,20 @@ function computeLayout(nodes, saved) {
       const dx = positions[s].x - positions[t].x;
       const dy = positions[s].y - positions[t].y;
       const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-      const force = (dist * dist) / k;
+      const force = dist / k; // Linear attraction (weaker than quadratic)
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
-      disp[s].x -= fx; disp[s].y -= fy;
-      disp[t].x += fx; disp[t].y += fy;
+      disp[s].x -= fx * k; disp[s].y -= fy * k;
+      disp[t].x += fx * k; disp[t].y += fy * k;
+    }
+
+    // Gravity — pull toward center
+    const center = centerOfMass();
+    for (const id of allIds) {
+      const dx = center.x - positions[id].x;
+      const dy = center.y - positions[id].y;
+      disp[id].x += dx * gravity;
+      disp[id].y += dy * gravity;
     }
 
     // Apply displacements (only to unsaved nodes)
@@ -654,7 +672,7 @@ function computeLayout(nodes, saved) {
     }
   }
 
-  // Round positions and ensure minimum spacing
+  // Round positions
   for (const id of allIds) {
     positions[id].x = Math.round(positions[id].x);
     positions[id].y = Math.round(positions[id].y);
