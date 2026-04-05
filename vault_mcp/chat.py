@@ -130,17 +130,22 @@ def build_system_prompt(session_id: str, vault_root: Path, context_level: str = 
     - folder: current folder README (lists children with summaries)
     - global: full master index (titles + summaries for all pages)
     """
-    parts = ["You are a helpful assistant for a personal knowledge base vault."]
+    parts = ["You are a helpful assistant for a personal knowledge base vault. Be concise."]
 
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
 
+    if not page_path:
+        return parts[0]  # Skip context injection if no page — faster
+
     if context_level == "page" and page_path:
-        # Inject the current page content
+        # Inject the current page content (truncated to avoid huge prompts)
         full_path = vault_root / page_path
         if full_path.exists():
             content = get_page_content(full_path)
             if content:
+                if len(content) > 8000:
+                    content = content[:8000] + "\n\n[... truncated ...]"
                 parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
 
             # Also inject parent folder README for local context
