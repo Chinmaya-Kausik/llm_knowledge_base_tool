@@ -602,10 +602,10 @@ body {
 .chat-activity-group { margin: 6px 0; background: var(--bg); border-radius: var(--radius); overflow: hidden; }
 .chat-activity-header {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  font-size: 11px; color: var(--text-muted); cursor: pointer; flex-wrap: wrap;
 }
 .chat-activity-header:hover { color: var(--text); }
-.activity-summary { font-size: 10px; color: var(--text-muted); margin-left: auto; }
+.activity-summary { font-size: 10px; color: var(--text-muted); }
 .chat-activity-body { display: none; padding: 0 8px 4px; }
 .chat-activity-body.open { display: block; }
 
@@ -617,8 +617,10 @@ body {
 }
 .chat-tool-entry:last-of-type { border-bottom: none; }
 .chat-tool-entry:hover { color: var(--text); }
-.tool-name { font-weight: 500; color: var(--cyan); }
+.tool-name { font-weight: 500; color: var(--cyan); min-width: 40px; }
+.tool-desc { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-input { font-size: 10px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.activity-latest { font-size: 11px; }
 .tool-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 .chat-tool-result {
   display: none; font-size: 10px; color: var(--text-muted);

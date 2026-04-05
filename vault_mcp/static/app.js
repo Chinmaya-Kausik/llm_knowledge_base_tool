@@ -1452,6 +1452,27 @@ function sendChatMessage() {
   }, 100);
 }
 
+function formatToolDesc(tool, input) {
+  // Format tool use like Claude Code: "Read src/main.py" instead of "Read {path: ...}"
+  const i = input || {};
+  switch (tool) {
+    case 'Read': return `Read ${i.file_path || i.path || ''}`;
+    case 'Write': return `Write ${i.file_path || i.path || ''}`;
+    case 'Edit': return `Edit ${i.file_path || i.path || ''}`;
+    case 'Grep': return `Grep "${i.pattern || ''}" ${i.path ? 'in ' + i.path : ''}`;
+    case 'Glob': return `Glob ${i.pattern || ''}`;
+    case 'Bash': return `Bash ${(i.command || '').slice(0, 60)}`;
+    case 'ripgrep_search': return `Search "${i.query || ''}" ${i.scope ? 'in ' + i.scope : ''}`;
+    case 'read_wiki_page': return `Read wiki ${i.path || ''}`;
+    case 'write_wiki_page': return `Write wiki ${i.path || ''}`;
+    case 'ingest_url': return `Ingest ${i.url || ''}`;
+    default:
+      // Try to show the most useful field
+      const vals = Object.values(i).filter(v => typeof v === 'string' && v.length > 0);
+      return `${tool} ${vals[0] ? vals[0].slice(0, 50) : ''}`;
+  }
+}
+
 function handleChatEvent(msg) {
   const messages = document.getElementById('chat-messages');
 
@@ -1543,20 +1564,20 @@ function handleChatEvent(msg) {
 
       if (!currentAssistantEl) break;
       const toolName = msg.tool || 'tool';
-
-      // Skip empty/permission tool uses
       if (!toolName || toolName === 'unknown') break;
 
-      // Create or reuse activity group for consecutive tools
+      // Format tool description like Claude Code: "Read src/main.py"
+      const toolDesc = formatToolDesc(toolName, msg.input || {});
+
+      // Create or reuse activity group
       if (!currentActivityGroup) {
         currentActivityGroup = document.createElement('div');
         currentActivityGroup.className = 'chat-activity-group';
         currentActivityGroup._tools = [];
         currentActivityGroup._startTime = Date.now();
-        // Group header
         const groupHeader = document.createElement('div');
         groupHeader.className = 'chat-activity-header';
-        groupHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Working...</span> <span class="activity-summary"></span>`;
+        groupHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="activity-latest pondering"></span>`;
         const groupBody = document.createElement('div');
         groupBody.className = 'chat-activity-body open';
         groupHeader.addEventListener('click', (e) => {
@@ -1569,29 +1590,22 @@ function handleChatEvent(msg) {
         currentAssistantEl.appendChild(currentActivityGroup);
       }
 
-      // Add this tool to the group
+      // Update header to show latest tool (like Claude Code shows current action)
+      const latestEl = currentActivityGroup.querySelector('.activity-latest');
+      if (latestEl) latestEl.textContent = toolDesc;
+
+      // Add tool entry
       const toolEntry = document.createElement('div');
       toolEntry.className = 'chat-tool-entry';
       toolEntry._startTime = Date.now();
-      const inputStr = JSON.stringify(msg.input || {}).slice(0, 80);
-      toolEntry.innerHTML = `<span class="tool-name pondering">${toolName}</span> <span class="tool-input">${inputStr}</span> <span class="tool-time"></span>`;
+      toolEntry.innerHTML = `<span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-time pondering"></span>`;
       const toolResult = document.createElement('div');
       toolResult.className = 'chat-tool-result';
-      toolEntry.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toolResult.classList.toggle('open');
-      });
-      const groupBody2 = currentActivityGroup.querySelector('.chat-activity-body');
-      groupBody2.appendChild(toolEntry);
-      groupBody2.appendChild(toolResult);
+      toolEntry.addEventListener('click', (e) => { e.stopPropagation(); toolResult.classList.toggle('open'); });
+      currentActivityGroup.querySelector('.chat-activity-body').appendChild(toolEntry);
+      currentActivityGroup.querySelector('.chat-activity-body').appendChild(toolResult);
 
-      // Update group header summary
       currentActivityGroup._tools.push(toolName);
-      const summary = currentActivityGroup.querySelector('.activity-summary');
-      if (summary) {
-        const unique = [...new Set(currentActivityGroup._tools)];
-        summary.textContent = `${unique.join(', ')} (${currentActivityGroup._tools.length} calls)`;
-      }
       break;
     }
 
