@@ -1319,6 +1319,8 @@ function sendChatMessage() {
 function handleChatEvent(msg) {
   const messages = document.getElementById('chat-messages');
 
+  if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
+
   switch (msg.type) {
     case 'thinking':
       if (!currentThinkingEl) {
