@@ -123,11 +123,14 @@
   <div id="chat-panel" class="chat-collapsed">
     <div id="chat-header">
       <button id="chat-toggle" title="Toggle chat">Chat</button>
-      <select id="chat-context-level" title="Context level">
-        <option value="page">Page</option>
-        <option value="folder">Folder</option>
-        <option value="global">Global</option>
-      </select>
+      <div class="chat-context-dropdown" id="chat-context-dropdown">
+        <button class="chat-context-btn" id="chat-context-btn">Page</button>
+        <div class="chat-context-menu" id="chat-context-menu">
+          <div class="chat-context-opt" data-value="page">Page <span class="ctx-desc">current file + parent</span></div>
+          <div class="chat-context-opt" data-value="folder">Folder <span class="ctx-desc">folder README</span></div>
+          <div class="chat-context-opt" data-value="global">Global <span class="ctx-desc">master index</span></div>
+        </div>
+      </div>
       <span id="chat-status">Disconnected</span>
       <span style="flex:1"></span>
       <button id="chat-dock-right" title="Dock right">→</button>

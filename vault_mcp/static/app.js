@@ -1062,6 +1062,7 @@ let chatSessionId = null;
 let chatGenerating = false;
 let currentAssistantEl = null;
 let currentThinkingEl = null;
+let chatContextLevel = 'page';
 
 function initChat() {
   const panel = document.getElementById('chat-panel');
@@ -1141,6 +1142,24 @@ function initChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
   };
 
+  // Context level dropdown
+  const ctxBtn = document.getElementById('chat-context-btn');
+  const ctxMenu = document.getElementById('chat-context-menu');
+  ctxBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ctxMenu.classList.toggle('open');
+  });
+  ctxMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opt = e.target.closest('.chat-context-opt');
+    if (opt) {
+      chatContextLevel = opt.dataset.value;
+      ctxBtn.textContent = opt.dataset.value.charAt(0).toUpperCase() + opt.dataset.value.slice(1);
+      ctxMenu.classList.remove('open');
+    }
+  });
+  document.addEventListener('click', () => ctxMenu.classList.remove('open'));
+
   // Stop generation
   stopBtn.onclick = () => {
     if (chatWs && chatGenerating) {
@@ -1210,7 +1229,7 @@ function sendChatMessage() {
 
   // Prepare context
   const level = currentLevel();
-  const contextLevel = document.getElementById('chat-context-level').value;
+  const contextLevel = chatContextLevel;
 
   chatWs.send(JSON.stringify({
     type: 'message',
