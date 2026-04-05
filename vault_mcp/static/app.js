@@ -1453,24 +1453,44 @@ function sendChatMessage() {
 }
 
 function formatToolDesc(tool, input) {
-  // Format tool use like Claude Code: "Read src/main.py" instead of "Read {path: ...}"
+  // Format like Claude Code terminal output
   const i = input || {};
   switch (tool) {
-    case 'Read': return `Read ${i.file_path || i.path || ''}`;
-    case 'Write': return `Write ${i.file_path || i.path || ''}`;
-    case 'Edit': return `Edit ${i.file_path || i.path || ''}`;
-    case 'Grep': return `Grep "${i.pattern || ''}" ${i.path ? 'in ' + i.path : ''}`;
-    case 'Glob': return `Glob ${i.pattern || ''}`;
-    case 'Bash': return `Bash ${(i.command || '').slice(0, 60)}`;
-    case 'ripgrep_search': return `Search "${i.query || ''}" ${i.scope ? 'in ' + i.scope : ''}`;
-    case 'read_wiki_page': return `Read wiki ${i.path || ''}`;
-    case 'write_wiki_page': return `Write wiki ${i.path || ''}`;
-    case 'ingest_url': return `Ingest ${i.url || ''}`;
+    case 'Read':            return i.file_path || i.path || 'file';
+    case 'Write':           return i.file_path || i.path || 'file';
+    case 'Edit':            return `${i.file_path || i.path || 'file'}`;
+    case 'Grep':            return `"${i.pattern || ''}"${i.path ? ' in ' + i.path : ''}`;
+    case 'Glob':            return i.pattern || '*';
+    case 'Bash':            return (i.command || '').slice(0, 80);
+    case 'WebSearch':       return i.query || '';
+    case 'WebFetch':        return i.url || '';
+    case 'ripgrep_search':  return `"${i.query || ''}"${i.scope ? ' in ' + i.scope : ''}`;
+    case 'read_wiki_page':  return i.path || '';
+    case 'write_wiki_page': return i.path || '';
+    case 'read_source':     return i.path || '';
+    case 'ingest_url':      return i.url || '';
+    case 'ingest_text':     return i.title || '';
+    case 'auto_commit':     return i.message ? `"${i.message.slice(0, 40)}"` : '';
+    case 'validate_links':  return 'checking wiki links';
+    case 'generate_health_report': return 'running health checks';
+    case 'get_changed_sources': return 'scanning for changes';
+    case 'update_master_index': return 'rebuilding index';
     default:
-      // Try to show the most useful field
       const vals = Object.values(i).filter(v => typeof v === 'string' && v.length > 0);
-      return `${tool} ${vals[0] ? vals[0].slice(0, 50) : ''}`;
+      return vals[0] ? vals[0].slice(0, 60) : '';
   }
+}
+
+function toolIcon(tool) {
+  // Icons matching Claude Code style
+  const icons = {
+    'Read': '📄', 'Write': '✏️', 'Edit': '✏️', 'Grep': '🔍', 'Glob': '📁',
+    'Bash': '⚡', 'WebSearch': '🌐', 'WebFetch': '🌐',
+    'ripgrep_search': '🔍', 'read_wiki_page': '📄', 'write_wiki_page': '✏️',
+    'validate_links': '🔗', 'generate_health_report': '🏥',
+    'ingest_url': '📥', 'ingest_text': '📥', 'auto_commit': '💾',
+  };
+  return icons[tool] || '⚡';
 }
 
 function handleChatEvent(msg) {
@@ -1523,7 +1543,20 @@ function handleChatEvent(msg) {
       if (currentActivityGroup) {
         const agHdr = currentActivityGroup.querySelector('.chat-activity-header');
         const agElapsed = ((Date.now() - currentActivityGroup._startTime) / 1000).toFixed(1);
-        if (agHdr) { const p = agHdr.querySelector('.pondering'); if (p) { p.textContent = `Done (${agElapsed}s)`; p.classList.remove('pondering'); } }
+        const toolCount = currentActivityGroup._tools.length;
+        const unique = [...new Set(currentActivityGroup._tools)];
+        if (agHdr) {
+          const latest = agHdr.querySelector('.activity-latest');
+          if (latest) {
+            latest.classList.remove('pondering');
+            latest.innerHTML = `${unique.join(', ')} — ${toolCount} call${toolCount > 1 ? 's' : ''} (${agElapsed}s)`;
+          }
+        }
+        // Collapse the body by default after completion
+        const agBody = currentActivityGroup.querySelector('.chat-activity-body');
+        if (agBody) agBody.classList.remove('open');
+        const agToggle = currentActivityGroup.querySelector('.chat-thinking-toggle');
+        if (agToggle) agToggle.classList.remove('open');
         currentActivityGroup = null;
       }
       // Finalize any open thinking block (but allow new ones later)
@@ -1590,15 +1623,15 @@ function handleChatEvent(msg) {
         currentAssistantEl.appendChild(currentActivityGroup);
       }
 
-      // Update header to show latest tool (like Claude Code shows current action)
+      // Update header to show latest tool
       const latestEl = currentActivityGroup.querySelector('.activity-latest');
-      if (latestEl) latestEl.textContent = toolDesc;
+      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${toolName}</b> ${toolDesc}`;
 
       // Add tool entry
       const toolEntry = document.createElement('div');
       toolEntry.className = 'chat-tool-entry';
       toolEntry._startTime = Date.now();
-      toolEntry.innerHTML = `<span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-time pondering"></span>`;
+      toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-time pondering"></span>`;
       const toolResult = document.createElement('div');
       toolResult.className = 'chat-tool-result';
       toolEntry.addEventListener('click', (e) => { e.stopPropagation(); toolResult.classList.toggle('open'); });
