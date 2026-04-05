@@ -1572,11 +1572,14 @@ function handleChatEvent(msg) {
       }
       if (currentAssistantEl && msg.content) {
         chatTokenCount += Math.ceil(msg.content.length / 4);
-        let textEl = currentAssistantEl.querySelector('.chat-text');
-        if (!textEl) {
+        // Always append text to the LAST .chat-text, or create a new one at the end
+        // This ensures text after tool calls appears below them
+        let textEl = currentAssistantEl._currentTextEl;
+        if (!textEl || !currentAssistantEl.contains(textEl)) {
           textEl = document.createElement('div');
           textEl.className = 'chat-text';
           currentAssistantEl.appendChild(textEl);
+          currentAssistantEl._currentTextEl = textEl;
         }
         textEl._rawText = (textEl._rawText || '') + msg.content;
         textEl.innerHTML = marked.parse(textEl._rawText);
@@ -1601,6 +1604,9 @@ function handleChatEvent(msg) {
 
       // Format tool description like Claude Code: "Read src/main.py"
       const toolDesc = formatToolDesc(toolName, msg.input || {});
+
+      // New activity group — reset text element so next text goes after this group
+      if (currentAssistantEl) currentAssistantEl._currentTextEl = null;
 
       // Create or reuse activity group
       if (!currentActivityGroup) {
