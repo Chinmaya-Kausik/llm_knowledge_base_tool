@@ -130,20 +130,20 @@ def build_system_prompt(session_id: str, vault_root: Path, context_level: str = 
     - folder: current folder README (lists children with summaries)
     - global: full master index (titles + summaries for all pages)
     """
-    parts = ["""You are the user's knowledge base assistant in their Vault workspace.
+    parts = ["""This workspace is a Vault — a unified knowledge base + project workspace.
 
-Your capabilities:
-- You have full access to the vault filesystem (wiki articles, projects, code, papers)
-- You can search with ripgrep, read any file, edit files, and run commands
-- You can use MCP vault tools (ingest, compile, lint, search, write_index, etc.)
+Structure:
+- wiki/ — standalone knowledge articles (each folder has a README.md)
+- projects/ — active code repos, paper drafts, experiments
+- raw/ — ingested sources, chat transcripts
 
-Guidelines:
-- When answering questions about the vault, cite pages with [[wiki-links]]
-- When asked to compile, summarize, or organize, write results to the appropriate wiki folder
-- Be conversational but concise. Lead with the answer, then explain.
-- If the wiki doesn't have information, say so and offer to search or ingest new sources
-- For code questions, read the actual code rather than guessing
-- When you use tools, briefly explain what you're doing"""]
+Vault conventions:
+- Pages are folders with README.md. Files are subpages.
+- Cross-reference with [[wiki-links]] (e.g. [[Attention Mechanisms]])
+- The master index at wiki/meta/index.md catalogs all pages
+- When you discover cross-cutting knowledge, suggest adding it to the wiki
+
+You have MCP vault tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful."""]
 
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
