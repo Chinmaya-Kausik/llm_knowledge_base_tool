@@ -270,8 +270,6 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         from claude_agent_sdk import (
             AssistantMessage,
             ClaudeAgentOptions,
-            ClaudeSDKClient,
-            HookMatcher,
             ResultMessage,
             StreamEvent,
             SystemMessage,
@@ -280,17 +278,12 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             TaskStartedMessage,
             UserMessage,
         )
-        from vault_mcp.subagent_control import SubagentController
 
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
         sdk_sid = sessions.get(session_id, {}).get("sdk_session_id")
         has_run = sessions.get(session_id, {}).get("has_run", False)
         model = sessions.get(session_id, {}).get("model")
-
-        # Subagent controller with hooks
-        controller = SubagentController(vault_root)
-        sessions.setdefault(session_id, {})["controller"] = controller
 
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
@@ -300,32 +293,16 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             permission_mode="auto",
             resume=sdk_sid if has_run and sdk_sid else None,
             model=model,
-            hooks={
-                "PreToolUse": [HookMatcher(matcher=None, hooks=[controller.pre_tool_use_hook], timeout=300)],
-                "SubagentStart": [HookMatcher(matcher=None, hooks=[controller.subagent_start_hook])],
-                "SubagentStop": [HookMatcher(matcher=None, hooks=[controller.subagent_stop_hook])],
-            },
         )
 
-        # Use ClaudeSDKClient for bidirectional control
-        client = ClaudeSDKClient(options)
-        sessions[session_id]["client"] = client
-        sessions[session_id]["has_run"] = True
+        sessions.setdefault(session_id, {})["has_run"] = True
 
         streamed_text = False
         sent_tool_ids = set()
         current_subagent_task_id = None
 
-        # Connect and stream
-        if has_run and sdk_sid:
-            await client.connect()
-            await client.query(prompt)
-            event_stream = client.receive_response()
-        else:
-            await client.connect(prompt)
-            event_stream = client.receive_messages()
-
-        async for event in event_stream:
+        from claude_agent_sdk import query
+        async for event in query(prompt=prompt, options=options):
             try:
                 if isinstance(event, StreamEvent):
                     ev = getattr(event, 'event', None) or {}
@@ -440,27 +417,13 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             await websocket.send_json({"type": "done"})
         except Exception:
             pass
-        finally:
-            try:
-                await client.disconnect()
-            except Exception:
-                pass
 
     except asyncio.CancelledError:
-        try:
-            client.interrupt()
-            await client.disconnect()
-        except Exception:
-            pass
         try:
             await websocket.send_json({"type": "stopped"})
         except Exception:
             pass
     except Exception as e:
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
         try:
             await websocket.send_json({"type": "error", "message": str(e)})
         except Exception:
