@@ -482,7 +482,29 @@ async def api_update_page(path: str, request: Request):
 
 @app.get("/api/settings")
 def api_get_settings():
-    return {"vault_root": str(VAULT_ROOT)}
+    import subprocess
+    # Check Claude auth status
+    auth_check = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True)
+    authenticated = auth_check.returncode == 0
+    return {"vault_root": str(VAULT_ROOT), "claude_authenticated": authenticated}
+
+
+@app.post("/api/claude-auth")
+async def api_claude_auth():
+    """Trigger Claude auth login. Opens browser for OAuth flow."""
+    import subprocess
+    result = subprocess.run(
+        ["claude", "auth", "login", "--no-browser"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode == 0:
+        return {"message": "Already authenticated."}
+    # Try with browser
+    try:
+        subprocess.Popen(["claude", "auth", "login"])
+        return {"message": "Auth flow started. Check your browser to complete login."}
+    except Exception as e:
+        return {"error": f"Failed to start auth: {e}"}
 
 
 @app.put("/api/settings")

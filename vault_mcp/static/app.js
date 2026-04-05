@@ -839,7 +839,9 @@ function applyFilters() {
     const category = card.dataset.category||'misc';
     const meta = cardMeta.get(path);
     const t = meta?.frontmatter?.tags||[];
-    const typeMatch = types.has(type) || types.has(category);
+    // Type filter applies to wiki types (concept, summary, etc.). Non-wiki files always pass.
+    const isWikiType = ['concept','summary','index','answer','structure-note'].includes(type);
+    const typeMatch = !isWikiType || types.has(type);
     const tagMatch = tags===null || t.some(x=>tags.has(x));
     const ftMatch = filetypes.has(category);
     card.style.display = (typeMatch && tagMatch && ftMatch) ? '' : 'none';
@@ -1428,17 +1430,32 @@ async function renderPdfInElement(container, pdfUrl) {
 // ========================================
 async function showSettings() {
   const resp = await fetch('/api/settings').then(r => r.json());
-  const newRoot = prompt(`Vault root directory:\n\nCurrent: ${resp.vault_root}\n\nEnter new path (or cancel):`, resp.vault_root);
-  if (newRoot && newRoot !== resp.vault_root) {
-    const result = await fetch('/api/settings', {
-      method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ vault_root: newRoot }),
-    }).then(r => r.json());
-    if (result.ok) {
-      alert('Vault root updated. Restart the server for changes to take effect.');
-    } else {
-      alert('Failed: ' + (result.error || 'unknown error'));
+  const authStatus = resp.claude_authenticated ? 'Logged in' : 'Not logged in';
+
+  const action = prompt(
+    `Vault Settings\n\n` +
+    `Vault root: ${resp.vault_root}\n` +
+    `Claude auth: ${authStatus}\n\n` +
+    `Enter:\n` +
+    `  1 — Change vault root\n` +
+    `  2 — Login to Claude\n` +
+    `  (or Cancel)`,
+    ''
+  );
+
+  if (action === '1') {
+    const newRoot = prompt('Enter new vault root path:', resp.vault_root);
+    if (newRoot && newRoot !== resp.vault_root) {
+      const result = await fetch('/api/settings', {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ vault_root: newRoot }),
+      }).then(r => r.json());
+      if (result.ok) alert('Vault root updated. Restart the server for changes to take effect.');
+      else alert('Failed: ' + (result.error || 'unknown'));
     }
+  } else if (action === '2') {
+    const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+    alert(result.message || result.error || 'Auth attempt completed');
   }
 }
 
