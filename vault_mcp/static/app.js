@@ -1739,9 +1739,9 @@ function handleChatEvent(msg) {
         currentActivityGroup._startTime = Date.now();
         const groupHeader = document.createElement('div');
         groupHeader.className = 'chat-activity-header';
-        groupHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="activity-latest pondering"></span>`;
+        groupHeader.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="activity-latest pondering"></span>`;
         const groupBody = document.createElement('div');
-        groupBody.className = 'chat-activity-body open';
+        groupBody.className = 'chat-activity-body';
         groupHeader.addEventListener('click', (e) => {
           e.stopPropagation();
           groupBody.classList.toggle('open');
@@ -1924,11 +1924,22 @@ function handleChatEvent(msg) {
 async function saveChatTranscript() {
   if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
   try {
-    await fetch('/api/chat/save', {
+    const resp = await fetch('/api/chat/save', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages }),
     });
-  } catch { /* silent — don't block UI on save failure */ }
+    const data = await resp.json();
+    console.log('Chat saved:', data);
+  } catch (e) { console.error('Chat save failed:', e); }
+}
+
+function saveChatBeacon() {
+  // For beforeunload — sendBeacon is the only reliable method
+  if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
+  const blob = new Blob([JSON.stringify({
+    session_id: chatSessionId, messages: chatMessages,
+  })], { type: 'application/json' });
+  navigator.sendBeacon('/api/chat/save', blob);
 }
 
 function appendChatMessage(role, text) {
@@ -2200,15 +2211,7 @@ async function init() {
   });
 
   // Save chat on page close
-  window.addEventListener('beforeunload', () => {
-    if (chatMessages.length > 0 && !chatIsTemporary) {
-      // Use sendBeacon for reliable save on close
-      navigator.sendBeacon('/api/chat/save', JSON.stringify({
-        session_id: chatSessionId || 'unknown',
-        messages: chatMessages,
-      }));
-    }
-  });
+  window.addEventListener('beforeunload', () => saveChatBeacon());
 
   await Promise.all([initGraphView(), initSidebar()]);
   populateTagFilter();
