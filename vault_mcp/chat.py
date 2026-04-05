@@ -202,6 +202,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             ResultMessage,
             StreamEvent,
             SystemMessage,
+            TaskNotificationMessage,
+            TaskProgressMessage,
+            TaskStartedMessage,
             UserMessage,
             query,
         )
@@ -299,6 +302,30 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                     result = getattr(event, 'result', '')
                     if result:
                         await websocket.send_json({"type": "result", "content": result})
+
+                elif isinstance(event, TaskStartedMessage):
+                    await websocket.send_json({
+                        "type": "subagent_started",
+                        "task_id": getattr(event, 'task_id', ''),
+                        "description": getattr(event, 'description', ''),
+                        "task_type": getattr(event, 'task_type', ''),
+                    })
+
+                elif isinstance(event, TaskProgressMessage):
+                    await websocket.send_json({
+                        "type": "subagent_progress",
+                        "task_id": getattr(event, 'task_id', ''),
+                        "description": getattr(event, 'description', ''),
+                        "last_tool": getattr(event, 'last_tool_name', ''),
+                    })
+
+                elif isinstance(event, TaskNotificationMessage):
+                    await websocket.send_json({
+                        "type": "subagent_done",
+                        "task_id": getattr(event, 'task_id', ''),
+                        "status": getattr(event, 'status', ''),
+                        "summary": getattr(event, 'summary', ''),
+                    })
 
                 elif isinstance(event, SystemMessage):
                     subtype = getattr(event, 'subtype', '')

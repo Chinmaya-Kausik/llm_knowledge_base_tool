@@ -632,6 +632,25 @@ body {
 .chat-tool-result.open { display: block; }
 .thinking-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 
+/* Subagent nested blocks */
+.chat-subagent {
+  margin: 6px 0; border-left: 2px solid var(--accent2); padding-left: 10px;
+  background: rgba(0,0,0,0.1); border-radius: 0 var(--radius) var(--radius) 0;
+}
+.chat-subagent-header {
+  display: flex; align-items: center; gap: 6px; padding: 5px 0;
+  font-size: 11px; color: var(--accent2); cursor: pointer;
+}
+.chat-subagent-header:hover { color: var(--text); }
+.chat-subagent-desc { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-subagent-status { font-size: 10px; color: var(--text-muted); }
+.chat-subagent-body { padding: 2px 0; }
+.chat-subagent-body.collapsed { display: none; }
+.chat-subagent-summary {
+  font-size: 11px; color: var(--text-muted); padding: 4px 0;
+  border-top: 1px solid var(--border); margin-top: 4px;
+}
+
 /* Chat text content */
 .chat-text { line-height: 1.55; }
 .chat-text p { margin: 4px 0; }

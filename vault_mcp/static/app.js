@@ -1148,6 +1148,7 @@ let chatTokenCount = 0;
 let chatTimerInterval = null;
 let currentActivityGroup = null; // Groups consecutive tool uses
 let selectedCards = new Set(); // Multi-select with Cmd+click
+let activeSubagents = new Map(); // task_id → DOM element
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1792,6 +1793,74 @@ function handleChatEvent(msg) {
       break;
     }
 
+    case 'subagent_started': {
+      if (!currentAssistantEl) break;
+      const taskId = msg.task_id || '';
+      const subEl = document.createElement('div');
+      subEl.className = 'chat-subagent';
+      subEl.dataset.taskId = taskId;
+
+      const subHeader = document.createElement('div');
+      subHeader.className = 'chat-subagent-header';
+      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${msg.description || msg.task_type || 'Subagent'}</span> <span class="chat-subagent-status">running</span>`;
+
+      const subBody = document.createElement('div');
+      subBody.className = 'chat-subagent-body';
+
+      subHeader.addEventListener('click', (e) => {
+        e.stopPropagation();
+        subBody.classList.toggle('collapsed');
+        subHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
+      });
+
+      subEl.appendChild(subHeader);
+      subEl.appendChild(subBody);
+      currentAssistantEl.appendChild(subEl);
+      activeSubagents.set(taskId, { el: subEl, body: subBody, header: subHeader });
+      break;
+    }
+
+    case 'subagent_progress': {
+      const sub = activeSubagents.get(msg.task_id);
+      if (sub) {
+        // Update the header with latest tool
+        const desc = sub.header.querySelector('.chat-subagent-desc');
+        if (desc && msg.last_tool) desc.textContent = `${msg.description || ''} — ${formatToolDesc(msg.last_tool, {})}`;
+        const status = sub.header.querySelector('.chat-subagent-status');
+        if (status) status.textContent = msg.description || 'working';
+      }
+      break;
+    }
+
+    case 'subagent_done': {
+      const sub2 = activeSubagents.get(msg.task_id);
+      if (sub2) {
+        const status2 = sub2.header.querySelector('.chat-subagent-status');
+        if (status2) {
+          status2.textContent = msg.status || 'done';
+          status2.style.color = msg.status === 'completed' ? 'var(--green)' : msg.status === 'failed' ? 'var(--red)' : 'var(--text-muted)';
+        }
+        const pond = sub2.header.querySelector('.pondering');
+        if (pond) pond.classList.remove('pondering');
+
+        // Show summary
+        if (msg.summary) {
+          const summaryEl = document.createElement('div');
+          summaryEl.className = 'chat-subagent-summary';
+          summaryEl.textContent = msg.summary.slice(0, 200);
+          sub2.el.appendChild(summaryEl);
+        }
+
+        // Collapse the body by default after completion
+        sub2.body.classList.add('collapsed');
+        const toggle = sub2.header.querySelector('.chat-thinking-toggle');
+        if (toggle) toggle.classList.remove('open');
+
+        activeSubagents.delete(msg.task_id);
+      }
+      break;
+    }
+
     case 'done':
     case 'stopped':
       // Track assistant response
@@ -1814,6 +1883,7 @@ function handleChatEvent(msg) {
       currentThinkingEl = null;
       currentThinkingWrapper = null;
       currentActivityGroup = null;
+      activeSubagents.clear();
       chatStartTime = null;
       break;
 
