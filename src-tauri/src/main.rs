@@ -4,18 +4,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::process::Command;
-use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             // Start the Python web server in the background
-            let vault_root = std::env::var("VAULT_ROOT")
-                .unwrap_or_else(|_| {
-                    dirs::home_dir()
-                        .map(|h| h.join("vault").to_string_lossy().to_string())
-                        .unwrap_or_else(|| ".".to_string())
-                });
+            let vault_root = std::env::var("VAULT_ROOT").unwrap_or_else(|_| {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                format!("{}/vault", home)
+            });
 
             std::thread::spawn(move || {
                 let status = Command::new("uv")

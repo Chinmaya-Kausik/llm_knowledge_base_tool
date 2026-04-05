@@ -45,3 +45,5 @@ htmlcov/
 raw/
 wiki/
 outputs/
+src-tauri/target/
+src-tauri/icons/android/

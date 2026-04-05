@@ -10,7 +10,6 @@
     "frontendDist": "http://localhost:8420"
   },
   "app": {
-    "title": "Vault — Knowledge Base",
     "windows": [
       {
         "title": "Vault",
