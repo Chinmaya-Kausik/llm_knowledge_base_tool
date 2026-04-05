@@ -1119,6 +1119,19 @@ function initChat() {
     toggleChat();
   });
 
+  // Double-click header → fullscreen chat
+  document.getElementById('chat-header').addEventListener('dblclick', (e) => {
+    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    e.stopPropagation();
+    clearChatClasses();
+    panel.classList.add('chat-float');
+    chatDockMode = 'float';
+    panel.style.left = '0'; panel.style.top = '0';
+    panel.style.right = '0'; panel.style.bottom = '0';
+    panel.style.width = '100vw'; panel.style.height = '100vh';
+    connectChat();
+  });
+
   // Dock buttons
   document.getElementById('chat-dock-bottom').onclick = (e) => { e.stopPropagation(); setChatMode('bottom', false); };
   document.getElementById('chat-dock-right').onclick = (e) => { e.stopPropagation(); setChatMode('right', false); };
@@ -1184,10 +1197,25 @@ function initChat() {
   // Context level dropdown
   const ctxBtn = document.getElementById('chat-context-btn');
   const ctxMenu = document.getElementById('chat-context-menu');
+  function positionMenu(btn, menu) {
+    const rect = btn.getBoundingClientRect();
+    const menuH = 120; // Approximate
+    // If there's room below, open downward; otherwise upward
+    if (rect.bottom + menuH < window.innerHeight) {
+      menu.style.top = rect.bottom + 4 + 'px';
+      menu.style.bottom = '';
+    } else {
+      menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+      menu.style.top = '';
+    }
+    menu.style.left = rect.left + 'px';
+  }
+
   ctxBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    modelMenu.classList.remove('open');
     ctxMenu.classList.toggle('open');
-    document.getElementById('chat-model-menu').classList.remove('open');
+    if (ctxMenu.classList.contains('open')) positionMenu(ctxBtn, ctxMenu);
   });
   ctxMenu.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1204,8 +1232,9 @@ function initChat() {
   const modelMenu = document.getElementById('chat-model-menu');
   modelBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    modelMenu.classList.toggle('open');
     ctxMenu.classList.remove('open');
+    modelMenu.classList.toggle('open');
+    if (modelMenu.classList.contains('open')) positionMenu(modelBtn, modelMenu);
   });
   modelMenu.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1406,11 +1435,14 @@ function handleChatEvent(msg) {
   switch (msg.type) {
     case 'thinking':
       if (!currentThinkingWrapper) {
+        // Create a new thinking block (there can be multiple per response)
         currentThinkingWrapper = document.createElement('div');
         currentThinkingWrapper.className = 'chat-thinking-wrapper';
+        currentThinkingWrapper._startTime = Date.now();
+        currentThinkingWrapper._tokens = 0;
         const header = document.createElement('div');
         header.className = 'chat-thinking-header';
-        header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering">Thinking...</span>';
+        header.innerHTML = '<span class="chat-thinking-toggle">▶</span> <span class="pondering">Thinking...</span> <span class="thinking-time"></span>';
         currentThinkingEl = document.createElement('div');
         currentThinkingEl.className = 'chat-thinking-body';
         header.onclick = () => {
@@ -1423,15 +1455,20 @@ function handleChatEvent(msg) {
       }
       if (msg.content) {
         currentThinkingEl.textContent += msg.content;
-        chatTokenCount += Math.ceil(msg.content.length / 4); // Rough token estimate
+        currentThinkingWrapper._tokens += Math.ceil(msg.content.length / 4);
+        chatTokenCount += Math.ceil(msg.content.length / 4);
+        // Update time display
+        const elapsed = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        currentThinkingWrapper.querySelector('.thinking-time').textContent = `${elapsed}s, ~${currentThinkingWrapper._tokens} tokens`;
       }
       break;
 
     case 'text':
-      // Close thinking section when text starts
+      // Finalize any open thinking block
       if (currentThinkingWrapper) {
         const header = currentThinkingWrapper.querySelector('.chat-thinking-header');
-        if (header) header.querySelector('.pondering').textContent = 'Thought';
+        const elapsed = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        if (header) header.querySelector('.pondering').textContent = `Thought (${elapsed}s)`;
         currentThinkingWrapper = null;
         currentThinkingEl = null;
       }
@@ -1452,26 +1489,48 @@ function handleChatEvent(msg) {
       break;
 
     case 'tool_use':
+      // Finalize any open thinking block before tool use
+      if (currentThinkingWrapper) {
+        const header = currentThinkingWrapper.querySelector('.chat-thinking-header');
+        const elapsed = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        if (header) header.querySelector('.pondering').textContent = `Thought (${elapsed}s)`;
+        currentThinkingWrapper = null;
+        currentThinkingEl = null;
+      }
       if (currentAssistantEl) {
+        const toolWrapper = document.createElement('div');
+        toolWrapper.className = 'chat-tool-wrapper';
+        toolWrapper._startTime = Date.now();
         const toolEl = document.createElement('div');
         toolEl.className = 'chat-tool-use';
-        toolEl.textContent = `${msg.tool || 'tool'}(${JSON.stringify(msg.input || {}).slice(0, 80)})`;
+        toolEl.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">${msg.tool || 'tool'}</span> <span class="tool-input">${JSON.stringify(msg.input || {}).slice(0, 60)}</span> <span class="tool-time"></span>`;
+        const resultEl = document.createElement('div');
+        resultEl.className = 'chat-tool-result';
         toolEl.onclick = () => {
-          const result = toolEl.nextElementSibling;
-          if (result?.classList.contains('chat-tool-result')) {
-            result.style.display = result.style.display === 'none' ? '' : 'none';
-          }
+          resultEl.classList.toggle('open');
+          toolEl.querySelector('.chat-thinking-toggle').classList.toggle('open');
         };
-        currentAssistantEl.appendChild(toolEl);
+        toolWrapper.appendChild(toolEl);
+        toolWrapper.appendChild(resultEl);
+        currentAssistantEl.appendChild(toolWrapper);
       }
       break;
 
     case 'tool_result':
       if (currentAssistantEl) {
-        const resultEl = document.createElement('div');
-        resultEl.className = 'chat-tool-result';
-        resultEl.textContent = msg.output || '';
-        currentAssistantEl.appendChild(resultEl);
+        // Find the last tool wrapper and fill in the result
+        const wrappers = currentAssistantEl.querySelectorAll('.chat-tool-wrapper');
+        const lastWrapper = wrappers[wrappers.length - 1];
+        if (lastWrapper) {
+          const resultEl = lastWrapper.querySelector('.chat-tool-result');
+          if (resultEl) resultEl.textContent = msg.output || '';
+          const elapsed = ((Date.now() - (lastWrapper._startTime || Date.now())) / 1000).toFixed(1);
+          const timeEl = lastWrapper.querySelector('.tool-time');
+          if (timeEl) timeEl.textContent = `${elapsed}s`;
+          // Stop the pondering animation
+          const pondering = lastWrapper.querySelector('.pondering');
+          if (pondering) pondering.classList.remove('pondering');
+        }
       }
       break;
 

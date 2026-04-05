@@ -537,9 +537,9 @@ body {
 }
 .chat-context-btn:hover { color: var(--text) !important; border-color: var(--accent) !important; }
 .chat-context-menu {
-  display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 4px;
+  display: none; position: fixed;
   background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 4px; z-index: 300;
+  border-radius: var(--radius); padding: 4px; z-index: 500;
   min-width: 180px; box-shadow: var(--shadow);
 }
 .chat-context-menu.open { display: block; }
@@ -598,17 +598,25 @@ body {
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+/* Tool use blocks */
+.chat-tool-wrapper { margin: 4px 0; }
 .chat-tool-use {
-  font-size: 11px; color: var(--text-muted); padding: 3px 8px;
-  background: var(--bg); border-radius: var(--radius); margin: 4px 0;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-muted); padding: 4px 8px;
+  background: var(--bg); border-radius: var(--radius);
   cursor: pointer;
 }
-.chat-tool-use::before { content: "⚡ "; }
+.chat-tool-use:hover { color: var(--text); }
+.tool-input { color: var(--text-muted); font-size: 10px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.tool-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 .chat-tool-result {
   display: none; font-size: 11px; color: var(--text-muted);
   padding: 4px 8px; background: var(--bg); border-radius: var(--radius);
-  max-height: 100px; overflow-y: auto; margin: 2px 0 4px;
+  max-height: 150px; overflow-y: auto; margin: 2px 0 4px;
+  border-left: 2px solid var(--green); white-space: pre-wrap;
 }
+.chat-tool-result.open { display: block; }
+.thinking-time { font-size: 10px; color: var(--text-muted); margin-left: auto; }
 
 #chat-input-area {
   display: flex; gap: 6px; padding: 8px 10px;
