@@ -184,14 +184,10 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         mcp_config = vault_root / ".claude" / "mcp.json"
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
-        from claude_agent_sdk import ThinkingConfigAdaptive
-
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
             system_prompt=system_prompt,
             include_partial_messages=True,
-            thinking=ThinkingConfigAdaptive(),
-            permission_mode="auto",
             resume=session_id if session_id in sessions and sessions[session_id].get("has_run") else None,
             session_id=session_id,
         )
@@ -199,35 +195,40 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         sessions.setdefault(session_id, {})["has_run"] = True
 
         async for event in query(prompt=prompt, options=options):
-            if isinstance(event, StreamEvent):
-                # Parse streaming events for partial text and thinking
-                ev = event.event if hasattr(event, 'event') else {}
-                if isinstance(ev, dict):
-                    ev_type = ev.get("type", "")
-                    delta = ev.get("delta", {})
+            try:
+                if isinstance(event, StreamEvent):
+                    ev = getattr(event, 'event', None) or {}
+                    if isinstance(ev, dict):
+                        ev_type = ev.get("type", "")
+                        delta = ev.get("delta", {})
 
-                    if delta.get("type") == "thinking_delta":
-                        await websocket.send_json({
-                            "type": "thinking",
-                            "content": delta.get("thinking", ""),
-                        })
-                    elif delta.get("type") == "text_delta":
-                        await websocket.send_json({
-                            "type": "text",
-                            "content": delta.get("text", ""),
-                        })
+                        if isinstance(delta, dict):
+                            if delta.get("type") == "thinking_delta":
+                                await websocket.send_json({
+                                    "type": "thinking",
+                                    "content": delta.get("thinking", ""),
+                                })
+                            elif delta.get("type") == "text_delta":
+                                await websocket.send_json({
+                                    "type": "text",
+                                    "content": delta.get("text", ""),
+                                })
 
-            elif isinstance(event, AssistantMessage):
-                # Full message with content blocks
-                for block in getattr(event, 'content', []):
-                    if hasattr(block, 'type'):
-                        if block.type == 'tool_use':
+                elif isinstance(event, AssistantMessage):
+                    for block in getattr(event, 'content', []):
+                        block_type = getattr(block, 'type', None)
+                        if block_type == 'text':
+                            await websocket.send_json({
+                                "type": "text",
+                                "content": getattr(block, 'text', ''),
+                            })
+                        elif block_type == 'tool_use':
                             await websocket.send_json({
                                 "type": "tool_use",
                                 "tool": getattr(block, 'name', 'unknown'),
                                 "input": getattr(block, 'input', {}),
                             })
-                        elif block.type == 'tool_result':
+                        elif block_type == 'tool_result':
                             output = getattr(block, 'content', '')
                             if isinstance(output, list):
                                 output = ' '.join(str(x) for x in output)
@@ -235,22 +236,32 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                                 "type": "tool_result",
                                 "output": str(output)[:2000],
                             })
+                        elif block_type == 'thinking':
+                            await websocket.send_json({
+                                "type": "thinking",
+                                "content": getattr(block, 'thinking', ''),
+                            })
 
-            elif isinstance(event, ResultMessage):
-                # Final result
-                result = getattr(event, 'result', '')
-                if result:
-                    await websocket.send_json({"type": "result", "content": result})
+                elif isinstance(event, ResultMessage):
+                    result = getattr(event, 'result', '')
+                    if result:
+                        await websocket.send_json({"type": "result", "content": result})
 
-            elif isinstance(event, SystemMessage):
-                # System events (init, etc.)
-                subtype = getattr(event, 'subtype', '')
-                if subtype == 'init':
-                    data = getattr(event, 'data', {})
-                    if isinstance(data, dict) and 'session_id' in data:
-                        sessions[session_id]["sdk_session_id"] = data["session_id"]
+                elif isinstance(event, SystemMessage):
+                    subtype = getattr(event, 'subtype', '')
+                    if subtype == 'init':
+                        data = getattr(event, 'data', {})
+                        if isinstance(data, dict) and 'session_id' in data:
+                            sessions[session_id]["sdk_session_id"] = data["session_id"]
 
-        await websocket.send_json({"type": "done"})
+            except Exception as send_err:
+                # Don't let a single event parsing error kill the stream
+                continue
+
+        try:
+            await websocket.send_json({"type": "done"})
+        except Exception:
+            pass
 
     except asyncio.CancelledError:
         try:
