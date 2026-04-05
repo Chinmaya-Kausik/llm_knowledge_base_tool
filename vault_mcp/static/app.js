@@ -1087,17 +1087,42 @@ function initChat() {
     e.stopPropagation();
     panel.classList.remove('chat-collapsed', 'chat-right', 'chat-float');
     panel.classList.add('chat-bottom');
+    panel.style.left = ''; panel.style.top = ''; // Reset float position
   };
   document.getElementById('chat-dock-right').onclick = (e) => {
     e.stopPropagation();
     panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-float');
     panel.classList.add('chat-right');
+    panel.style.left = ''; panel.style.top = '';
   };
   document.getElementById('chat-dock-float').onclick = (e) => {
     e.stopPropagation();
     panel.classList.remove('chat-collapsed', 'chat-bottom', 'chat-right');
     panel.classList.add('chat-float');
   };
+
+  // Drag floating chat by its header
+  const chatHeader = document.getElementById('chat-header');
+  chatHeader.addEventListener('pointerdown', (e) => {
+    if (!panel.classList.contains('chat-float')) return;
+    if (e.target.closest('button') || e.target.closest('select')) return;
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const rect = panel.getBoundingClientRect();
+    const origX = rect.left, origY = rect.top;
+
+    function onMove(e) {
+      panel.style.left = (origX + e.clientX - startX) + 'px';
+      panel.style.top = (origY + e.clientY - startY) + 'px';
+      panel.style.right = 'auto'; panel.style.bottom = 'auto';
+    }
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  });
 
   // Send message
   sendBtn.onclick = () => sendChatMessage();
@@ -1117,39 +1142,49 @@ function connectChat() {
   if (chatWs && chatWs.readyState === WebSocket.OPEN) return;
 
   const status = document.getElementById('chat-status');
+  status.textContent = 'Connecting...';
+  status.className = '';
+
   const wsUrl = `ws://${location.host}/ws/chat`;
-  chatWs = new WebSocket(wsUrl);
+  try {
+    chatWs = new WebSocket(wsUrl);
+  } catch (e) {
+    status.textContent = 'Failed to connect';
+    return;
+  }
 
   chatWs.onopen = () => {
-    status.textContent = 'Connected';
-    status.className = 'connected';
     chatSessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
 
-    // Get current page path
     const level = currentLevel();
-    const pagePath = level.parentPath || '';
-
     chatWs.send(JSON.stringify({
       type: 'init',
       session_id: chatSessionId,
-      page_path: pagePath,
+      page_path: level.parentPath || '',
     }));
   };
 
   chatWs.onmessage = (e) => {
     const msg = JSON.parse(e.data);
+    // Mark as connected only after successful init response
+    if (msg.type === 'init') {
+      status.textContent = 'Connected';
+      status.className = 'connected';
+    }
     handleChatEvent(msg);
   };
 
   chatWs.onclose = () => {
     status.textContent = 'Disconnected';
     status.className = '';
+    chatWs = null;
   };
 
   chatWs.onerror = () => {
-    status.textContent = 'Error';
+    status.textContent = 'Connection failed';
     status.className = '';
+    chatWs = null;
   };
 }
 

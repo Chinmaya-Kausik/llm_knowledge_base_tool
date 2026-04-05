@@ -98,8 +98,11 @@ def build_prompt(text: str, context: dict, session_id: str, vault_root: Path) ->
     # Add selection context if provided
     selection = context.get("selection")
     selection_file = context.get("selection_file")
-    if selection and selection_file:
-        parts.append(f'The user has selected this text from `{selection_file}`:\n```\n{selection}\n```\n')
+    if selection:
+        if selection_file:
+            parts.append(f'The user has selected this text from `{selection_file}`:\n```\n{selection}\n```\n')
+        else:
+            parts.append(f'The user has selected this text:\n```\n{selection}\n```\n')
 
     parts.append(text)
     return "\n".join(parts)

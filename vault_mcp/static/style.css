@@ -472,10 +472,11 @@ body {
   transition: height 0.2s;
 }
 #chat-panel.chat-collapsed { height: 36px; overflow: hidden; }
-#chat-panel.chat-bottom { height: 300px; }
+#chat-panel.chat-bottom { height: 300px; resize: vertical; overflow: hidden; min-height: 36px; }
 #chat-panel.chat-right {
   position: fixed; right: 0; top: 36px; bottom: 0; width: 380px;
   height: auto; border-top: none; border-left: 1px solid var(--border); z-index: 200;
+  resize: horizontal; overflow: hidden; min-width: 200px;
 }
 #chat-panel.chat-float {
   position: fixed; right: 40px; bottom: 40px; width: 420px; height: 500px;
@@ -495,10 +496,12 @@ body {
   cursor: pointer; padding: 2px 6px;
 }
 #chat-context-level {
-  background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
-  font-family: var(--font); font-size: 11px; border-radius: 3px;
-  padding: 2px 4px; outline: none;
+  background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
+  font-family: var(--font); font-size: 11px; border-radius: var(--radius);
+  padding: 3px 6px; outline: none; cursor: pointer;
 }
+#chat-context-level:hover { color: var(--text); border-color: var(--accent); }
+#chat-context-level option { background: var(--bg-surface); color: var(--text); }
 #chat-status {
   font-size: 10px; color: var(--text-muted);
 }
