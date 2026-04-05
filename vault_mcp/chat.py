@@ -184,13 +184,16 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         mcp_config = vault_root / ".claude" / "mcp.json"
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
+        # Use the SDK's session ID for resume (not our browser session ID)
+        sdk_sid = sessions.get(session_id, {}).get("sdk_session_id")
+        has_run = sessions.get(session_id, {}).get("has_run", False)
+
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
             system_prompt=system_prompt,
             include_partial_messages=True,
             thinking={"type": "enabled", "budget_tokens": 10000},
-            resume=session_id if session_id in sessions and sessions[session_id].get("has_run") else None,
-            session_id=session_id,
+            resume=sdk_sid if has_run and sdk_sid else None,
         )
 
         sessions.setdefault(session_id, {})["has_run"] = True
