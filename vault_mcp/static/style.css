@@ -475,7 +475,7 @@ body {
 /* Chat collapsed states */
 #chat-panel.chat-collapsed { height: 36px; overflow: hidden; }
 #chat-panel.chat-collapsed-right {
-  position: fixed; right: 0; top: 0; bottom: 0; width: 36px; height: auto;
+  position: fixed; right: 0; top: 36px; bottom: 0; width: 24px; height: auto;
   border-left: 1px solid var(--border);
   z-index: 200; writing-mode: vertical-rl; overflow: hidden;
 }
@@ -498,7 +498,7 @@ body {
 /* Chat open states */
 #chat-panel.chat-bottom { height: 300px; resize: vertical; overflow: hidden; min-height: 60px; }
 #chat-panel.chat-right {
-  position: fixed; right: 0; top: 0; bottom: 0; width: 380px;
+  position: fixed; right: 0; top: 36px; bottom: 0; width: 380px;
   height: auto; border-top: none; border-left: 1px solid var(--border); z-index: 200;
   resize: horizontal; overflow: hidden; min-width: 200px;
 }

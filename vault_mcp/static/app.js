@@ -1107,9 +1107,11 @@ function initChat() {
 
   toggle.onclick = (e) => { e.stopPropagation(); toggleChat(); };
 
-  // Header click toggles collapse (except on interactive elements)
+  // Header click toggles collapse (except on interactive elements or after drag)
+  let chatDragOccurred = false;
   document.getElementById('chat-header').addEventListener('click', (e) => {
     if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    if (chatDragOccurred) { chatDragOccurred = false; return; }
     toggleChat();
   });
 
@@ -1131,6 +1133,7 @@ function initChat() {
       const dx = e.clientX - startX, dy = e.clientY - startY;
       if (!dragging && Math.abs(dx) + Math.abs(dy) < 4) return; // Dead zone
       dragging = true;
+      chatDragOccurred = true;
 
       // Detach to float if not already floating
       if (!panel.classList.contains('chat-float') && !panel.classList.contains('chat-collapsed-float')) {
