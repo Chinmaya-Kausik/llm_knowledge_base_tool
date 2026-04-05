@@ -783,9 +783,11 @@ function initFilterDropdowns() {
     if (!wasOpen) menu.classList.add('open');
   }
 
-  document.getElementById('filter-type-btn').onclick = (e) => toggleMenu('filter-type-menu', e);
-  document.getElementById('filter-tag-btn').onclick = (e) => toggleMenu('filter-tag-menu', e);
-  document.getElementById('filter-filetype-btn').onclick = (e) => toggleMenu('filter-filetype-menu', e);
+  document.getElementById('filter-type-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-type-menu', e); });
+  document.getElementById('filter-tag-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-tag-menu', e); });
+  document.getElementById('filter-filetype-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-filetype-menu', e); });
+  // Close menus on click outside — but stop menus themselves from closing
+  menus.forEach(id => document.getElementById(id)?.addEventListener('click', (e) => e.stopPropagation()));
   document.addEventListener('click', closeAll);
 
   // Type filter

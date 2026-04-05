@@ -6,8 +6,22 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-# Resolve vault root — configurable via VAULT_ROOT env var, defaults to parent of vault_mcp/
-VAULT_ROOT = Path(os.environ.get("VAULT_ROOT", Path(__file__).resolve().parent.parent))
+# Resolve vault root: env var > config file > default
+def _resolve_vault_root() -> Path:
+    if "VAULT_ROOT" in os.environ:
+        return Path(os.environ["VAULT_ROOT"])
+    config = Path.home() / ".vault-app-config.json"
+    if config.exists():
+        try:
+            import json as _json
+            data = _json.loads(config.read_text())
+            if data.get("vault_root"):
+                return Path(data["vault_root"])
+        except Exception:
+            pass
+    return Path.home() / "Documents" / "vault"
+
+VAULT_ROOT = _resolve_vault_root()
 
 mcp = FastMCP("vault", instructions="Personal knowledge base tools. All tools are deterministic — no LLM calls.")
 

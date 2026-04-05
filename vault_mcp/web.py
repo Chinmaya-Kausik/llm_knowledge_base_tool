@@ -18,7 +18,21 @@ from vault_mcp.tools import compile as compile_tools
 from vault_mcp.tools import lint as lint_tools
 from vault_mcp.tools import search as search_tools
 
-VAULT_ROOT = Path(os.environ.get("VAULT_ROOT", Path(__file__).resolve().parent.parent))
+def _resolve_vault_root() -> Path:
+    """Resolve vault root: env var > config file > default."""
+    if "VAULT_ROOT" in os.environ:
+        return Path(os.environ["VAULT_ROOT"])
+    config = Path.home() / ".vault-app-config.json"
+    if config.exists():
+        try:
+            data = json.loads(config.read_text())
+            if data.get("vault_root"):
+                return Path(data["vault_root"])
+        except Exception:
+            pass
+    return Path.home() / "Documents" / "vault"
+
+VAULT_ROOT = _resolve_vault_root()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
