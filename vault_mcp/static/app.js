@@ -1871,31 +1871,35 @@ function handleChatEvent(msg) {
 
       const subHeader = document.createElement('div');
       subHeader.className = 'chat-subagent-header';
-      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${msg.description || msg.task_type || 'Subagent'}</span> <span class="chat-subagent-status">running</span> <button class="subagent-stop" title="Stop all">Stop</button>`;
+      const subDesc = msg.description || msg.task_type || 'Subagent';
+      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span> <button class="subagent-redirect" title="Stop and redirect">Redirect</button>`;
 
       const subBody = document.createElement('div');
       subBody.className = 'chat-subagent-body';
 
-      // Stop button in header
-      subHeader.querySelector('.subagent-stop').addEventListener('click', (e) => {
-        e.stopPropagation();
+      function doRedirect() {
         if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
+        const input = document.getElementById('chat-input');
+        input.value = `The subagent "${subDesc}" was going in the wrong direction. Instead, `;
+        input.focus();
+      }
+
+      subHeader.querySelector('.subagent-redirect').addEventListener('click', (e) => {
+        e.stopPropagation(); doRedirect();
       });
 
       subHeader.addEventListener('click', (e) => {
-        if (e.target.closest('.subagent-stop')) return;
+        if (e.target.closest('.subagent-redirect')) return;
         e.stopPropagation();
         subBody.classList.toggle('collapsed');
         subHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
       });
 
-      // Sticky stop bar at bottom of body
       const stopBar = document.createElement('div');
-      stopBar.className = 'subagent-stop-bar';
-      stopBar.innerHTML = '<button class="subagent-stop">Stop All</button>';
+      stopBar.className = 'subagent-redirect-bar';
+      stopBar.innerHTML = '<button class="subagent-redirect">Redirect</button>';
       stopBar.querySelector('button').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
+        e.stopPropagation(); doRedirect();
       });
 
       subEl.appendChild(subHeader);

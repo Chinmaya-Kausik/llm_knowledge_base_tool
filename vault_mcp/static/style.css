@@ -646,13 +646,13 @@ body {
 .chat-subagent-status { font-size: 10px; color: var(--text-muted); }
 .chat-subagent-body { padding: 2px 0; }
 .chat-subagent-body.collapsed { display: none; }
-.subagent-stop {
-  background: transparent !important; border: 1px solid var(--red) !important;
-  color: var(--red) !important; font-size: 10px !important; padding: 1px 6px !important;
+.subagent-redirect {
+  background: transparent !important; border: 1px solid var(--orange) !important;
+  color: var(--orange) !important; font-size: 10px !important; padding: 1px 6px !important;
   border-radius: 3px !important; cursor: pointer; margin-left: auto;
 }
-.subagent-stop:hover { background: var(--red) !important; color: white !important; }
-.subagent-stop-bar {
+.subagent-redirect:hover { background: var(--orange) !important; color: var(--bg) !important; }
+.subagent-redirect-bar {
   padding: 4px 8px; border-top: 1px solid var(--border);
   position: sticky; bottom: 0; background: var(--bg-surface);
 }
