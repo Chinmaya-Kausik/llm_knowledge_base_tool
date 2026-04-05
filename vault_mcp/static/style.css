@@ -475,8 +475,8 @@ body {
 /* Chat collapsed states */
 #chat-panel.chat-collapsed { height: 36px; overflow: hidden; }
 #chat-panel.chat-collapsed-right {
-  position: fixed; right: 0; top: 50%; width: 36px; height: auto;
-  border: 1px solid var(--border); border-radius: var(--radius) 0 0 var(--radius);
+  position: fixed; right: 0; top: 0; bottom: 0; width: 36px; height: auto;
+  border-left: 1px solid var(--border);
   z-index: 200; writing-mode: vertical-rl; overflow: hidden;
 }
 #chat-panel.chat-collapsed-right #chat-header { flex-direction: column; padding: 10px 6px; }
