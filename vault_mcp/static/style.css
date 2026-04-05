@@ -93,24 +93,25 @@ body {
 .filter-menu button:hover { text-decoration: underline; }
 
 /* Settings dropdown specifics */
-.settings-menu { min-width: 260px; right: 0; }
-.settings-section { display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
-.settings-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.settings-value { font-size: 11px; color: var(--text); }
+.settings-menu { min-width: 260px; right: 0; padding: 10px 12px; }
+.settings-section { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
+.settings-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+.settings-value { font-size: 11px; color: var(--text); padding: 2px 0; }
 .settings-input {
   background: var(--bg); border: 1px solid var(--border); color: var(--text);
-  font-family: var(--font); font-size: 11px; padding: 4px 6px;
-  border-radius: 3px; outline: none; width: 100%;
+  font-family: var(--font); font-size: 11px; padding: 5px 8px;
+  border-radius: var(--radius); outline: none; width: 100%;
 }
 .settings-input:focus { border-color: var(--accent); }
 .settings-action {
   background: var(--bg-surface2) !important; border: 1px solid var(--border) !important;
-  color: var(--text) !important; padding: 4px 8px !important; border-radius: 3px !important;
+  color: var(--text) !important; padding: 5px 10px !important; border-radius: var(--radius) !important;
   cursor: pointer; font-size: 11px !important; text-decoration: none !important;
-  text-align: center; display: inline-block !important;
+  text-align: center; display: inline-block !important; margin-top: 2px;
 }
 .settings-action:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
-.settings-range { width: 100%; }
+.settings-range { width: 100%; accent-color: var(--accent); }
+.settings-menu hr { border-color: var(--border); margin: 6px 0; }
 
 #btn-auto-layout, #btn-fit {
   background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);

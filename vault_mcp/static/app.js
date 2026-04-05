@@ -1070,8 +1070,8 @@ function initChat() {
   const sendBtn = document.getElementById('chat-send');
   const stopBtn = document.getElementById('chat-stop');
 
-  // Toggle panel
-  toggle.onclick = () => {
+  // Toggle: click header bar to collapse/expand (not just the button)
+  function toggleChatPanel() {
     if (panel.classList.contains('chat-collapsed')) {
       panel.classList.remove('chat-collapsed');
       panel.classList.add('chat-bottom');
@@ -1079,8 +1079,19 @@ function initChat() {
     } else {
       panel.classList.remove('chat-bottom', 'chat-right', 'chat-float');
       panel.classList.add('chat-collapsed');
+      panel.style.left = ''; panel.style.top = '';
     }
-  };
+  }
+  toggle.onclick = toggleChatPanel;
+
+  // Click on header bar (not buttons/selects inside it) also toggles
+  document.getElementById('chat-header').addEventListener('click', (e) => {
+    // Don't toggle if clicking on buttons, selects, or dock controls
+    if (e.target.closest('button') || e.target.closest('select')) return;
+    // Don't toggle if in float mode (header is for dragging there)
+    if (panel.classList.contains('chat-float')) return;
+    toggleChatPanel();
+  });
 
   // Dock buttons
   document.getElementById('chat-dock-bottom').onclick = (e) => {

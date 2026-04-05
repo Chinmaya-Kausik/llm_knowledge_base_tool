@@ -491,20 +491,20 @@ def api_get_settings():
 
 @app.post("/api/claude-auth")
 async def api_claude_auth():
-    """Trigger Claude auth login. Opens browser for OAuth flow."""
+    """Trigger Claude auth login via browser OAuth."""
     import subprocess
-    result = subprocess.run(
-        ["claude", "auth", "login", "--no-browser"],
-        capture_output=True, text=True, timeout=10,
-    )
-    if result.returncode == 0:
+    # Check if already authenticated
+    check = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True, timeout=5)
+    if check.returncode == 0:
         return {"message": "Already authenticated."}
-    # Try with browser
+    # Open browser-based auth
     try:
         subprocess.Popen(["claude", "auth", "login"])
-        return {"message": "Auth flow started. Check your browser to complete login."}
+        return {"message": "Browser opened for login. Complete auth there, then come back."}
+    except FileNotFoundError:
+        return {"error": "Claude CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"}
     except Exception as e:
-        return {"error": f"Failed to start auth: {e}"}
+        return {"error": f"Failed: {e}"}
 
 
 @app.put("/api/settings")
