@@ -1509,28 +1509,26 @@ function initChat() {
 
   function updateRedirectInputArea() {
     const preview = document.getElementById('chat-context-preview');
+    const numCheckpoints = redirectCheckpoints.size;
 
-    // Build compact one-line summary
-    const parts = [];
-    for (const [tid, sub] of redirectSnapshot) {
-      const desc = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'Agent';
-      const shortDesc = desc.length > 20 ? desc.slice(0, 20) + '...' : desc;
-      if (redirectCheckpoints.has(tid)) {
-        parts.push(`<b>${shortDesc}</b>: redirecting`);
-      } else {
-        parts.push(`${shortDesc}: continues`);
+    if (numCheckpoints === 0) {
+      preview.innerHTML = `<span class="ctx-text">Choose breakpoints by clicking on tool calls above</span><span class="ctx-remove" title="Cancel">✕</span>`;
+    } else {
+      const agents = [];
+      for (const [tid] of redirectCheckpoints) {
+        const sub = redirectSnapshot.get(tid);
+        const desc = sub?.header?.querySelector('.chat-subagent-desc')?.textContent || 'Agent';
+        agents.push(desc.length > 25 ? desc.slice(0, 25) + '...' : desc);
       }
+      preview.innerHTML = `<span class="ctx-text">Redirecting: ${agents.join(', ')}</span><span class="ctx-remove" title="Cancel">✕</span>`;
     }
-
-    const summaryText = parts.length > 0 ? parts.join('. ') + '.' : 'Select breakpoints above.';
-    preview.innerHTML = `<span class="ctx-text">${summaryText}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
     preview.style.display = 'flex';
     preview.querySelector('.ctx-remove').onclick = () => exitCheckpointMode();
 
     const input = document.getElementById('chat-input');
-    input.placeholder = redirectCheckpoints.size > 0
+    input.placeholder = numCheckpoints > 0
       ? 'Type redirect instructions...'
-      : 'Select breakpoints on tool calls above, then type here...';
+      : 'Choose breakpoints above, then type here...';
   }
 
   function exitCheckpointMode() {
@@ -2048,7 +2046,12 @@ function handleChatEvent(msg) {
         const fullPrompt = document.createElement('div');
         fullPrompt.className = 'chat-subagent-prompt-full';
         fullPrompt.textContent = agentPrompt;
-        promptEl.addEventListener('click', (e) => { e.stopPropagation(); fullPrompt.classList.toggle('open'); });
+        promptEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = fullPrompt.classList.toggle('open');
+          // Hide partial prompt when full is visible, show when collapsed
+          promptEl.querySelector('.prompt-text').style.display = isOpen ? 'none' : '';
+        });
         subBody.appendChild(promptEl);
         subBody.appendChild(fullPrompt);
       }
