@@ -1446,7 +1446,15 @@ function switchView(name) {
   document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(`view-${name}`)?.classList.add('active');
   document.querySelector(`.view-tab[data-view="${name}"]`)?.classList.add('active');
-  if (name==='files') initFilesView();
+  if (name==='files') {
+    // Sync tile path to current canvas level
+    const level = currentLevel();
+    if (level.parentPath) {
+      filesTilePath = level.parentPath.split('/');
+    }
+    if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
+    initFilesView();
+  }
   if (name==='tags') initTagCloud();
   if (name==='health') initHealth();
 }
