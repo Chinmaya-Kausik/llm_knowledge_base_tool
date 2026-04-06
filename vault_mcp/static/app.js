@@ -2345,66 +2345,72 @@ function exitCheckpointMode() {
 }
 
 function connectChat() {
-  if (chatWs && chatWs.readyState === WebSocket.OPEN) return;
+  const mainP = chatPanels.get('main');
+  // Check the main panel's actual WS, not the global
+  if (mainP.ws && mainP.ws.readyState === WebSocket.OPEN) return;
 
   const statusEl = document.querySelector('#chat-header .panel-status');
   if (statusEl) statusEl.className = 'panel-status';
 
   const wsUrl = `ws://${location.host}/ws/chat`;
+  let ws;
   try {
-    chatWs = new WebSocket(wsUrl);
+    ws = new WebSocket(wsUrl);
   } catch (e) {
-    status.textContent = 'Failed to connect';
     return;
   }
 
-  chatWs.onopen = () => {
-    chatSessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
-    sessionStorage.setItem('vault-chat-session', chatSessionId);
-    syncToPanel(activePanel);
+  // Store directly on main panel AND the global
+  mainP.ws = ws;
+  chatWs = ws;
+
+  ws.onopen = () => {
+    mainP.sessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
+    sessionStorage.setItem('vault-chat-session', mainP.sessionId);
+    chatSessionId = mainP.sessionId;
 
     const level = currentLevel();
-    chatWs.send(JSON.stringify({
+    ws.send(JSON.stringify({
       type: 'init',
-      session_id: chatSessionId,
+      session_id: mainP.sessionId,
       page_path: level.parentPath || '',
     }));
   };
 
-  // Capture the WebSocket in closure so onmessage always finds the right panel
-  const thisWs = chatWs;
-  thisWs.onmessage = (e) => {
+  // Main panel's onmessage — always operates on the main panel's state
+  ws.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch (err) { console.error('Chat parse error:', err); return; }
     if (msg.type === 'init') {
       if (statusEl) statusEl.className = 'panel-status connected';
     }
-    // Find the panel that owns THIS WebSocket (not the global chatWs)
-    const ownerPanel = [...chatPanels.values()].find(p => p.ws === thisWs) || activePanel;
-    const ownerKey = [...chatPanels.entries()].find(([k, p]) => p.ws === thisWs)?.[0] || 'unknown';
-    if (msg.type !== 'text') console.log('[WS-MAIN] event:', msg.type, 'owner:', ownerKey, 'activePanel:', [...chatPanels.entries()].find(([k,p]) => p === activePanel)?.[0]);
-    syncFromPanel(ownerPanel);
+    if (msg.type !== 'text') console.log('[WS-MAIN] event:', msg.type);
+    // Always sync main panel — don't search by WS (it may have been swapped during dock)
+    syncFromPanel(mainP);
     handleChatEvent(msg);
-    syncToPanel(ownerPanel);
+    syncToPanel(mainP);
   };
 
-  thisWs.onclose = () => {
+  ws.onclose = () => {
     if (statusEl) statusEl.className = 'panel-status';
-    // Only null out global if it's still pointing to this ws
-    if (chatWs === thisWs) chatWs = null;
+    if (mainP.ws === ws) mainP.ws = null;
+    if (chatWs === ws) chatWs = null;
   };
 
-  chatWs.onerror = () => {
+  ws.onerror = () => {
     if (statusEl) statusEl.className = 'panel-status';
-    chatWs = null;
+    if (mainP.ws === ws) mainP.ws = null;
+    if (chatWs === ws) chatWs = null;
   };
 }
 
 function sendChatMessage() {
-  syncFromPanel(activePanel);
+  const mainP = chatPanels.get('main');
+  syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { syncToPanel(activePanel); return; }
+  if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) { syncToPanel(mainP); return; }
+  chatWs = mainP.ws; // Ensure global points to main
 
   // If currently generating, queue the message
   if (chatGenerating) {
@@ -2482,13 +2488,15 @@ function sendChatMessage() {
     const tokEl = document.getElementById('chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
-  syncToPanel(activePanel);
+  syncToPanel(chatPanels.get('main'));
 }
 
 function sendQueuedMessage(text) {
-  syncFromPanel(activePanel);
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { syncToPanel(activePanel); return; }
-  if (chatGenerating) { messageQueue.push({ text, el: null }); syncToPanel(activePanel); return; }
+  const mainP = chatPanels.get('main');
+  syncFromPanel(mainP);
+  if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) { syncToPanel(mainP); return; }
+  chatWs = mainP.ws;
+  if (chatGenerating) { messageQueue.push({ text, el: null }); syncToPanel(mainP); return; }
 
   chatMessages.push({ role: 'user', content: text });
   currentResponseText = '';
@@ -2527,7 +2535,7 @@ function sendQueuedMessage(text) {
     const tokEl = document.getElementById('chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
-  syncToPanel(activePanel);
+  syncToPanel(chatPanels.get('main'));
 }
 
 function escapeHtml(str) {
