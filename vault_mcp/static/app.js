@@ -1727,9 +1727,12 @@ function createPanelHeader(panelId, label = 'Chat') {
 
   header.querySelector('.panel-minimize').onclick = (e) => { e.stopPropagation(); toggleMinimize(); };
 
-  // Header click (not on buttons/menu/label) toggles minimize
+  // Header click (not on buttons/menu/label) toggles minimize — but not after a drag
+  let _headerDragged = false;
+  header._setDragged = () => { _headerDragged = true; };
   header.addEventListener('click', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
+    if (_headerDragged) { _headerDragged = false; return; }
     e.stopPropagation();
     toggleMinimize();
   });
@@ -1861,21 +1864,25 @@ function createFloatingPanel(options = {}) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
   };
 
-  // Draggable header
-  let dragging = false, dx, dy;
+  // Draggable header with dead zone to distinguish from click
+  let dragReady = false, dragging = false, startX, startY, dx, dy;
   headerEl.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
-    dragging = true;
+    dragReady = true; dragging = false;
+    startX = e.clientX; startY = e.clientY;
     dx = e.clientX - card.offsetLeft;
     dy = e.clientY - card.offsetTop;
     headerEl.setPointerCapture(e.pointerId);
   });
   headerEl.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (!dragReady) return;
+    if (!dragging && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 4) return;
+    dragging = true;
+    headerEl._setDragged();
     card.style.left = (e.clientX - dx) + 'px';
     card.style.top = (e.clientY - dy) + 'px';
   });
-  headerEl.addEventListener('pointerup', () => { dragging = false; });
+  headerEl.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
 
   // Connect WebSocket
   connectPanelChat(panel, messagesEl);
@@ -2034,7 +2041,8 @@ function initChat() {
       if (!dragging && Math.abs(dx) + Math.abs(dy) < 4) return; // Dead zone
       dragging = true;
       chatDragOccurred = true;
-      console.log('[DRAG] dragging, dx:', dx, 'dy:', dy);
+      const hdr = document.querySelector('#chat-header .panel-header');
+      if (hdr?._setDragged) hdr._setDragged();
 
       // Detach to float if not already floating
       if (!panel.classList.contains('chat-float') && !panel.classList.contains('chat-collapsed-float')) {
