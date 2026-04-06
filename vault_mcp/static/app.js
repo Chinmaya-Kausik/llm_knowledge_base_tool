@@ -1164,7 +1164,7 @@ function renderTreeItems(container, items, depth) {
 
     const icon = document.createElement('span');
     icon.className = 'ftree-icon';
-    icon.textContent = item.type === 'folder' ? '▶' : fileIcon(item.name);
+    icon.textContent = item.type === 'folder' ? '▶' : fileIconText(item.name);
     row.appendChild(icon);
 
     const label = document.createElement('span');
@@ -1216,7 +1216,7 @@ function renderFilesTiles() {
 
     const iconEl = document.createElement('div');
     iconEl.className = 'file-tile-icon';
-    iconEl.textContent = item.type === 'folder' ? '📁' : fileIcon(item.name);
+    iconEl.innerHTML = item.type === 'folder' ? _fileIcons.folder : fileIcon(item.name);
 
     const nameEl = document.createElement('div');
     nameEl.className = 'file-tile-name' + (item.type === 'folder' ? ' folder-name' : '');
@@ -1265,11 +1265,32 @@ function updateBreadcrumbs() {
   }
 }
 
+// SVG file icons (Lucide-inspired, monochrome)
+const _fileIcons = {
+  folder: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+  md: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  py: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">PY</text></svg>`,
+  js: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">JS</text></svg>`,
+  tex: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="7" y="18" font-size="6" fill="currentColor" stroke="none" font-family="sans-serif">TEX</text></svg>`,
+  pdf: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="6" y="18" font-size="6" fill="currentColor" stroke="none" font-family="sans-serif">PDF</text></svg>`,
+  json: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="6" y="18" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">{  }</text></svg>`,
+  yaml: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="6" y="18" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">YML</text></svg>`,
+  img: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+  default: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+};
+
 function fileIcon(name) {
-  if (!name) return '📄';
+  if (!name) return _fileIcons.default;
   const ext = name.split('.').pop()?.toLowerCase();
-  const icons = { md: '📝', py: '🐍', js: '📜', ts: '📜', json: '📋', yaml: '📋', yml: '📋', pdf: '📕', png: '🖼', jpg: '🖼', jpeg: '🖼', gif: '🖼', svg: '🖼' };
-  return icons[ext] || '📄';
+  const map = { md: 'md', py: 'py', js: 'js', ts: 'js', jsx: 'js', tsx: 'js', json: 'json', yaml: 'yaml', yml: 'yaml', tex: 'tex', bib: 'tex', pdf: 'pdf', png: 'img', jpg: 'img', jpeg: 'img', gif: 'img', svg: 'img', sh: 'js', css: 'js', html: 'js' };
+  return _fileIcons[map[ext]] || _fileIcons.default;
+}
+
+function fileIconText(name) {
+  if (!name) return '○';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const icons = { md: '◇', py: '◆', js: '◆', ts: '◆', json: '{ }', yaml: '≡', yml: '≡', tex: '∑', pdf: '▤', png: '▣', jpg: '▣' };
+  return icons[ext] || '○';
 }
 
 function openExternal(path) {
