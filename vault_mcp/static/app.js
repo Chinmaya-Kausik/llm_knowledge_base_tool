@@ -1688,23 +1688,30 @@ function createPanelHeader(panelId, label = 'Chat') {
   function toggleMinimize() {
     const panel = chatPanels.get(panelId);
     if (panelId === 'main') {
-      const chatPanel = document.getElementById('chat-panel');
-      const isOpen = chatPanel.classList.contains('chat-bottom') || chatPanel.classList.contains('chat-right') || chatPanel.classList.contains('chat-float');
+      const cp = document.getElementById('chat-panel');
+      const before = { classes: [...cp.classList], style: cp.style.cssText, size: `${cp.offsetWidth}x${cp.offsetHeight}` };
+      const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
+      // Detect mode from both open AND collapsed classes
+      let mode = 'bottom';
+      if (cp.classList.contains('chat-right') || cp.classList.contains('chat-collapsed-right')) mode = 'right';
+      else if (cp.classList.contains('chat-float') || cp.classList.contains('chat-collapsed-float')) mode = 'float';
+      console.log('[TOGGLE] before:', JSON.stringify(before), 'isOpen:', isOpen, 'mode:', mode);
+
+      // Clear ALL inline styles
+      cp.removeAttribute('style');
+
       if (isOpen) {
-        const mode = chatPanel.classList.contains('chat-right') ? 'right' : chatPanel.classList.contains('chat-float') ? 'float' : 'bottom';
-        ['chat-bottom','chat-right','chat-float'].forEach(c => chatPanel.classList.remove(c));
-        chatPanel.style.left = ''; chatPanel.style.top = ''; chatPanel.style.right = '';
-        chatPanel.style.bottom = ''; chatPanel.style.width = ''; chatPanel.style.height = '';
-        chatPanel.style.inset = '';
-        chatPanel.classList.add(mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed');
+        ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
+        const collapsed = mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed';
+        cp.classList.add(collapsed);
+        console.log('[TOGGLE] collapsed to:', collapsed);
       } else {
-        ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => chatPanel.classList.remove(c));
-        chatPanel.style.left = ''; chatPanel.style.top = ''; chatPanel.style.right = '';
-        chatPanel.style.bottom = ''; chatPanel.style.width = ''; chatPanel.style.height = '';
-        chatPanel.style.inset = '';
-        chatPanel.classList.add('chat-bottom');
+        ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
+        cp.classList.add('chat-' + mode);
         connectChat();
+        console.log('[TOGGLE] expanded to: chat-' + mode);
       }
+      console.log('[TOGGLE] after:', { classes: [...cp.classList], style: cp.style.cssText, size: `${cp.offsetWidth}x${cp.offsetHeight}` });
     } else {
       const card = panel?.container;
       if (card) card.classList.toggle('minimized');
@@ -1716,6 +1723,7 @@ function createPanelHeader(panelId, label = 'Chat') {
   // Header click (not on buttons/menu/label) toggles minimize
   header.addEventListener('click', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
+    e.stopPropagation();
     toggleMinimize();
   });
 
@@ -1973,6 +1981,7 @@ function initChat() {
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     e.stopPropagation();
+    console.log('[DBLCLICK] header dblclick, chatMaximized:', chatMaximized);
 
     if (chatMaximized) {
       // Restore previous state
@@ -2007,6 +2016,7 @@ function initChat() {
   const chatHeader = document.getElementById('chat-header');
   chatHeader.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
+    console.log('[DRAG] pointerdown on chat header');
     const startX = e.clientX, startY = e.clientY;
     let dragging = false;
     const rect = panel.getBoundingClientRect();
@@ -2017,9 +2027,11 @@ function initChat() {
       if (!dragging && Math.abs(dx) + Math.abs(dy) < 4) return; // Dead zone
       dragging = true;
       chatDragOccurred = true;
+      console.log('[DRAG] dragging, dx:', dx, 'dy:', dy);
 
       // Detach to float if not already floating
       if (!panel.classList.contains('chat-float') && !panel.classList.contains('chat-collapsed-float')) {
+        console.log('[DRAG] detaching to float');
         clearChatClasses();
         panel.classList.add('chat-float');
         chatDockMode = 'float';

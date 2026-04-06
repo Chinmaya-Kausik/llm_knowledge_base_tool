@@ -666,11 +666,11 @@ body {
 #chat-panel.chat-collapsed-right #chat-body,
 #chat-panel.chat-collapsed-right #chat-input-area { display: none; }
 #chat-panel.chat-collapsed-float {
-  position: fixed; right: 40px; bottom: 40px; width: auto; height: 36px;
+  position: fixed; right: 40px; bottom: 40px; width: 200px; height: 36px;
   border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); z-index: 200; overflow: hidden;
+  box-shadow: var(--shadow); z-index: 200; overflow: hidden; cursor: pointer;
 }
-#chat-panel.chat-collapsed-float #chat-messages,
+#chat-panel.chat-collapsed-float #chat-body,
 #chat-panel.chat-collapsed-float #chat-input-area { display: none; }
 
 /* Chat open states */
