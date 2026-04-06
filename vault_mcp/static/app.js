@@ -1303,7 +1303,7 @@ async function doSearch(query) {
   const inFolder = currentLevel().parentPath;
   const q = query.replace(/'/g, "\\'");
   const scopeHtml = `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'checked':''} onchange="searchScopeGlobal=this.checked;doSearch('${q}')"> Global</label>`;
-  opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label><label class="search-check"><input type="checkbox" ${searchLines?'checked':''} onchange="searchLines=this.checked;doSearch('${q}')"> Lines</label>`;
+  opts.innerHTML = `<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label>${scopeHtml}<label class="search-check"><input type="checkbox" ${searchLines?'checked':''} onchange="searchLines=this.checked;doSearch('${q}')"> Lines</label>`;
   c.appendChild(opts);
 
   // Determine mode
@@ -1328,18 +1328,16 @@ async function doSearch(query) {
 
     const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const openResult = (path) => {
-      // Find the page path — strip filename for non-folder pages
-      const pagePath = path.replace(/\/[^/]+\.[^/]+$/, '') || path;
-      const card = cardElements.get(pagePath) || cardElements.get(path);
+      const card = cardElements.get(path);
       if (card) {
         switchView('graph');
         expandCardFullPage(card);
       } else {
-        // Create fake card to open fullpage
+        // Create fake card to open fullpage directly with the result path
         const fakeCard = document.createElement('div');
-        fakeCard.dataset.path = pagePath;
-        const nd = nodeById(pagePath);
-        fakeCard.innerHTML = `<span class="doc-title">${nd?.label || path}</span>`;
+        fakeCard.dataset.path = path;
+        const nd = nodeById(path);
+        fakeCard.innerHTML = `<span class="doc-title">${nd?.label || path.split('/').pop()}</span>`;
         switchView('graph');
         expandCardFullPage(fakeCard);
       }
