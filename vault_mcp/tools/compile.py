@@ -420,7 +420,12 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
     chats_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(timezone.utc)
-    filename = f"{now.strftime('%Y-%m-%d')}_{session_id[:8]}.md"
+    # Name file from first user message (slugified)
+    first_msg = next((m.get("content", "") for m in messages if m.get("role") == "user"), "")
+    slug = first_msg[:40].strip().lower()
+    slug = "".join(c if c.isalnum() or c == ' ' else '' for c in slug).strip().replace(' ', '-')
+    slug = slug or session_id[:8]
+    filename = f"{now.strftime('%Y-%m-%d_%H%M')}_{slug}.md"
     path = chats_dir / filename
 
     lines = [
