@@ -37,16 +37,18 @@
         <button class="filter-btn" id="btn-toolbar-menu" title="Settings &amp; Filters">⚙<span id="filter-active-dot" style="display:none">●</span></button>
         <div class="filter-menu toolbar-menu" id="toolbar-menu">
           <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label">Canvas</div>
-            <div class="toolbar-menu-row">
-              <button id="btn-auto-layout">Layout</button>
-              <button id="btn-fit">Fit</button>
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Canvas</div>
+            <div class="toolbar-menu-body">
+              <div class="toolbar-menu-row">
+                <button id="btn-auto-layout">Layout</button>
+                <button id="btn-fit">Fit</button>
+              </div>
             </div>
           </div>
           <hr>
           <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label">Type Filter</div>
-            <div id="filter-type-menu">
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Type Filter</div>
+            <div class="toolbar-menu-body collapsed" id="filter-type-menu">
               <label><input type="checkbox" value="concept" checked> concept</label>
               <label><input type="checkbox" value="summary" checked> summary</label>
               <label><input type="checkbox" value="index" checked> index</label>
@@ -57,13 +59,13 @@
           </div>
           <hr>
           <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label">Tag Filter</div>
-            <div id="filter-tag-menu"><!-- Populated by JS --></div>
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Tag Filter</div>
+            <div class="toolbar-menu-body collapsed" id="filter-tag-menu"><!-- Populated by JS --></div>
           </div>
           <hr>
           <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label">File Type Filter</div>
-            <div id="filter-filetype-menu">
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">File Type Filter</div>
+            <div class="toolbar-menu-body collapsed" id="filter-filetype-menu">
               <label><input type="checkbox" value="folder" checked> Folders</label>
               <label><input type="checkbox" value="markdown" checked> Markdown</label>
               <label><input type="checkbox" value="code" checked> Code</label>
@@ -75,8 +77,8 @@
           </div>
           <hr>
           <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label">Settings</div>
-            <div id="settings-menu">
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Settings</div>
+            <div class="toolbar-menu-body" id="settings-menu">
           <div class="settings-section">
             <label class="settings-label">Vault Root</label>
             <input type="text" id="settings-vault-root" class="settings-input" placeholder="/path/to/vault">

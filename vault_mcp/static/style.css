@@ -418,7 +418,14 @@ body {
   max-height: 80vh; overflow-y: auto; min-width: 220px;
 }
 .toolbar-menu-section { padding: 6px 12px; }
-.toolbar-menu-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.toolbar-menu-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+  cursor: pointer; padding: 2px 0; border-bottom: 1px dotted var(--border);
+}
+.toolbar-menu-label:hover { color: var(--text); }
+.toolbar-menu-body { max-height: 150px; overflow-y: auto; }
+.toolbar-menu-body.collapsed { display: none; }
 .toolbar-menu-row { display: flex; gap: 6px; margin-top: 4px; }
 .toolbar-menu-row button { font-size: 11px; padding: 2px 8px; }
 #filter-active-dot { color: var(--accent); font-size: 8px; margin-left: 2px; vertical-align: super; }
@@ -640,9 +647,9 @@ body {
   transition: height 0.2s;
 }
 /* Chat collapsed states */
-#chat-panel.chat-collapsed { height: 40px; overflow: hidden; cursor: pointer; }
+#chat-panel.chat-collapsed { height: 36px; overflow: hidden; cursor: pointer; }
 #chat-panel.chat-collapsed-right {
-  position: fixed; right: 0; top: 36px; bottom: 0; width: 24px; height: auto;
+  position: fixed; right: 0; top: 36px; bottom: 0; width: 36px; height: auto;
   border-left: 1px solid var(--border);
   z-index: 200; writing-mode: vertical-rl; overflow: hidden;
 }
