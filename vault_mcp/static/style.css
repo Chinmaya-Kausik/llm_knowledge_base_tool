@@ -642,8 +642,11 @@ body {
   cursor: pointer; font-family: var(--font); font-size: 12px;
 }
 .fullpage-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.fullpage-content.editing {
+  display: flex; flex-direction: column; padding: 0;
+}
 .fullpage-edit-area {
-  width: 100%; flex: 1; background: var(--bg-surface); color: var(--text);
+  width: 100%; flex: 1; background: transparent; color: var(--text);
   border: none; font-family: var(--font); font-size: 14px; line-height: 1.7;
   padding: 24px 40px; max-width: 800px; resize: none; outline: none;
 }

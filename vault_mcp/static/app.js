@@ -843,6 +843,7 @@ async function toggleFullPageEdit(overlay, path) {
 
   if (overlay.dataset.mode === 'preview') {
     // Switch to edit
+    contentEl.classList.add('editing');
     contentEl.innerHTML = `<textarea class="fullpage-edit-area">${(meta?.content||'').replace(/</g,'&lt;')}</textarea>`;
     overlay.dataset.mode = 'edit';
     toggleBtn.textContent = 'Preview';
@@ -858,6 +859,7 @@ async function toggleFullPageEdit(overlay, path) {
           meta.content = newContent;
         } catch (err) { /* silent */ }
       }
+      contentEl.classList.remove('editing');
       // Render based on file type
       const isCode = path.endsWith('.py') || path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.rs') || path.endsWith('.go') || path.endsWith('.java') || path.endsWith('.c') || path.endsWith('.cpp') || path.endsWith('.sh');
       if (isCode) {
