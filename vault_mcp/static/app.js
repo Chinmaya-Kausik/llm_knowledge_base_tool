@@ -2047,19 +2047,6 @@ function createPanelHeader(panelId, label = 'Chat') {
     e.stopPropagation();
     const panel = chatPanels.get(panelId);
 
-    // Don't close the last remaining panel — just clear it
-    if (chatPanels.size <= 1) {
-      if (panelId === 'main') {
-        saveChatTranscript();
-        document.getElementById('chat-messages').innerHTML = '';
-        syncFromPanel(activePanel);
-        chatMessages = [];
-        chatSessionId = crypto.randomUUID();
-        syncToPanel(activePanel);
-      }
-      return;
-    }
-
     if (panelId === 'main') {
       // Close main: hide entirely and disconnect
       saveChatTranscript();
