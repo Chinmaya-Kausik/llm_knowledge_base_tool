@@ -1396,6 +1396,7 @@ class ChatPanel {
     this.thinkingEl = null;
     this.thinkingWrapper = null;
     this.contextLevel = options.contextLevel || 'page';
+    this.contextPath = null; // Custom context path (Browse...)
     this.messages = options.messages ? [...options.messages] : [];
     this.isTemporary = false;
     this.startTime = null;
@@ -1506,26 +1507,51 @@ function createPanelHeader(panelId, label = 'Chat') {
     const ctx = panel.contextLevel || 'page';
     const isTemp = panel.isTemporary;
 
+    const customCtx = panel.contextPath || '';
+    const ctxLabel = customCtx ? customCtx.split('/').slice(-2).join('/') : '';
+
     menu.innerHTML = `
-      <div class="panel-menu-item" data-action="model" data-value="sonnet"${model==='sonnet'?' class="panel-menu-item active"':''}>Sonnet</div>
-      <div class="panel-menu-item" data-action="model" data-value="opus"${model==='opus'?' class="panel-menu-item active"':''}>Opus</div>
-      <div class="panel-menu-item" data-action="model" data-value="haiku"${model==='haiku'?' class="panel-menu-item active"':''}>Haiku</div>
+      <div class="panel-menu-section">
+        <div class="panel-menu-label" data-toggle="model-body">Model: ${model}</div>
+        <div class="panel-menu-body collapsed" data-id="model-body">
+          <div class="panel-menu-item${model==='sonnet'?' active':''}" data-action="model" data-value="sonnet">Sonnet</div>
+          <div class="panel-menu-item${model==='opus'?' active':''}" data-action="model" data-value="opus">Opus</div>
+          <div class="panel-menu-item${model==='haiku'?' active':''}" data-action="model" data-value="haiku">Haiku</div>
+        </div>
+      </div>
       <div class="panel-menu-sep"></div>
-      <div class="panel-menu-item" data-action="context" data-value="page"${ctx==='page'?' class="panel-menu-item active"':''}>Page context</div>
-      <div class="panel-menu-item" data-action="context" data-value="folder"${ctx==='folder'?' class="panel-menu-item active"':''}>Folder context</div>
-      <div class="panel-menu-item" data-action="context" data-value="global"${ctx==='global'?' class="panel-menu-item active"':''}>Global context</div>
+      <div class="panel-menu-section">
+        <div class="panel-menu-label" data-toggle="context-body">Context: ${customCtx ? ctxLabel : ctx}</div>
+        <div class="panel-menu-body collapsed" data-id="context-body">
+          <div class="panel-menu-item${ctx==='page'&&!customCtx?' active':''}" data-action="context" data-value="page">Page</div>
+          <div class="panel-menu-item${ctx==='folder'&&!customCtx?' active':''}" data-action="context" data-value="folder">Folder</div>
+          <div class="panel-menu-item${ctx==='global'&&!customCtx?' active':''}" data-action="context" data-value="global">Global</div>
+          <div class="panel-menu-item${customCtx?' active':''}" data-action="browse">Browse...</div>
+        </div>
+      </div>
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="new">+ New Chat</div>
       <div class="panel-menu-item" data-action="fork">⑂ Fork Conversation</div>
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="temp">${isTemp ? '☑' : '☐'} Temporary</div>
       <div class="panel-menu-sep"></div>
+      ${panelId === 'main' ? `
       <div class="panel-menu-item" data-action="dock-right">Dock Right →</div>
       <div class="panel-menu-item" data-action="dock-bottom">Dock Bottom ↓</div>
       <div class="panel-menu-item" data-action="float">Float ◻</div>
+      ` : ''}
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="clear">Clear Conversation</div>
     `;
+
+    // Wire collapsible section labels
+    menu.querySelectorAll('.panel-menu-label[data-toggle]').forEach(label => {
+      label.onclick = (e) => {
+        e.stopPropagation();
+        const body = menu.querySelector(`[data-id="${label.dataset.toggle}"]`);
+        if (body) body.classList.toggle('collapsed');
+      };
+    });
   }
 
   // Toggle menu
@@ -1558,7 +1584,18 @@ function createPanelHeader(panelId, label = 'Chat') {
       closeMenu = false;
     } else if (action === 'context') {
       panel.contextLevel = value;
+      panel.contextPath = null; // Clear custom path when selecting preset
       syncFromPanel(panel);
+      renderMenu();
+      closeMenu = false;
+    } else if (action === 'browse') {
+      // Show a prompt for custom path (simple for now, tree picker later)
+      const path = prompt('Enter vault path for context (e.g., wiki/concepts/attention):');
+      if (path) {
+        panel.contextPath = path;
+        panel.contextLevel = 'page'; // Will use the custom path
+        syncFromPanel(panel);
+      }
       renderMenu();
       closeMenu = false;
     } else if (action === 'new') {
@@ -2217,13 +2254,14 @@ function sendChatMessage() {
 
   const level = currentLevel();
   const contextLevel = chatContextLevel;
+  const contextPath = activePanel.contextPath || level.parentPath || '';
 
   chatWs.send(JSON.stringify({
     type: 'message',
     text: fullText,
     context_level: contextLevel,
     context: {
-      page_path: level.parentPath || '',
+      page_path: contextPath,
       selection: pendingSelection?.text || null,
       selection_file: pendingSelection?.file || null,
     },

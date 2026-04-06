@@ -471,6 +471,15 @@ body {
 .panel-menu-item:hover { background: var(--bg-hover); }
 .panel-menu-item.active { color: var(--accent); }
 .panel-menu-sep { border-top: 1px solid var(--border); margin: 2px 0; }
+.panel-menu .panel-menu-section { padding: 4px 0; }
+.panel-menu .panel-menu-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  cursor: pointer; padding: 4px 12px;
+}
+.panel-menu .panel-menu-label:hover { color: var(--text); }
+.panel-menu .panel-menu-body { max-height: 120px; overflow-y: auto; }
+.panel-menu .panel-menu-body.collapsed { display: none; }
 .panel-menu-sub {
   position: absolute; left: 100%; top: -1px;
   background: var(--bg-surface); border: 1px solid var(--border);
