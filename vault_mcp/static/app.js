@@ -1228,6 +1228,8 @@ async function refreshFileTree() {
         if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
       }
     } catch {}
+    // Re-render canvas to include new nodes
+    renderCurrentLevel();
   }
 }
 
