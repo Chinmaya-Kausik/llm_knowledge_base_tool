@@ -640,20 +640,15 @@ body {
   transition: height 0.2s;
 }
 /* Chat collapsed states */
-#chat-panel.chat-collapsed { height: 36px; overflow: hidden; }
+#chat-panel.chat-collapsed { height: 40px; overflow: hidden; cursor: pointer; }
 #chat-panel.chat-collapsed-right {
   position: fixed; right: 0; top: 36px; bottom: 0; width: 24px; height: auto;
   border-left: 1px solid var(--border);
   z-index: 200; writing-mode: vertical-rl; overflow: hidden;
 }
 #chat-panel.chat-collapsed-right #chat-header { flex-direction: column; padding: 10px 6px; }
-#chat-panel.chat-collapsed-right #chat-messages,
-#chat-panel.chat-collapsed-right #chat-input-area,
-#chat-panel.chat-collapsed-right .chat-context-dropdown,
-#chat-panel.chat-collapsed-right #chat-status,
-#chat-panel.chat-collapsed-right #chat-dock-right,
-#chat-panel.chat-collapsed-right #chat-dock-bottom,
-#chat-panel.chat-collapsed-right #chat-dock-float { display: none; }
+#chat-panel.chat-collapsed-right #chat-body,
+#chat-panel.chat-collapsed-right #chat-input-area { display: none; }
 #chat-panel.chat-collapsed-float {
   position: fixed; right: 40px; bottom: 40px; width: auto; height: 36px;
   border: 1px solid var(--border); border-radius: var(--radius);

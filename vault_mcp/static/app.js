@@ -1604,6 +1604,50 @@ function createPanelHeader(panelId, label = 'Chat') {
   labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); } });
   labelEl.addEventListener('focus', () => { labelEl.style.cursor = 'text'; });
 
+  // Minimize button
+  header.querySelector('.panel-minimize').onclick = (e) => {
+    e.stopPropagation();
+    const panel = chatPanels.get(panelId);
+    if (panelId === 'main') {
+      // Main panel: toggle collapsed
+      const chatPanel = document.getElementById('chat-panel');
+      const isOpen = chatPanel.classList.contains('chat-bottom') || chatPanel.classList.contains('chat-right') || chatPanel.classList.contains('chat-float');
+      if (isOpen) {
+        const mode = chatPanel.classList.contains('chat-right') ? 'right' : chatPanel.classList.contains('chat-float') ? 'float' : 'bottom';
+        ['chat-bottom','chat-right','chat-float'].forEach(c => chatPanel.classList.remove(c));
+        chatPanel.classList.add(mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed');
+      } else {
+        ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => chatPanel.classList.remove(c));
+        chatPanel.classList.add('chat-bottom');
+        connectChat();
+      }
+    } else {
+      // Floating panel: toggle minimized
+      const card = panel?.container;
+      if (card) card.classList.toggle('minimized');
+    }
+  };
+
+  // Close button
+  header.querySelector('.panel-close').onclick = (e) => {
+    e.stopPropagation();
+    const panel = chatPanels.get(panelId);
+    if (panelId === 'main') {
+      // Main panel: just clear conversation
+      saveChatTranscript();
+      document.getElementById('chat-messages').innerHTML = '';
+      syncFromPanel(activePanel);
+      chatMessages = [];
+      chatSessionId = crypto.randomUUID();
+      syncToPanel(activePanel);
+    } else {
+      // Floating panel: close and remove
+      if (panel?.ws) panel.ws.close();
+      chatPanels.delete(panelId);
+      panel?.container?.remove();
+    }
+  };
+
   wrapper.appendChild(header);
   wrapper.appendChild(menu);
   return { wrapper, header, menu, statusEl: header.querySelector('.panel-status'), labelEl };
@@ -1612,32 +1656,41 @@ function createPanelHeader(panelId, label = 'Chat') {
 function createFloatingPanel(options = {}) {
   if (chatPanels.size >= 6) { alert('Max 6 chat panels'); return null; }
   const panelId = 'panel-' + (++panelCounter);
+  const label = options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`;
   const panel = new ChatPanel(null, {
     sessionId: crypto.randomUUID(),
     messages: options.fork ? [...activePanel.messages] : [],
     contextLevel: activePanel.contextLevel,
   });
 
-  // Create floating card on canvas
+  // Create floating card
   const card = document.createElement('div');
   card.className = 'floating-chat-panel';
   card.dataset.panelId = panelId;
-  card.innerHTML = `
-    <div class="fcp-header">
-      <span class="fcp-title">${options.fork ? 'Fork' : 'Chat'} ${panelCounter}</span>
-      <span style="flex:1"></span>
-      <button class="fcp-dock" title="Dock this panel">⬒</button>
-      <button class="fcp-minimize" title="Minimize">─</button>
-      <button class="fcp-close" title="Close">✕</button>
-    </div>
-    <div class="fcp-messages"></div>
-    <div class="fcp-input-area">
-      <textarea class="fcp-input" placeholder="Message Claude..." rows="1"></textarea>
-      <button class="fcp-send">Send</button>
-    </div>
-  `;
 
-  // Position near center of canvas
+  // Universal header
+  const { wrapper: headerWrapper, header: headerEl } = createPanelHeader(panelId, label);
+  card.appendChild(headerWrapper);
+
+  // Messages area
+  const messagesEl = document.createElement('div');
+  messagesEl.className = 'fcp-messages';
+  card.appendChild(messagesEl);
+
+  // Input area
+  const inputArea = document.createElement('div');
+  inputArea.className = 'fcp-input-area';
+  const input = document.createElement('textarea');
+  input.className = 'fcp-input';
+  input.placeholder = 'Message Claude...';
+  input.rows = 1;
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'fcp-send';
+  sendBtn.textContent = 'Send';
+  inputArea.appendChild(input);
+  inputArea.appendChild(sendBtn);
+  card.appendChild(inputArea);
+
   card.style.left = (150 + panelCounter * 30) + 'px';
   card.style.top = (100 + panelCounter * 30) + 'px';
 
@@ -1645,12 +1698,7 @@ function createFloatingPanel(options = {}) {
   panel.container = card;
   chatPanels.set(panelId, panel);
 
-  // Wire events
-  const input = card.querySelector('.fcp-input');
-  const messagesEl = card.querySelector('.fcp-messages');
-  const sendBtn = card.querySelector('.fcp-send');
-
-  // If forked, render existing messages
+  // Render forked messages
   if (options.fork && panel.messages.length) {
     for (const msg of panel.messages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
@@ -1662,20 +1710,18 @@ function createFloatingPanel(options = {}) {
     }
   }
 
+  // Send handler
   sendBtn.onclick = () => {
     const text = input.value.trim();
     if (!text) return;
-    // Switch active panel, send, switch back
     syncToPanel(activePanel);
     activePanel = panel;
     syncFromPanel(panel);
 
-    // Ensure connected
     if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
       connectPanelChat(panel, messagesEl);
     }
 
-    // Append user message
     const userEl = document.createElement('div');
     userEl.className = 'chat-msg chat-msg-user';
     userEl.textContent = text;
@@ -1683,7 +1729,6 @@ function createFloatingPanel(options = {}) {
     chatMessages.push({ role: 'user', content: text });
     input.value = '';
 
-    // Send via WebSocket
     chatWs.send(JSON.stringify({
       type: 'message', text,
       context_level: chatContextLevel,
@@ -1694,7 +1739,6 @@ function createFloatingPanel(options = {}) {
     chatStartTime = Date.now();
     chatTokenCount = 0;
 
-    // Create assistant container
     currentAssistantEl = document.createElement('div');
     currentAssistantEl.className = 'chat-msg chat-msg-assistant';
     const sb = document.createElement('div');
@@ -1711,41 +1755,23 @@ function createFloatingPanel(options = {}) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
   };
 
-  card.querySelector('.fcp-close').onclick = () => {
-    if (panel.ws) panel.ws.close();
-    chatPanels.delete(panelId);
-    card.remove();
-  };
-
-  card.querySelector('.fcp-minimize').onclick = () => {
-    card.classList.toggle('minimized');
-  };
-
-  card.querySelector('.fcp-dock').onclick = () => {
-    // Swap this panel into the main dock
-    syncToPanel(activePanel);
-    // TODO: implement full dock swap
-    alert('Dock swap — coming soon');
-  };
-
-  // Make draggable
-  const header = card.querySelector('.fcp-header');
+  // Draggable header
   let dragging = false, dx, dy;
-  header.addEventListener('pointerdown', (e) => {
-    if (e.target.tagName === 'BUTTON') return;
+  headerEl.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     dragging = true;
     dx = e.clientX - card.offsetLeft;
     dy = e.clientY - card.offsetTop;
-    header.setPointerCapture(e.pointerId);
+    headerEl.setPointerCapture(e.pointerId);
   });
-  header.addEventListener('pointermove', (e) => {
+  headerEl.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     card.style.left = (e.clientX - dx) + 'px';
     card.style.top = (e.clientY - dy) + 'px';
   });
-  header.addEventListener('pointerup', () => { dragging = false; });
+  headerEl.addEventListener('pointerup', () => { dragging = false; });
 
-  // Connect this panel's WebSocket
+  // Connect WebSocket
   connectPanelChat(panel, messagesEl);
 
   return panel;
