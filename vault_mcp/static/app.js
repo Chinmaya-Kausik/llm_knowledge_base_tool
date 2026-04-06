@@ -3812,6 +3812,85 @@ async function init() {
       return;
     }
 
+    // View switching: Cmd+1/2/3/4
+    if (mod && e.key === '1') { e.preventDefault(); switchView('graph'); return; }
+    if (mod && e.key === '2') { e.preventDefault(); switchView('files'); return; }
+    if (mod && e.key === '3') { e.preventDefault(); switchView('tags'); return; }
+    if (mod && e.key === '4') { e.preventDefault(); switchView('health'); return; }
+
+    // Cmd+T: toggle tree/tile in Files view
+    if (mod && e.key === 't' && !inInput) {
+      e.preventDefault();
+      if (filesInitialized) setFilesMode(filesMode === 'tree' ? 'tiles' : 'tree');
+      return;
+    }
+
+    // Cmd+B: toggle sidebar
+    if (mod && e.key === 'b' && !inInput) {
+      e.preventDefault();
+      document.getElementById('sidebar').classList.toggle('collapsed');
+      return;
+    }
+
+    // Cmd+\: toggle chat panel
+    if (mod && e.key === '\\') {
+      e.preventDefault();
+      const panelHeader = document.querySelector('#chat-header .panel-header');
+      if (panelHeader) panelHeader.click();
+      return;
+    }
+
+    // Cmd+N: new floating chat
+    if (mod && !e.shiftKey && e.key === 'n' && !inInput) {
+      e.preventDefault();
+      createFloatingPanel();
+      return;
+    }
+
+    // Cmd+Shift+N: fork current chat
+    if (mod && e.shiftKey && e.key === 'N') {
+      e.preventDefault();
+      createFloatingPanel({ fork: true });
+      return;
+    }
+
+    // Cmd+,: open settings menu
+    if (mod && e.key === ',') {
+      e.preventDefault();
+      document.getElementById('btn-toolbar-menu')?.click();
+      return;
+    }
+
+    // Cmd+0: fit view
+    if (mod && e.key === '0' && !inInput) {
+      e.preventDefault();
+      fitView();
+      return;
+    }
+
+    // Cmd+L: auto layout
+    if (mod && e.key === 'l' && !inInput) {
+      e.preventDefault();
+      autoLayout();
+      return;
+    }
+
+    // Cmd+E: toggle edit mode in fullpage
+    if (mod && e.key === 'e' && expandedCard) {
+      e.preventDefault();
+      const path = expandedCard.dataset.path;
+      toggleFullPageEdit(expandedCard, path);
+      return;
+    }
+
+    // Cmd+S: save edits in fullpage
+    if (mod && e.key === 's' && expandedCard && expandedCard.dataset.mode === 'edit') {
+      e.preventDefault();
+      const path = expandedCard.dataset.path;
+      toggleFullPageEdit(expandedCard, path); // Toggle back to preview = save
+      return;
+    }
+
     // Canvas shortcuts (only when not typing)
     if (!inInput) {
       // Cmd+= / Cmd+- zoom
