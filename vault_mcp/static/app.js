@@ -1998,7 +1998,7 @@ function createPanelHeader(panelId, label = 'Chat') {
     if (_headerDragged) { _headerDragged = false; return; }
     if (_clickTimer) return; // Already waiting
     e.stopPropagation();
-    _clickTimer = setTimeout(() => { _clickTimer = null; toggleMinimize(); }, 250);
+    _clickTimer = setTimeout(() => { _clickTimer = null; toggleMinimize(); }, 150);
   });
 
   // Double-click header to maximize/restore (floating panels)
@@ -2047,12 +2047,12 @@ function createPanelHeader(panelId, label = 'Chat') {
     }
 
     if (panelId === 'main') {
-      // Close main: collapse and clear
+      // Close main: hide entirely and disconnect
       saveChatTranscript();
       const cp = document.getElementById('chat-panel');
       cp.removeAttribute('style');
-      ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
-      cp.classList.add('chat-collapsed');
+      ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
+      cp.style.display = 'none';
       document.getElementById('chat-messages').innerHTML = '';
       if (panel?.ws) { panel.ws.close(); panel.ws = null; }
       syncFromPanel(activePanel);
