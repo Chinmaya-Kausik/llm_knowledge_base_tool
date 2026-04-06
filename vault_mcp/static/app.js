@@ -1862,10 +1862,11 @@ function createFloatingPanel(options = {}) {
   sendBtn.onclick = () => {
     const text = input.value.trim();
     if (!text) return;
+    console.log('[SEND-FLOAT] text:', JSON.stringify(text?.slice(0,30)), 'panelId:', panelId, 'ws:', !!panel.ws, 'readyState:', panel.ws?.readyState, 'generating:', panel.generating);
 
     if (!panel.ws || panel.ws.readyState !== WebSocket.OPEN) {
+      console.log('[SEND-FLOAT] BLOCKED: ws not open, reconnecting...');
       connectPanelChat(panel, messagesEl);
-      // Wait for connection before sending
       setTimeout(() => sendBtn.click(), 500);
       return;
     }
@@ -1890,11 +1891,20 @@ function createFloatingPanel(options = {}) {
     const assistantEl = document.createElement('div');
     assistantEl.className = 'chat-msg chat-msg-assistant';
     const sb = document.createElement('div');
-    sb.className = 'chat-status-bar';
-    sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span>`;
+    sb.className = 'chat-status-bar chat-active-status';
+    sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
     assistantEl.appendChild(sb);
     messagesEl.appendChild(assistantEl);
     panel.assistantEl = assistantEl;
+
+    // Timer for this panel
+    if (panel.timerInterval) clearInterval(panel.timerInterval);
+    panel.timerInterval = setInterval(() => {
+      const el = assistantEl.querySelector('.chat-elapsed');
+      if (el && panel.startTime) el.textContent = ((Date.now() - panel.startTime) / 1000).toFixed(1) + 's';
+      const tokEl = assistantEl.querySelector('.chat-tokens');
+      if (tokEl) tokEl.textContent = panel.tokenCount + ' tokens';
+    }, 100);
   };
 
   input.onkeydown = (e) => {
@@ -1975,6 +1985,7 @@ function connectPanelChat(panel, messagesEl) {
       pendingAgentPrompt: pendingAgentPrompt, editedFiles: sessionEditedFiles,
       lastResultUsage: lastResultUsage, lastResultCost: lastResultCost,
     };
+    console.log('[QUEUE] processing event:', msg.type, 'for panel, saved mainP.ws:', !!saved.ws, 'panel.ws:', !!panel.ws);
 
     // Load this panel's state into globals
     chatWs = panel.ws; chatSessionId = panel.sessionId;
@@ -2010,6 +2021,7 @@ function connectPanelChat(panel, messagesEl) {
     pendingAgentPrompt = saved.pendingAgentPrompt; sessionEditedFiles = saved.editedFiles;
     lastResultUsage = saved.lastResultUsage; lastResultCost = saved.lastResultCost;
 
+    console.log('[QUEUE] restored — chatWs:', !!chatWs, 'readyState:', chatWs?.readyState, 'mainP.ws:', !!chatPanels.get('main')?.ws, 'panel.ws:', !!panel.ws);
     processing = false;
     if (eventQueue.length > 0) requestAnimationFrame(processQueue);
   }
@@ -2335,8 +2347,8 @@ function exitCheckpointMode() {
 
 function connectChat() {
   const mainP = chatPanels.get('main');
-  // Check the main panel's actual WS, not the global
-  if (mainP.ws && mainP.ws.readyState === WebSocket.OPEN) return;
+  console.log('[CONNECT] mainP.ws:', !!mainP.ws, 'readyState:', mainP.ws?.readyState);
+  if (mainP.ws && mainP.ws.readyState === WebSocket.OPEN) { console.log('[CONNECT] already open'); return; }
 
   const statusEl = document.querySelector('#chat-header .panel-status');
   if (statusEl) statusEl.className = 'panel-status';
@@ -2397,8 +2409,14 @@ function sendChatMessage() {
   syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) { syncToPanel(mainP); return; }
-  chatWs = mainP.ws; // Ensure global points to main
+  console.log('[SEND-MAIN] text:', JSON.stringify(text?.slice(0,30)), 'ws:', !!mainP.ws, 'readyState:', mainP.ws?.readyState, 'generating:', chatGenerating);
+  if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) {
+    console.log('[SEND-MAIN] BLOCKED: ws not open, connecting...');
+    connectChat();
+    syncToPanel(mainP);
+    return;
+  }
+  chatWs = mainP.ws;
 
   // If currently generating, queue the message
   if (chatGenerating) {
