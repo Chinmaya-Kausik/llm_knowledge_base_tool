@@ -2994,7 +2994,8 @@ async function init() {
       }
       // Cmd+[ go back
       if (mod && e.key === '[') {
-        e.preventDefault();
+        e.preventDefault(); e.stopPropagation();
+        if (expandedCard) { collapseFullPage(); return; }
         if (canvasStack.length > 1) navigateToLevel(canvasStack.length - 2);
         return;
       }
