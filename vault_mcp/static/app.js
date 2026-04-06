@@ -4173,28 +4173,30 @@ async function init() {
     // Cmd+J: cycle focus between chat inputs (in visit order)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
-      const alive = chatFocusHistory.filter(id => chatPanels.has(id));
-      if (!alive.length) return;
-      chatCycleIndex = (chatCycleIndex + 1) % alive.length;
-      const targetId = alive[chatCycleIndex];
-      focusChatPanel(targetId);
+      // Build list: all panels, ordered by focus history, then any not yet in history
+      const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
+      if (alive.length <= 1) { focusChatPanel(alive[0] || 'main'); return; }
+      chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
+      focusChatPanel(alive[chatCycleIndex]);
       return;
     }
     // Cmd+/: solo cycle — open target, minimize others
     if (matchesBinding(e, 'cycle-chat-solo')) {
       e.preventDefault();
-      const alive = chatFocusHistory.filter(id => chatPanels.has(id));
+      const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
       if (!alive.length) return;
-      chatCycleIndex = (chatCycleIndex + 1) % alive.length;
+      chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
       const targetId = alive[chatCycleIndex];
-      // Minimize all others
+      // Minimize/collapse all others
       for (const [id, p] of chatPanels) {
         if (id === targetId) continue;
         if (id === 'main') {
           const cp = document.getElementById('chat-panel');
-          if (cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float')) {
-            const ph = document.querySelector('#chat-header .panel-header');
-            if (ph) ph.click();
+          const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
+          if (isOpen) {
+            cp.removeAttribute('style');
+            ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
+            cp.classList.add('chat-collapsed');
           }
         } else if (p.container) {
           p.container.classList.add('minimized');
