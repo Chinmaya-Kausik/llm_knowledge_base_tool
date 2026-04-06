@@ -1189,19 +1189,24 @@ function renderTreeItems(container, items, depth) {
       renderTreeItems(childContainer, item.children, depth + 1);
       container.appendChild(childContainer);
 
+      let lastClickTime = 0;
       row.onclick = (e) => {
         e.stopPropagation();
-        childContainer.classList.toggle('open');
-        icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
+        const now = Date.now();
+        if (now - lastClickTime < 300) {
+          // Fast double click — enter folder
+          if (e.metaKey || e.ctrlKey) { openExternal(item.id); return; }
+          filesTilePath = item.id.split('/');
+          renderFilesTree();
+          updateBreadcrumbs();
+        } else {
+          // Single click — expand/collapse
+          childContainer.classList.toggle('open');
+          icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
+        }
+        lastClickTime = now;
       };
-      row.ondblclick = (e) => {
-        e.stopPropagation();
-        if (e.metaKey || e.ctrlKey) { openExternal(item.id); return; }
-        // Navigate tree into this folder
-        filesTilePath = item.id.split('/');
-        renderFilesTree();
-        updateBreadcrumbs();
-      };
+      row.ondblclick = (e) => e.stopPropagation(); // Suppress native dblclick
     } else {
       row.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
     }
