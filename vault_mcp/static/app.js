@@ -1535,11 +1535,9 @@ function createPanelHeader(panelId, label = 'Chat') {
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="temp">${isTemp ? '☑' : '☐'} Temporary</div>
       <div class="panel-menu-sep"></div>
-      ${panelId === 'main' ? `
       <div class="panel-menu-item" data-action="dock-right">Dock Right →</div>
       <div class="panel-menu-item" data-action="dock-bottom">Dock Bottom ↓</div>
       <div class="panel-menu-item" data-action="float">Float ◻</div>
-      ` : ''}
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="clear">Clear Conversation</div>
     `;
@@ -1613,13 +1611,59 @@ function createPanelHeader(panelId, label = 'Chat') {
       renderMenu();
       closeMenu = false;
     } else if (action === 'dock-right' || action === 'dock-bottom' || action === 'float') {
-      const chatPanel = document.getElementById('chat-panel');
+      const chatPanelEl = document.getElementById('chat-panel');
       const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
-      allStates.forEach(c => chatPanel.classList.remove(c));
-      if (action === 'dock-right') chatPanel.classList.add('chat-right');
-      else if (action === 'dock-bottom') chatPanel.classList.add('chat-bottom');
-      else chatPanel.classList.add('chat-float');
-      connectChat();
+
+      if (panelId !== 'main') {
+        // Floating panel wants to dock — swap it into the main dock slot
+        // 1. Save current main panel as a floating panel
+        syncToPanel(activePanel);
+        const mainP = chatPanels.get('main');
+        if (mainP && mainP.messages.length > 0) {
+          createFloatingPanel({ fork: false }); // Pop out current main as floating
+          // Copy main's messages to the new floating panel
+          const newFloating = [...chatPanels.values()].find(p => p !== mainP && p !== panel);
+          if (newFloating) {
+            newFloating.messages = [...mainP.messages];
+            newFloating.ws = mainP.ws;
+            newFloating.sessionId = mainP.sessionId;
+          }
+        }
+
+        // 2. Move the floating panel's state into main
+        const messagesEl = document.getElementById('chat-messages');
+        messagesEl.innerHTML = '';
+        for (const msg of panel.messages) {
+          if (msg.role === 'user' || msg.role === 'assistant') {
+            const el = document.createElement('div');
+            el.className = `chat-msg chat-msg-${msg.role}`;
+            el.textContent = msg.content?.slice(0, 500) || '';
+            messagesEl.appendChild(el);
+          }
+        }
+
+        // 3. Transfer state
+        activePanel = chatPanels.get('main');
+        activePanel.ws = panel.ws;
+        activePanel.sessionId = panel.sessionId;
+        activePanel.messages = panel.messages;
+        activePanel.model = panel.model;
+        activePanel.contextLevel = panel.contextLevel;
+        activePanel.contextPath = panel.contextPath;
+        syncFromPanel(activePanel);
+
+        // 4. Remove the floating panel
+        if (panel.container) panel.container.remove();
+        chatPanels.delete(panelId);
+      }
+
+      // Set dock mode
+      allStates.forEach(c => chatPanelEl.classList.remove(c));
+      if (action === 'dock-right') chatPanelEl.classList.add('chat-right');
+      else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
+      else chatPanelEl.classList.add('chat-float');
+
+      if (panelId === 'main') connectChat();
     } else if (action === 'clear') {
       syncToPanel(activePanel);
       activePanel = panel;
