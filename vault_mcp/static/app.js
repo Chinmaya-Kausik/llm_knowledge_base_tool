@@ -2318,7 +2318,7 @@ function connectPanelChat(panel, messagesEl) {
 // ========================================
 let terminalCounter = 0;
 
-async function createTerminalPanel() {
+function createTerminalPanel() {
   const id = ++terminalCounter;
   const card = document.createElement('div');
   card.className = 'floating-chat-panel floating-terminal';
@@ -2392,11 +2392,12 @@ async function createTerminalPanel() {
   header.querySelector('.panel-close').onclick = () => { if (ws) ws.close(); card.remove(); };
   header.querySelector('.panel-minimize').onclick = () => card.classList.toggle('minimized');
 
-  // Load xterm.js
-  const { Terminal } = await import('/static/vendor/xterm.min.js');
-  const { FitAddon } = await import('/static/vendor/xterm-fit.min.js');
+  // xterm.js loaded via script tags
+  const XTerm = window.Terminal;
+  const XFitAddon = window.FitAddon?.FitAddon || window.FitAddon;
+  if (!XTerm) { console.error('xterm.js not loaded'); return; }
 
-  const term = new Terminal({
+  const term = new XTerm({
     cursorBlink: true,
     fontSize: 13,
     fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
@@ -2407,10 +2408,10 @@ async function createTerminalPanel() {
       selectionBackground: '#33467c',
     },
   });
-  const fitAddon = new FitAddon();
-  term.loadAddon(fitAddon);
+  const fitAddon = XFitAddon ? new XFitAddon() : null;
+  if (fitAddon) term.loadAddon(fitAddon);
   term.open(termContainer);
-  fitAddon.fit();
+  if (fitAddon) fitAddon.fit();
 
   // WebSocket to backend PTY
   const ws = new WebSocket(`ws://${location.host}/ws/terminal`);
