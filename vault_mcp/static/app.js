@@ -24,6 +24,7 @@ const DEFAULT_KEYBINDINGS = {
   'nav-forward':    { key: ']', mod: true, label: 'Drill into folder' },
   'show-shortcuts': { key: 'k', mod: true, label: 'Show shortcuts' },
   'focus-chat':     { key: 'j', mod: true, label: 'Focus chat input' },
+  'new-terminal':   { key: '`', mod: true, label: 'New terminal' },
 };
 
 let keyBindings = { ...DEFAULT_KEYBINDINGS };
@@ -130,6 +131,7 @@ function initCanvas() {
     .scaleExtent([0.05, 2])
     .filter(event => {
       if (event.target.closest('.floating-chat-panel')) return false;
+      if (event.target.closest('.floating-terminal')) return false;
       if (event.type === 'wheel' && event.target.closest('.doc-body')) return false;
       if (event.type === 'wheel' && event.target.closest('.doc-edit-area')) return false;
       const isStart = event.type === 'mousedown' || event.type === 'pointerdown' || event.type === 'touchstart';
@@ -2311,6 +2313,132 @@ function connectPanelChat(panel, messagesEl) {
   thisWs.onclose = () => { if (panel.ws === thisWs) panel.ws = null; };
 }
 
+// ========================================
+// Terminal Panels
+// ========================================
+let terminalCounter = 0;
+
+async function createTerminalPanel() {
+  const id = ++terminalCounter;
+  const card = document.createElement('div');
+  card.className = 'floating-chat-panel floating-terminal';
+  card.style.width = '500px';
+  card.style.height = '350px';
+  card.style.left = (120 + id * 30) + 'px';
+  card.style.top = (80 + id * 30) + 'px';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'panel-header';
+  header.innerHTML = `
+    <span class="panel-label" contenteditable="true">Terminal ${id}</span>
+    <span style="flex:1"></span>
+    <button class="panel-minimize" title="Minimize">─</button>
+    <button class="panel-close" title="Close">✕</button>
+  `;
+  card.appendChild(header);
+
+  // Terminal container
+  const termContainer = document.createElement('div');
+  termContainer.className = 'terminal-container';
+  card.appendChild(termContainer);
+
+  // Resize handles
+  for (const dir of ['right', 'bottom', 'left', 'top', 'corner']) {
+    const handle = document.createElement('div');
+    handle.className = `fcp-resize fcp-resize-${dir}`;
+    handle.addEventListener('pointerdown', (re) => {
+      re.preventDefault(); re.stopPropagation();
+      const rect = card.getBoundingClientRect();
+      const startX = re.clientX, startY = re.clientY;
+      const startW = rect.width, startH = rect.height;
+      const startL = rect.left, startT = rect.top;
+      function onMove(me) {
+        const dx = me.clientX - startX, dy = me.clientY - startY;
+        if (dir === 'right' || dir === 'corner') card.style.width = Math.max(300, startW + dx) + 'px';
+        if (dir === 'bottom' || dir === 'corner') card.style.height = Math.max(200, startH + dy) + 'px';
+        if (dir === 'left') { card.style.width = Math.max(300, startW - dx) + 'px'; card.style.left = Math.max(0, startL + dx) + 'px'; }
+        if (dir === 'top') { card.style.height = Math.max(200, startH - dy) + 'px'; card.style.top = Math.max(0, startT + dy) + 'px'; }
+        if (fitAddon) fitAddon.fit();
+      }
+      function onUp() { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+    card.appendChild(handle);
+  }
+
+  document.getElementById('canvas-container').appendChild(card);
+
+  // Draggable
+  let dragging = false, dragReady = false, startX, startY, dx, dy;
+  header.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button') || e.target.closest('[contenteditable]')) return;
+    dragReady = true; dragging = false;
+    startX = e.clientX; startY = e.clientY;
+    dx = e.clientX - card.offsetLeft; dy = e.clientY - card.offsetTop;
+    header.setPointerCapture(e.pointerId);
+  });
+  header.addEventListener('pointermove', (e) => {
+    if (!dragReady) return;
+    if (!dragging && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 4) return;
+    dragging = true;
+    card.style.left = Math.max(0, Math.min(e.clientX - dx, window.innerWidth - 100)) + 'px';
+    card.style.top = Math.max(0, Math.min(e.clientY - dy, window.innerHeight - 50)) + 'px';
+  });
+  header.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
+
+  // Close / minimize
+  header.querySelector('.panel-close').onclick = () => { if (ws) ws.close(); card.remove(); };
+  header.querySelector('.panel-minimize').onclick = () => card.classList.toggle('minimized');
+
+  // Load xterm.js
+  const { Terminal } = await import('/static/vendor/xterm.min.js');
+  const { FitAddon } = await import('/static/vendor/xterm-fit.min.js');
+
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+    theme: {
+      background: '#1a1b26',
+      foreground: '#c0caf5',
+      cursor: '#c0caf5',
+      selectionBackground: '#33467c',
+    },
+  });
+  const fitAddon = new FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(termContainer);
+  fitAddon.fit();
+
+  // WebSocket to backend PTY
+  const ws = new WebSocket(`ws://${location.host}/ws/terminal`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    // Send initial size
+    ws.send(`RESIZE:${term.cols}:${term.rows}`);
+  };
+
+  ws.onmessage = (e) => {
+    if (e.data instanceof ArrayBuffer) {
+      term.write(new Uint8Array(e.data));
+    } else {
+      term.write(e.data);
+    }
+  };
+
+  ws.onclose = () => term.write('\r\n[Session ended]\r\n');
+
+  term.onData((data) => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+  term.onResize(({ cols, rows }) => { if (ws.readyState === WebSocket.OPEN) ws.send(`RESIZE:${cols}:${rows}`); });
+
+  // Refit on window resize
+  const resizeObs = new ResizeObserver(() => fitAddon.fit());
+  resizeObs.observe(termContainer);
+}
+
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
 
@@ -4006,6 +4134,7 @@ async function init() {
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
+    if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
     if (matchesBinding(e, 'focus-chat')) {
       e.preventDefault();
       // Focus main chat input, expand if collapsed

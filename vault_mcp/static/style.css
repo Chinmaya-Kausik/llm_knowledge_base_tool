@@ -590,6 +590,10 @@ body {
 }
 .fcp-send:hover { color: var(--text-bright); }
 
+/* Terminal panel */
+.terminal-container { flex: 1; overflow: hidden; }
+.terminal-container .xterm { height: 100%; }
+
 /* CodeMirror overrides — transparent background, match app */
 .cm-editor { background: transparent !important; height: 100%; }
 .cm-editor .cm-scroller { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px; }

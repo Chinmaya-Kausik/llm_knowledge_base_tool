@@ -619,6 +619,76 @@ async def websocket_chat(websocket: WebSocket):
     await ws_chat(websocket, VAULT_ROOT)
 
 
+# --- Terminal WebSocket ---
+
+@app.websocket("/ws/terminal")
+async def websocket_terminal(websocket: WebSocket):
+    import pty, os, signal, fcntl
+    await websocket.accept()
+
+    # Spawn shell with pty
+    master_fd, slave_fd = pty.openpty()
+    shell = os.environ.get("SHELL", "/bin/zsh")
+    import subprocess
+    proc = subprocess.Popen(
+        [shell, "-l"],
+        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        cwd=str(VAULT_ROOT),
+        preexec_fn=os.setsid,
+    )
+    os.close(slave_fd)
+
+    # Set master to non-blocking
+    fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+
+    try:
+        # Read from shell → send to WebSocket
+        async def read_pty():
+            while True:
+                await asyncio.sleep(0.01)
+                try:
+                    data = os.read(master_fd, 4096)
+                    if data:
+                        await websocket.send_bytes(data)
+                except (OSError, BlockingIOError):
+                    if proc.poll() is not None:
+                        break
+
+        read_task = asyncio.create_task(read_pty())
+
+        # Read from WebSocket → write to shell
+        while True:
+            msg = await websocket.receive()
+            if msg["type"] == "websocket.receive":
+                if "bytes" in msg:
+                    os.write(master_fd, msg["bytes"])
+                elif "text" in msg:
+                    text = msg["text"]
+                    # Handle resize messages
+                    if text.startswith("RESIZE:"):
+                        try:
+                            _, cols, rows = text.split(":")
+                            import struct, termios
+                            winsize = struct.pack("HHHH", int(rows), int(cols), 0, 0)
+                            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                        except Exception:
+                            pass
+                    else:
+                        os.write(master_fd, text.encode())
+            elif msg["type"] == "websocket.disconnect":
+                break
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        read_task.cancel()
+        try:
+            os.kill(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        os.close(master_fd)
+
+
 # --- Media serving (downloaded images) ---
 
 @app.get("/media/{filepath:path}")
