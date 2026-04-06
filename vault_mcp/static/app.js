@@ -1697,15 +1697,22 @@ function createPanelHeader(panelId, label = 'Chat') {
       else if (cp.classList.contains('chat-float') || cp.classList.contains('chat-collapsed-float')) mode = 'float';
       console.log('[TOGGLE] before:', JSON.stringify(before), 'isOpen:', isOpen, 'mode:', mode);
 
-      // Clear ALL inline styles
-      cp.removeAttribute('style');
-
       if (isOpen) {
+        // Collapsing — save position for float, clear size styles
+        const pos = mode === 'float' ? { left: cp.style.left, top: cp.style.top } : null;
+        cp.removeAttribute('style');
+        if (pos) { cp.style.left = pos.left; cp.style.top = pos.top; }
+
         ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
         const collapsed = mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed';
         cp.classList.add(collapsed);
         console.log('[TOGGLE] collapsed to:', collapsed);
       } else {
+        // Expanding — save position for float, clear everything
+        const pos = mode === 'float' ? { left: cp.style.left, top: cp.style.top } : null;
+        cp.removeAttribute('style');
+        if (pos) { cp.style.left = pos.left; cp.style.top = pos.top; }
+
         ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
         cp.classList.add('chat-' + mode);
         connectChat();
