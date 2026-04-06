@@ -1597,7 +1597,8 @@ function connectChat() {
 function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+  console.log('sendChatMessage:', { text: text.slice(0, 30), checkpointMode, wsOpen: chatWs?.readyState === WebSocket.OPEN, redirectSnapshotSize: redirectSnapshot.size });
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { console.log('BLOCKED: WebSocket not open'); return; }
 
   // Build the actual message — might include redirect context
   let fullText = text;
@@ -1605,9 +1606,9 @@ function sendChatMessage() {
   if (checkpointMode) {
     fullText = buildRedirectMessage(text);
     exitCheckpointMode();
-    if (!fullText) return;
+    if (!fullText) { console.log('BLOCKED: buildRedirectMessage returned empty'); return; }
   } else if (!text && !pendingSelection?.text) {
-    return;
+    console.log('BLOCKED: no text and no pending selection'); return;
   }
 
   chatMessages.push({ role: 'user', content: fullText });
