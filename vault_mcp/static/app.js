@@ -1420,40 +1420,252 @@ class ChatPanel {
   }
 }
 
-// Main panel instance — all existing code references these shims
-const mainPanel = new ChatPanel(null); // container set in initChat()
-
-// Global shims — these proxy to mainPanel so existing code works unchanged
-let chatWs = null;
-let chatSessionId = null;
-let chatGenerating = false;
-let messageQueue = [];
-let currentAssistantEl = null;
-let currentThinkingEl = null;
-let currentThinkingWrapper = null;
-let chatContextLevel = 'page';
-let chatMessages = [];
-let chatIsTemporary = false;
-let chatStartTime = null;
-let chatTokenCount = 0;
-let chatTimerInterval = null;
-let currentActivityGroup = null;
-let selectedCards = new Set();
-let activeSubagents = new Map();
-let currentResponseText = '';
-let pendingAgentPrompt = null;
-let checkpointMode = false;
-let redirectSnapshot = new Map();
-let redirectCheckpoints = new Map();
-let wasUserInterrupt = false;
-let lastResultUsage = null;
-let lastResultCost = null;
-let activePlanPath = null;
-let activePlanContent = '';
-let sessionEditedFiles = new Set();
-
-// Panel registry
+// Panel registry and active panel proxy
 const chatPanels = new Map(); // panelId → ChatPanel
+let activePanel = new ChatPanel(null); // set properly in initChat()
+chatPanels.set('main', activePanel);
+
+// Global proxy — all existing code reads/writes these, which proxy to activePanel.
+// This lets us swap activePanel to operate on any panel without changing 400+ lines.
+const _proxy = (prop) => ({
+  get() { return activePanel[prop]; },
+  set(v) { activePanel[prop] = v; },
+  configurable: true,
+});
+// We can't use Object.defineProperty on `let` vars, so we keep them as real vars
+// but sync them. Instead, we use a simpler approach: a function that syncs
+// globals FROM activePanel before any chat operation, and TO activePanel after.
+
+let chatWs, chatSessionId, chatGenerating, messageQueue, currentAssistantEl;
+let currentThinkingEl, currentThinkingWrapper, chatContextLevel, chatMessages;
+let chatIsTemporary, chatStartTime, chatTokenCount, chatTimerInterval;
+let currentActivityGroup, activeSubagents, currentResponseText, pendingAgentPrompt;
+let checkpointMode, redirectSnapshot, redirectCheckpoints, wasUserInterrupt;
+let lastResultUsage, lastResultCost, activePlanPath, activePlanContent, sessionEditedFiles;
+let selectedCards = new Set();
+
+function syncFromPanel(panel) {
+  if (!panel) panel = activePanel;
+  chatWs = panel.ws; chatSessionId = panel.sessionId;
+  chatGenerating = panel.generating; messageQueue = panel.messageQueue;
+  currentAssistantEl = panel.assistantEl; currentThinkingEl = panel.thinkingEl;
+  currentThinkingWrapper = panel.thinkingWrapper; chatContextLevel = panel.contextLevel;
+  chatMessages = panel.messages; chatIsTemporary = panel.isTemporary;
+  chatStartTime = panel.startTime; chatTokenCount = panel.tokenCount;
+  chatTimerInterval = panel.timerInterval; currentActivityGroup = panel.activityGroup;
+  activeSubagents = panel.subagents; currentResponseText = panel.responseText;
+  pendingAgentPrompt = panel.pendingAgentPrompt; checkpointMode = panel.checkpointMode;
+  redirectSnapshot = panel.redirectSnapshot; redirectCheckpoints = panel.redirectCheckpoints;
+  wasUserInterrupt = panel.wasUserInterrupt; lastResultUsage = panel.lastResultUsage;
+  lastResultCost = panel.lastResultCost; activePlanPath = panel.activePlanPath;
+  activePlanContent = panel.activePlanContent; sessionEditedFiles = panel.editedFiles;
+}
+
+function syncToPanel(panel) {
+  if (!panel) panel = activePanel;
+  panel.ws = chatWs; panel.sessionId = chatSessionId;
+  panel.generating = chatGenerating; panel.messageQueue = messageQueue;
+  panel.assistantEl = currentAssistantEl; panel.thinkingEl = currentThinkingEl;
+  panel.thinkingWrapper = currentThinkingWrapper; panel.contextLevel = chatContextLevel;
+  panel.messages = chatMessages; panel.isTemporary = chatIsTemporary;
+  panel.startTime = chatStartTime; panel.tokenCount = chatTokenCount;
+  panel.timerInterval = chatTimerInterval; panel.activityGroup = currentActivityGroup;
+  panel.subagents = activeSubagents; panel.responseText = currentResponseText;
+  panel.pendingAgentPrompt = pendingAgentPrompt; panel.checkpointMode = checkpointMode;
+  panel.redirectSnapshot = redirectSnapshot; panel.redirectCheckpoints = redirectCheckpoints;
+  panel.wasUserInterrupt = wasUserInterrupt; panel.lastResultUsage = lastResultUsage;
+  panel.lastResultCost = lastResultCost; panel.activePlanPath = activePlanPath;
+  panel.activePlanContent = activePlanContent; panel.editedFiles = sessionEditedFiles;
+}
+
+// Initialize globals from the default panel
+syncFromPanel(activePanel);
+
+// --- Panel management ---
+let panelCounter = 0;
+
+function createFloatingPanel(options = {}) {
+  if (chatPanels.size >= 6) { alert('Max 6 chat panels'); return null; }
+  const panelId = 'panel-' + (++panelCounter);
+  const panel = new ChatPanel(null, {
+    sessionId: crypto.randomUUID(),
+    messages: options.fork ? [...activePanel.messages] : [],
+    contextLevel: activePanel.contextLevel,
+  });
+
+  // Create floating card on canvas
+  const card = document.createElement('div');
+  card.className = 'floating-chat-panel';
+  card.dataset.panelId = panelId;
+  card.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-title">${options.fork ? 'Fork' : 'Chat'} ${panelCounter}</span>
+      <span style="flex:1"></span>
+      <button class="fcp-dock" title="Dock this panel">⬒</button>
+      <button class="fcp-minimize" title="Minimize">─</button>
+      <button class="fcp-close" title="Close">✕</button>
+    </div>
+    <div class="fcp-messages"></div>
+    <div class="fcp-input-area">
+      <textarea class="fcp-input" placeholder="Message Claude..." rows="1"></textarea>
+      <button class="fcp-send">Send</button>
+    </div>
+  `;
+
+  // Position near center of canvas
+  card.style.left = (150 + panelCounter * 30) + 'px';
+  card.style.top = (100 + panelCounter * 30) + 'px';
+
+  document.getElementById('world').appendChild(card);
+  panel.container = card;
+  chatPanels.set(panelId, panel);
+
+  // Wire events
+  const input = card.querySelector('.fcp-input');
+  const messagesEl = card.querySelector('.fcp-messages');
+  const sendBtn = card.querySelector('.fcp-send');
+
+  // If forked, render existing messages
+  if (options.fork && panel.messages.length) {
+    for (const msg of panel.messages) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        const el = document.createElement('div');
+        el.className = `chat-msg chat-msg-${msg.role}`;
+        el.textContent = msg.content?.slice(0, 200) || '';
+        messagesEl.appendChild(el);
+      }
+    }
+  }
+
+  sendBtn.onclick = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    // Switch active panel, send, switch back
+    syncToPanel(activePanel);
+    activePanel = panel;
+    syncFromPanel(panel);
+
+    // Ensure connected
+    if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
+      connectPanelChat(panel, messagesEl);
+    }
+
+    // Append user message
+    const userEl = document.createElement('div');
+    userEl.className = 'chat-msg chat-msg-user';
+    userEl.textContent = text;
+    messagesEl.appendChild(userEl);
+    chatMessages.push({ role: 'user', content: text });
+    input.value = '';
+
+    // Send via WebSocket
+    chatWs.send(JSON.stringify({
+      type: 'message', text,
+      context_level: chatContextLevel,
+      context: { page_path: currentLevel().parentPath || '' },
+    }));
+
+    chatGenerating = true;
+    chatStartTime = Date.now();
+    chatTokenCount = 0;
+
+    // Create assistant container
+    currentAssistantEl = document.createElement('div');
+    currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+    const sb = document.createElement('div');
+    sb.className = 'chat-status-bar';
+    sb.id = 'chat-active-status';
+    sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span>`;
+    currentAssistantEl.appendChild(sb);
+    messagesEl.appendChild(currentAssistantEl);
+
+    syncToPanel(panel);
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+  };
+
+  card.querySelector('.fcp-close').onclick = () => {
+    if (panel.ws) panel.ws.close();
+    chatPanels.delete(panelId);
+    card.remove();
+  };
+
+  card.querySelector('.fcp-minimize').onclick = () => {
+    card.classList.toggle('minimized');
+  };
+
+  card.querySelector('.fcp-dock').onclick = () => {
+    // Swap this panel into the main dock
+    syncToPanel(activePanel);
+    // TODO: implement full dock swap
+    alert('Dock swap — coming soon');
+  };
+
+  // Make draggable
+  const header = card.querySelector('.fcp-header');
+  let dragging = false, dx, dy;
+  header.addEventListener('pointerdown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    dx = e.clientX - card.offsetLeft;
+    dy = e.clientY - card.offsetTop;
+    header.setPointerCapture(e.pointerId);
+  });
+  header.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    card.style.left = (e.clientX - dx) + 'px';
+    card.style.top = (e.clientY - dy) + 'px';
+  });
+  header.addEventListener('pointerup', () => { dragging = false; });
+
+  // Connect this panel's WebSocket
+  connectPanelChat(panel, messagesEl);
+
+  return panel;
+}
+
+function connectPanelChat(panel, messagesEl) {
+  const wsUrl = `ws://${location.host}/ws/chat`;
+  try {
+    panel.ws = new WebSocket(wsUrl);
+  } catch (e) { return; }
+
+  panel.ws.onopen = () => {
+    panel.ws.send(JSON.stringify({
+      type: 'init',
+      session_id: panel.sessionId,
+      page_path: currentLevel().parentPath || '',
+    }));
+  };
+
+  panel.ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+
+    // Sync to this panel's state, handle event, sync back
+    const prevActive = activePanel;
+    syncToPanel(prevActive);
+    activePanel = panel;
+    syncFromPanel(panel);
+
+    // For floating panels, redirect DOM operations to panel's messages container
+    const mainMessages = document.getElementById('chat-messages');
+    handleChatEvent(msg);
+
+    // Move any new assistant elements from main to panel's container
+    if (currentAssistantEl && currentAssistantEl.parentElement === mainMessages) {
+      messagesEl.appendChild(currentAssistantEl);
+    }
+
+    syncToPanel(panel);
+    activePanel = prevActive;
+    syncFromPanel(prevActive);
+  };
+
+  panel.ws.onclose = () => { panel.ws = null; };
+}
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1738,6 +1950,9 @@ function initChat() {
   });
 
   // Clear chat / new conversation — save existing chat first
+  document.getElementById('chat-new-panel').onclick = () => createFloatingPanel();
+  document.getElementById('chat-fork').onclick = () => createFloatingPanel({ fork: true });
+
   document.getElementById('chat-clear').addEventListener('click', async (e) => {
     e.stopPropagation();
     await saveChatTranscript(); // Save before clearing
@@ -1868,6 +2083,7 @@ function connectChat() {
   chatWs.onopen = () => {
     chatSessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
+    syncToPanel(activePanel); // Save ws + sessionId to panel
 
     const level = currentLevel();
     chatWs.send(JSON.stringify({
@@ -1880,12 +2096,15 @@ function connectChat() {
   chatWs.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch (err) { console.error('Chat parse error:', err); return; }
-    // Mark as connected only after successful init response
     if (msg.type === 'init') {
       status.textContent = 'Connected';
       status.className = 'connected';
     }
+    // Sync to/from the panel that owns this WebSocket
+    const panel = [...chatPanels.values()].find(p => p.ws === chatWs) || activePanel;
+    syncFromPanel(panel);
     handleChatEvent(msg);
+    syncToPanel(panel);
   };
 
   chatWs.onclose = () => {
@@ -1902,9 +2121,10 @@ function connectChat() {
 }
 
 function sendChatMessage() {
+  syncFromPanel(activePanel);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { syncToPanel(activePanel); return; }
 
   // If currently generating, queue the message
   if (chatGenerating) {
@@ -1981,11 +2201,13 @@ function sendChatMessage() {
     const tokEl = document.getElementById('chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
+  syncToPanel(activePanel);
 }
 
 function sendQueuedMessage(text) {
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
-  if (chatGenerating) { messageQueue.push({ text, el: null }); return; }
+  syncFromPanel(activePanel);
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { syncToPanel(activePanel); return; }
+  if (chatGenerating) { messageQueue.push({ text, el: null }); syncToPanel(activePanel); return; }
 
   chatMessages.push({ role: 'user', content: text });
   currentResponseText = '';
@@ -2024,6 +2246,7 @@ function sendQueuedMessage(text) {
     const tokEl = document.getElementById('chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
+  syncToPanel(activePanel);
 }
 
 function escapeHtml(str) {
