@@ -22,6 +22,7 @@ const DEFAULT_KEYBINDINGS = {
   'cycle-model':    { key: 'p', alt: true, label: 'Cycle model' },
   'nav-back':       { key: '[', mod: true, label: 'Navigate back' },
   'nav-forward':    { key: ']', mod: true, label: 'Drill into folder' },
+  'show-shortcuts': { key: 'k', mod: true, label: 'Show shortcuts' },
 };
 
 let keyBindings = { ...DEFAULT_KEYBINDINGS };
@@ -3818,8 +3819,33 @@ function initSettings() {
   renderKeybindingEditor();
 }
 
-function renderKeybindingEditor() {
-  const editor = document.getElementById('keybinding-editor');
+function openKeybindingPanel() {
+  // Remove existing panel if open
+  document.getElementById('keybinding-panel')?.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'keybinding-panel';
+  panel.className = 'keybinding-panel';
+  panel.innerHTML = `
+    <div class="keybinding-panel-header">
+      <span>Keyboard Shortcuts</span>
+      <span style="flex:1"></span>
+      <button onclick="document.getElementById('keybinding-panel').remove()" title="Close">✕</button>
+    </div>
+    <div class="keybinding-panel-body" id="keybinding-panel-body"></div>
+  `;
+  document.getElementById('canvas-container').appendChild(panel);
+  renderKeybindingEditor(panel.querySelector('#keybinding-panel-body'));
+
+  // Close on Escape
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+}
+
+function renderKeybindingEditor(container) {
+  const editor = container || document.getElementById('keybinding-editor');
   if (!editor) return;
   editor.innerHTML = '';
   for (const [action, binding] of Object.entries(keyBindings)) {
@@ -3930,6 +3956,7 @@ async function init() {
     if (matchesBinding(e, 'new-chat') && !inInput) { e.preventDefault(); createFloatingPanel(); return; }
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
+    if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
     if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
     if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
