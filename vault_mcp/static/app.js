@@ -2060,18 +2060,22 @@ function createPanelHeader(panelId, label = 'Chat') {
     const panel = chatPanels.get(panelId);
 
     if (panelId === 'main') {
-      // Close main: hide entirely and disconnect
-      saveChatTranscript();
+      // Close main: sync state first, then save, then hide
+      const mainP = chatPanels.get('main');
+      syncFromPanel(mainP);
+      if (chatMessages.length > 0 && !chatIsTemporary) {
+        saveChatTranscript();
+      }
       const cp = document.getElementById('chat-panel');
       cp.removeAttribute('style');
       ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
       cp.style.display = 'none';
       document.getElementById('chat-messages').innerHTML = '';
-      if (panel?.ws) { panel.ws.close(); panel.ws = null; }
-      syncFromPanel(activePanel);
+      if (mainP?.ws) { mainP.ws.close(); mainP.ws = null; }
       chatMessages = [];
       chatWs = null;
-      syncToPanel(activePanel);
+      chatSessionId = crypto.randomUUID();
+      syncToPanel(mainP);
     } else {
       // Floating panel: save transcript, close and remove
       if (panel && panel.messages.length > 0 && !panel.isTemporary) {
@@ -3790,7 +3794,7 @@ async function saveChatTranscript() {
       body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages }),
     });
     const data = await resp.json();
-    console.log('Chat saved:', data);
+    console.log('Chat saved:', data, 'messages sent:', chatMessages.length);
   } catch (e) { console.error('Chat save failed:', e); }
 }
 
