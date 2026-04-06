@@ -1186,6 +1186,14 @@ function renderTreeItems(container, items, depth) {
         icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
         filesLastClickedFolder = item.id || null;
       };
+      row.ondblclick = (e) => {
+        e.stopPropagation();
+        if (e.metaKey || e.ctrlKey) { openExternal(item.id); return; }
+        // Enter folder on canvas
+        switchView('graph');
+        const nd = nodeById(item.id);
+        if (nd) drillInto(item.id);
+      };
     } else {
       row.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
     }
@@ -1269,7 +1277,7 @@ function updateBreadcrumbs() {
 
 // SVG file icons (Lucide-inspired, monochrome)
 const _fileIcons = {
-  folder: `<svg width="44" height="44" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="fback" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3a8fd4"/><stop offset="100%" stop-color="#2e7cbf"/></linearGradient><linearGradient id="ffront" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7dd3fc"/><stop offset="100%" stop-color="#5eb8e8"/></linearGradient><filter id="fshadow"><feDropShadow dx="0" dy="1" stdDeviation="0.5" flood-opacity="0.25"/></filter></defs><rect x="4" y="8" width="32" height="27" rx="3" fill="url(#fback)"/><path d="M4 10a3 3 0 0 1 3-3h8.5c0 0 1 0 1.5.8L18.5 10C19 10.8 20 11 20 11H33a3 3 0 0 1 3 3H4V10z" fill="url(#fback)"/><rect x="3.5" y="13.5" width="33" height="22" rx="3" fill="url(#ffront)" filter="url(#fshadow)"/><rect x="3.5" y="13.5" width="33" height="22" rx="3" stroke="#4a9ad4" stroke-width="0.4" fill="none"/><rect x="6" y="32" width="28" height="1.5" rx="0.75" fill="#4a9ad4" opacity="0.3"/></svg>`,
+  folder: `<svg width="52" height="52" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="fback" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4a9ee0"/><stop offset="100%" stop-color="#2a7bc4"/></linearGradient><linearGradient id="ffront" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8ed6fb"/><stop offset="50%" stop-color="#6dc4f0"/><stop offset="100%" stop-color="#5ab5e6"/></linearGradient><filter id="fshadow"><feDropShadow dx="0" dy="1.5" stdDeviation="1" flood-opacity="0.3"/></filter></defs><rect x="4" y="7" width="40" height="36" rx="3.5" fill="url(#fback)"/><path d="M4 11a3.5 3.5 0 0 1 3.5-3.5H18c0 0 1.2 0 2 1l2.5 3c.8 1 2 1.5 2 1.5H40.5A3.5 3.5 0 0 1 44 16.5v1H4V11z" fill="url(#fback)"/><rect x="3.5" y="16" width="41" height="27" rx="3.5" fill="url(#ffront)" filter="url(#fshadow)"/><rect x="3.5" y="16" width="41" height="27" rx="3.5" stroke="#4090c8" stroke-width="0.4" fill="none"/><rect x="7" y="39" width="34" height="1.5" rx="0.75" fill="#3a88c0" opacity="0.3"/></svg>`,
   md: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   py: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">PY</text></svg>`,
   js: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">JS</text></svg>`,
