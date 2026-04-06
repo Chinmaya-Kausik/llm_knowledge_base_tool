@@ -658,12 +658,13 @@ body {
 /* Chat collapsed states */
 #chat-panel.chat-collapsed { height: 36px; overflow: hidden; cursor: pointer; }
 #chat-panel.chat-collapsed-right {
-  position: fixed; right: 0; top: 36px; bottom: 0; width: 36px; height: auto;
+  position: fixed; right: 0; top: 36px; bottom: 0; width: 32px; height: auto;
   border-left: 1px solid var(--border);
-  z-index: 200; overflow: hidden; cursor: pointer;
+  z-index: 200; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-#chat-panel.chat-collapsed-right #chat-header { writing-mode: vertical-lr; transform: rotate(180deg); padding: 10px 6px; height: 100%; }
-#chat-panel.chat-collapsed-right .panel-header { writing-mode: vertical-lr; transform: rotate(180deg); }
+#chat-panel.chat-collapsed-right #chat-header { display: flex; align-items: center; justify-content: center; height: 100%; padding: 0; }
+#chat-panel.chat-collapsed-right .panel-header { writing-mode: vertical-lr; flex-direction: column; gap: 4px; padding: 12px 0; }
+#chat-panel.chat-collapsed-right .panel-label { font-size: 12px; }
 #chat-panel.chat-collapsed-right .panel-menu,
 #chat-panel.chat-collapsed-right .panel-status,
 #chat-panel.chat-collapsed-right .panel-minimize,
