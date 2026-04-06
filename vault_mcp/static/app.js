@@ -1146,7 +1146,7 @@ function setFilesMode(mode) {
   document.getElementById('files-tiles').style.display = mode === 'tiles' ? '' : 'none';
 
   if (mode === 'tree') renderFilesTree();
-  else { filesTilePath = []; renderFilesTiles(); }
+  else renderFilesTiles();
 }
 
 function renderFilesTree() {
@@ -1264,7 +1264,7 @@ function updateBreadcrumbs() {
   const root = document.createElement('span');
   root.className = 'breadcrumb-item';
   root.textContent = 'vault';
-  root.onclick = () => { filesTilePath = []; renderFilesTiles(); };
+  root.onclick = () => { filesTilePath = []; filesMode === 'tiles' ? renderFilesTiles() : renderFilesTree(); };
   bc.appendChild(root);
 
   // Path segments
@@ -1278,7 +1278,7 @@ function updateBreadcrumbs() {
     crumb.className = 'breadcrumb-item';
     crumb.textContent = filesTilePath[i];
     const depth = i;
-    crumb.onclick = () => { filesTilePath = filesTilePath.slice(0, depth + 1); renderFilesTiles(); };
+    crumb.onclick = () => { filesTilePath = filesTilePath.slice(0, depth + 1); filesMode === 'tiles' ? renderFilesTiles() : renderFilesTree(); };
     bc.appendChild(crumb);
   }
 }
@@ -3810,10 +3810,11 @@ async function init() {
       if (mod && e.key === '[') {
         e.preventDefault(); e.stopPropagation();
         if (expandedCard) { collapseFullPage(); return; }
-        // Files tile view: navigate breadcrumbs back
-        if (filesMode === 'tiles' && filesTilePath.length > 0) {
+        // Files view: navigate breadcrumbs back
+        if (filesTilePath.length > 0) {
           filesTilePath.pop();
-          renderFilesTiles();
+          if (filesMode === 'tiles') renderFilesTiles();
+          else renderFilesTree();
           return;
         }
         if (canvasStack.length > 1) navigateToLevel(canvasStack.length - 2);
