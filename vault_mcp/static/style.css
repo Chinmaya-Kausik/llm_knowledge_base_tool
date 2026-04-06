@@ -479,6 +479,7 @@ body {
 .result-path { font-size: 11px; color: var(--accent); margin-bottom: 3px; }
 .result-context { font-size: 12px; color: var(--text-muted); }
 .result-context mark { background: rgba(122,162,247,0.25); color: var(--accent); }
+.result-count { color: var(--text-muted); font-size: 10px; }
 
 /* === Full-page overlay === */
 #fullpage-overlay {

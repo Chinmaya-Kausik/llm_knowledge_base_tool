@@ -1280,6 +1280,7 @@ async function initHealth() {
 let searchScopeGlobal = false; // false = auto (current folder), true = all
 let searchContent = true;
 let searchName = true;
+let searchLines = false; // false = group by file, true = show each line
 
 async function doSearch(query) {
   if (!query.trim()) return;
@@ -1302,7 +1303,7 @@ async function doSearch(query) {
   const inFolder = currentLevel().parentPath;
   const q = query.replace(/'/g, "\\'");
   const scopeHtml = `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'checked':''} onchange="searchScopeGlobal=this.checked;doSearch('${q}')"> Global</label>`;
-  opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label>`;
+  opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label><label class="search-check"><input type="checkbox" ${searchLines?'checked':''} onchange="searchLines=this.checked;doSearch('${q}')"> Lines</label>`;
   c.appendChild(opts);
 
   // Determine mode
@@ -1324,13 +1325,50 @@ async function doSearch(query) {
       c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: 'No results' }));
       return;
     }
-    for (const r of results) {
-      const div=document.createElement('div'); div.className='search-result';
-      const esc=query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const lineInfo = r.line ? `:${r.line}` : '';
-      div.innerHTML=`<div class="result-path">${r.path}${lineInfo}</div><div class="result-context">${r.context.replace(new RegExp(`(${esc})`,'gi'),'<mark>$1</mark>')}</div>`;
-      div.onclick=()=>{ switchView('graph'); const card=cardElements.get(r.path); if(card) focusCard(card); };
-      c.appendChild(div);
+
+    const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const openResult = (path) => {
+      // Find the page path — strip filename for non-folder pages
+      const pagePath = path.replace(/\/[^/]+\.[^/]+$/, '') || path;
+      const card = cardElements.get(pagePath) || cardElements.get(path);
+      if (card) {
+        switchView('graph');
+        expandCardFullPage(card);
+      } else {
+        // Create fake card to open fullpage
+        const fakeCard = document.createElement('div');
+        fakeCard.dataset.path = pagePath;
+        const nd = nodeById(pagePath);
+        fakeCard.innerHTML = `<span class="doc-title">${nd?.label || path}</span>`;
+        switchView('graph');
+        expandCardFullPage(fakeCard);
+      }
+    };
+
+    if (searchLines) {
+      // Show each matching line
+      for (const r of results) {
+        const div = document.createElement('div'); div.className = 'search-result';
+        const lineInfo = r.line ? `:${r.line}` : '';
+        div.innerHTML = `<div class="result-path">${r.path}${lineInfo}</div><div class="result-context">${r.context.replace(new RegExp(`(${esc})`, 'gi'), '<mark>$1</mark>')}</div>`;
+        div.onclick = () => openResult(r.path);
+        c.appendChild(div);
+      }
+    } else {
+      // Group by file
+      const grouped = new Map();
+      for (const r of results) {
+        if (!grouped.has(r.path)) grouped.set(r.path, []);
+        grouped.get(r.path).push(r);
+      }
+      for (const [path, matches] of grouped) {
+        const div = document.createElement('div'); div.className = 'search-result';
+        const preview = matches[0].context.replace(new RegExp(`(${esc})`, 'gi'), '<mark>$1</mark>');
+        const countLabel = matches.length > 1 ? ` <span class="result-count">(${matches.length} matches)</span>` : '';
+        div.innerHTML = `<div class="result-path">${path}${countLabel}</div><div class="result-context">${preview}</div>`;
+        div.onclick = () => openResult(path);
+        c.appendChild(div);
+      }
     }
   } catch(e) { c.innerHTML=`<div class="empty-state">Error: ${e.message}</div>`; }
 }
