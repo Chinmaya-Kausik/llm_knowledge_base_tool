@@ -1615,11 +1615,37 @@ function createPanelHeader(panelId, label = 'Chat') {
       const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
 
       if (panelId !== 'main') {
-        // Floating panel wants to dock — transfer its state into the main dock slot
+        // Floating panel wants to dock — swap with main
         const mainP = chatPanels.get('main');
         syncToPanel(activePanel);
 
-        // Transfer state to main
+        // Pop out current main as floating (if it has content)
+        if (mainP.messages.length > 0) {
+          const poppedPanel = createFloatingPanel({ fork: false });
+          if (poppedPanel) {
+            poppedPanel.messages = [...mainP.messages];
+            poppedPanel.ws = mainP.ws;
+            poppedPanel.sessionId = mainP.sessionId;
+            poppedPanel.model = mainP.model;
+            poppedPanel.contextLevel = mainP.contextLevel;
+            poppedPanel.contextPath = mainP.contextPath;
+            // Re-render popped panel messages
+            const poppedMsgs = poppedPanel.container?.querySelector('.fcp-messages');
+            if (poppedMsgs) {
+              poppedMsgs.innerHTML = '';
+              for (const msg of poppedPanel.messages) {
+                if (msg.role === 'user' || msg.role === 'assistant') {
+                  const el = document.createElement('div');
+                  el.className = `chat-msg chat-msg-${msg.role}`;
+                  el.textContent = msg.content?.slice(0, 200) || '';
+                  poppedMsgs.appendChild(el);
+                }
+              }
+            }
+          }
+        }
+
+        // Transfer docking panel's state to main
         mainP.ws = panel.ws;
         mainP.sessionId = panel.sessionId;
         mainP.messages = [...panel.messages];
@@ -1640,7 +1666,7 @@ function createPanelHeader(panelId, label = 'Chat') {
           }
         }
 
-        // Remove floating panel
+        // Remove the floating panel that just docked
         chatPanels.delete(panelId);
         if (panel.container) panel.container.remove();
 
@@ -1882,7 +1908,23 @@ function createFloatingPanel(options = {}) {
     card.style.left = (e.clientX - dx) + 'px';
     card.style.top = (e.clientY - dy) + 'px';
   });
-  headerEl.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
+  headerEl.addEventListener('pointerup', (e) => {
+    if (dragging) {
+      // Proximity dock: snap if dragged near edges
+      const snapDist = 40;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const x = e.clientX, y = e.clientY;
+      if (x > vw - snapDist) {
+        // Near right edge — dock right
+        const menuItem = { dataset: { action: 'dock-right' } };
+        menu.querySelector('[data-action="dock-right"]')?.click();
+      } else if (y > vh - snapDist) {
+        // Near bottom edge — dock bottom
+        menu.querySelector('[data-action="dock-bottom"]')?.click();
+      }
+    }
+    dragReady = false; dragging = false;
+  });
 
   // Connect WebSocket
   connectPanelChat(panel, messagesEl);
