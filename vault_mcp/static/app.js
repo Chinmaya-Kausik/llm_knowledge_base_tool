@@ -1455,6 +1455,26 @@ function switchView(name) {
     if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     initFilesView();
   }
+  if (name==='graph' && filesTilePath.length > 0) {
+    // Sync canvas to the folder we were browsing in Files
+    const tilePath = filesTilePath.join('/');
+    if (tilePath && currentLevel().parentPath !== tilePath) {
+      // Navigate canvas to match
+      const nd = nodeById(tilePath);
+      if (nd) {
+        canvasStack = [{ parentPath: null, label: 'Root' }];
+        // Build stack from root to target
+        const parts = tilePath.split('/');
+        let path = '';
+        for (const part of parts) {
+          path = path ? path + '/' + part : part;
+          const n = nodeById(path);
+          if (n) canvasStack.push({ parentPath: path, label: n.label || part });
+        }
+        renderCurrentLevel();
+      }
+    }
+  }
   if (name==='tags') initTagCloud();
   if (name==='health') initHealth();
 }
