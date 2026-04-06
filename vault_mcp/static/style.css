@@ -746,7 +746,7 @@ body {
 #chat-panel.chat-collapsed-right #chat-body,
 #chat-panel.chat-collapsed-right #chat-input-area { display: none; }
 #chat-panel.chat-collapsed-float {
-  position: fixed; width: 200px; height: 36px;
+  position: fixed; width: auto; height: auto;
   border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); z-index: 200; overflow: hidden; cursor: pointer;
 }
