@@ -302,12 +302,6 @@ function wireCardButtons(card, hasChildren) {
 
   const body = card.querySelector('.doc-body');
 
-  // Double-click body → full page view (for folders: view/edit README)
-  body.addEventListener('dblclick', (e) => {
-    e.stopPropagation(); e.preventDefault();
-    if (card.dataset.editing !== 'true') expandCardFullPage(card);
-  });
-
   // Single click body → expand content (for non-markdown files in summary mode)
   if (!isMarkdown) {
     body.addEventListener('click', (e) => {
@@ -318,11 +312,14 @@ function wireCardButtons(card, hasChildren) {
     });
   }
 
-  // Double-click body → enter edit mode (for any expanded card)
+  // Double-click body → edit if expanded, fullpage if collapsed
   body.addEventListener('dblclick', (e) => {
     e.stopPropagation(); e.preventDefault();
-    if (card.dataset.editing !== 'true' && card.dataset.expanded === 'true') {
+    if (card.dataset.editing === 'true') return;
+    if (card.dataset.expanded === 'true') {
       enterCardEdit(card, path);
+    } else {
+      expandCardFullPage(card);
     }
   });
 
