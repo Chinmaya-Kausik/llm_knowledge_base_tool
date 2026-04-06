@@ -1488,28 +1488,23 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 
 function dockPanel(panelId, action) {
-  console.log('[DOCK-FN] panelId:', panelId, 'action:', action, 'allPanels:', [...chatPanels.keys()]);
   const panel = chatPanels.get(panelId);
-  if (!panel) { console.log('[DOCK-FN] panel not found!'); return; }
   const chatPanelEl = document.getElementById('chat-panel');
   const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
 
   if (panelId !== 'main') {
     const mainP = chatPanels.get('main');
     syncToPanel(activePanel);
-    console.log('[DOCK-FN] before swap — panels:', [...chatPanels.keys()]);
 
     // Pop out current main as floating (if it has content)
     // DON'T create a new WebSocket — close the popped panel's auto-created one
     // and transfer the main panel's existing WebSocket
     if (mainP.messages.length > 0) {
       const mainLabel = document.querySelector('#chat-header .panel-label')?.textContent || 'Chat';
-      console.log('[DOCK-FN] popping out main as:', mainLabel);
       const poppedPanel = createFloatingPanel({ fork: false, label: mainLabel });
       if (poppedPanel) {
         // Close the auto-created WebSocket (createFloatingPanel opened one)
         if (poppedPanel.ws && poppedPanel.ws !== mainP.ws) {
-          console.log('[DOCK-FN] closing popped panel auto-created ws');
           poppedPanel.ws.onclose = null; // Prevent cleanup
           poppedPanel.ws.close();
         }
@@ -1533,12 +1528,10 @@ function dockPanel(panelId, action) {
             }
           }
         }
-        console.log('[DOCK-FN] popped panel created with', poppedPanel.messages.length, 'messages');
       }
     }
 
     // Transfer docking panel's state + label to main
-    console.log('[DOCK-FN] transferring panel', panelId, 'to main');
     mainP.ws = panel.ws;
     mainP.sessionId = panel.sessionId;
     mainP.messages = [...panel.messages];
@@ -1563,10 +1556,8 @@ function dockPanel(panelId, action) {
     }
 
     // Remove ONLY the docking panel (not others)
-    console.log('[DOCK-FN] removing panel', panelId, 'panels before:', [...chatPanels.keys()]);
     chatPanels.delete(panelId);
     if (panel.container) panel.container.remove();
-    console.log('[DOCK-FN] panels after:', [...chatPanels.keys()]);
 
     activePanel = mainP;
     syncFromPanel(mainP);
@@ -1743,7 +1734,6 @@ function createPanelHeader(panelId, label = 'Chat') {
       let mode = 'bottom';
       if (cp.classList.contains('chat-right') || cp.classList.contains('chat-collapsed-right')) mode = 'right';
       else if (cp.classList.contains('chat-float') || cp.classList.contains('chat-collapsed-float')) mode = 'float';
-      console.log('[TOGGLE] before:', JSON.stringify(before), 'isOpen:', isOpen, 'mode:', mode);
 
       if (isOpen) {
         // Collapsing — save position for float, clear size styles
@@ -1754,7 +1744,6 @@ function createPanelHeader(panelId, label = 'Chat') {
         ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
         const collapsed = mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed';
         cp.classList.add(collapsed);
-        console.log('[TOGGLE] collapsed to:', collapsed);
       } else {
         // Expanding — save position for float, clear everything
         const pos = mode === 'float' ? { left: cp.style.left, top: cp.style.top } : null;
@@ -1764,9 +1753,7 @@ function createPanelHeader(panelId, label = 'Chat') {
         ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
         cp.classList.add('chat-' + mode);
         connectChat();
-        console.log('[TOGGLE] expanded to: chat-' + mode);
       }
-      console.log('[TOGGLE] after:', { classes: [...cp.classList], style: cp.style.cssText, size: `${cp.offsetWidth}x${cp.offsetHeight}` });
     } else {
       const card = panel?.container;
       if (card) card.classList.toggle('minimized');
@@ -2028,7 +2015,6 @@ function connectPanelChat(panel, messagesEl) {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
     const panelKey = [...chatPanels.entries()].find(([k, p]) => p === panel)?.[0] || 'orphaned';
-    if (msg.type !== 'text') console.log('[WS-FLOAT] event:', msg.type, 'panel:', panelKey, 'queueLen:', eventQueue.length);
     eventQueue.push(msg);
     processQueue();
   };
@@ -2103,7 +2089,6 @@ function initChat() {
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     e.stopPropagation();
-    console.log('[DBLCLICK] header dblclick, chatMaximized:', chatMaximized);
 
     if (chatMaximized) {
       // Restore previous state
@@ -2138,7 +2123,6 @@ function initChat() {
   const chatHeader = document.getElementById('chat-header');
   chatHeader.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
-    console.log('[DRAG] pointerdown on chat header');
     const startX = e.clientX, startY = e.clientY;
     let dragging = false;
     const rect = panel.getBoundingClientRect();
@@ -2154,7 +2138,6 @@ function initChat() {
 
       // Detach to float if not already floating
       if (!panel.classList.contains('chat-float') && !panel.classList.contains('chat-collapsed-float')) {
-        console.log('[DRAG] detaching to float');
         clearChatClasses();
         panel.classList.add('chat-float');
         chatDockMode = 'float';
@@ -2384,7 +2367,6 @@ function connectChat() {
     if (msg.type === 'init') {
       if (statusEl) statusEl.className = 'panel-status connected';
     }
-    if (msg.type !== 'text') console.log('[WS-MAIN] event:', msg.type);
     // Always sync main panel — don't search by WS (it may have been swapped during dock)
     syncFromPanel(mainP);
     handleChatEvent(msg);
