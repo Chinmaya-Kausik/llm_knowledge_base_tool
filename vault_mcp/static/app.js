@@ -192,9 +192,10 @@ function wireCardButtons(card, hasChildren) {
   // Single-click title: toggle expand/collapse
   card.querySelector('.doc-handle').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (card.dataset.expanded === 'false') {
+    if (card.dataset.expanded === 'false' || body.style.display === 'none') {
       card.dataset.expanded = 'true';
       card.dataset.collapseState = 'expanded';
+      body.style.display = '';
       card.querySelector('.btn-collapse').textContent = '-';
       if (!isMarkdown && !cardMeta.has(path)) expandCardContent(card, path);
     } else {
