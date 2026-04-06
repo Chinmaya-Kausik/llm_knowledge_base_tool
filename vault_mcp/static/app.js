@@ -1446,6 +1446,8 @@ function initChat() {
     chatSessionId = crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
     currentAssistantEl = null; currentThinkingEl = null; currentThinkingWrapper = null; currentActivityGroup = null;
+    activeSubagents.clear(); currentResponseText = ''; pendingAgentPrompt = null; pendingSelection = null;
+    if (checkpointMode) exitCheckpointMode();
     if (chatWs && chatWs.readyState === WebSocket.OPEN) {
       chatWs.send(JSON.stringify({ type: 'init', session_id: chatSessionId, page_path: currentLevel().parentPath || '' }));
     }
@@ -1662,6 +1664,11 @@ function sendChatMessage() {
   }, 100);
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function formatToolDesc(tool, input) {
   // Format like Claude Code terminal output
   const i = input || {};
@@ -1759,9 +1766,6 @@ function buildRedirectMessage(generalText) {
   return msg;
 }
 
-function chatAutoScroll() {
-  // User controls scroll — no auto-scroll
-}
 
 function handleChatEvent(msg) {
   const messages = document.getElementById('chat-messages');
@@ -1918,7 +1922,7 @@ function handleChatEvent(msg) {
 
       // Update header
       const latestEl = ag.querySelector('.activity-latest');
-      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${toolName}</b> ${toolDesc}`;
+      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${escapeHtml(toolName)}</b> ${escapeHtml(toolDesc)}`;
 
       // Same-tool grouping: if same tool as last, increment counter
       const agBody = ag.querySelector('.chat-activity-body');
@@ -1943,7 +1947,7 @@ function handleChatEvent(msg) {
         toolEntry.className = 'chat-tool-entry';
         toolEntry._startTime = Date.now();
         toolEntry._count = 1;
-        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
+        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${escapeHtml(toolDesc)}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
         // Store the message index for this tool call (for checkpoint truncation)
         toolEntry.dataset.msgIndex = chatMessages.length - 1;
         const toolResult = document.createElement('div');
@@ -2015,7 +2019,7 @@ function handleChatEvent(msg) {
 
       const subHeader = document.createElement('div');
       subHeader.className = 'chat-subagent-header';
-      const subDesc = msg.description || msg.task_type || 'Subagent';
+      const subDesc = escapeHtml(msg.description || msg.task_type || 'Subagent');
       const agentPrompt = pendingAgentPrompt || '';
       pendingAgentPrompt = null;
 
@@ -2029,7 +2033,7 @@ function handleChatEvent(msg) {
       if (agentPrompt) {
         const promptEl = document.createElement('div');
         promptEl.className = 'chat-subagent-prompt';
-        promptEl.innerHTML = `<span class="prompt-label">Prompt:</span> <span class="prompt-text">${agentPrompt.slice(0, 100)}${agentPrompt.length > 100 ? '...' : ''}</span>`;
+        promptEl.innerHTML = `<span class="prompt-label">Prompt:</span> <span class="prompt-text">${escapeHtml(agentPrompt.slice(0, 100))}${agentPrompt.length > 100 ? '...' : ''}</span>`;
         promptEl.title = agentPrompt;
         const fullPrompt = document.createElement('div');
         fullPrompt.className = 'chat-subagent-prompt-full';
@@ -2101,7 +2105,20 @@ function handleChatEvent(msg) {
 
     case 'done':
     case 'stopped':
-      // Track assistant response (from accumulator, not DOM)
+      // Finalize any open thinking/activity
+      if (currentThinkingWrapper) {
+        const tw = currentThinkingWrapper;
+        const hdr = tw.querySelector('.chat-thinking-header');
+        if (hdr) { const p = hdr.querySelector('.pondering'); if (p) { p.textContent = `Thought`; p.classList.remove('pondering'); } }
+        currentThinkingWrapper = null; currentThinkingEl = null;
+      }
+      if (currentActivityGroup) {
+        const ag = currentActivityGroup;
+        const hdr = ag.querySelector('.chat-activity-header');
+        if (hdr) { const l = hdr.querySelector('.activity-latest'); if (l) l.classList.remove('pondering'); }
+        currentActivityGroup = null;
+      }
+      // Track assistant response
       if (currentResponseText) {
         chatMessages.push({ role: 'assistant', content: currentResponseText });
         currentResponseText = '';
@@ -2147,7 +2164,7 @@ function handleChatEvent(msg) {
       break;
 
     case 'error':
-      appendChatMessage('system', `Error: ${msg.message || 'Unknown error'}`);
+      appendChatMessage('system', `Error: ${escapeHtml(msg.message || 'Unknown error')}`);
       chatGenerating = false;
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
@@ -2157,11 +2174,15 @@ function handleChatEvent(msg) {
       currentThinkingEl = null;
       currentThinkingWrapper = null;
       currentActivityGroup = null;
+      activeSubagents.clear();
       chatStartTime = null;
+      currentResponseText = '';
+      pendingSelection = null;
+      pendingAgentPrompt = null;
+      if (checkpointMode) exitCheckpointMode();
       break;
   }
 
-  chatAutoScroll();
 }
 
 async function saveChatTranscript() {
@@ -2191,7 +2212,6 @@ function appendChatMessage(role, text) {
   el.className = `chat-msg chat-msg-${role}`;
   el.textContent = text;
   messages.appendChild(el);
-  chatAutoScroll();
 }
 
 // ========================================
