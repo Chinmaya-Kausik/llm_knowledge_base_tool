@@ -2824,7 +2824,7 @@ async function loadCodeMirror() {
 
 function getLanguageExt(filename) {
   const ext = filename.split('.').pop()?.toLowerCase();
-  const map = { py: 'python', js: 'javascript', ts: 'javascript', jsx: 'javascript', tsx: 'javascript', html: 'html', htm: 'html', css: 'css', json: 'json', md: 'markdown', tex: 'markdown', bib: 'markdown', sh: 'javascript', bash: 'javascript', yaml: 'markdown', yml: 'markdown' };
+  const map = { py: 'python', js: 'javascript', ts: 'javascript', jsx: 'javascript', tsx: 'javascript', html: 'html', htm: 'html', css: 'css', json: 'json', md: 'markdown', tex: 'latex', bib: 'latex', sh: 'javascript', bash: 'javascript', yaml: 'markdown', yml: 'markdown' };
   return map[ext] || null;
 }
 
@@ -2839,6 +2839,7 @@ async function createCodeEditor(container, content, filename, options = {}) {
   else if (langName === 'css') extensions.push(cm.css());
   else if (langName === 'json') extensions.push(cm.json());
   else if (langName === 'markdown') extensions.push(cm.markdown());
+  else if (langName === 'latex') extensions.push(cm.StreamLanguage.define(cm.stex));
 
   if (options.readOnly) {
     extensions.push(cm.EditorState.readOnly.of(true));

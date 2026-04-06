@@ -413,6 +413,12 @@ body {
 .file-tile-name { font-size: 11px; color: var(--text); word-break: break-word; line-height: 1.3; }
 .file-tile-name.folder-name { font-weight: 600; }
 
+/* CodeMirror overrides — match app theme */
+.cm-editor { background: var(--bg-surface) !important; height: 100%; }
+.cm-editor .cm-scroller { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px; }
+.cm-editor .cm-gutters { background: var(--bg-surface) !important; border-right: 1px solid var(--border); }
+.cm-editor.cm-focused { outline: none; }
+
 /* Legacy tree (sidebar) */
 .tree-folder-section { margin-bottom: 16px; }
 .tree-folder-section h3 {
