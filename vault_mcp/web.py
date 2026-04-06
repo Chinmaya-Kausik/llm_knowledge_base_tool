@@ -51,6 +51,22 @@ def bootstrap_vault(vault_root: Path) -> None:
     if not reg.exists():
         reg.write_text('{"pages": []}', encoding="utf-8")
 
+    # Create .claude/mcp.json in vault so the agent can find MCP tools
+    claude_dir = vault_root / ".claude"
+    claude_dir.mkdir(exist_ok=True)
+    mcp_json = claude_dir / "mcp.json"
+    repo_dir = str(Path(__file__).parent.parent)
+    import json
+    mcp_config = {
+        "mcpServers": {
+            "vault": {
+                "command": "uv",
+                "args": ["run", "--directory", repo_dir, "python", "-m", "vault_mcp.server"]
+            }
+        }
+    }
+    mcp_json.write_text(json.dumps(mcp_config, indent=2), encoding="utf-8")
+
     # Create glossary if missing
     glossary = vault_root / "wiki" / "meta" / "glossary.md"
     if not glossary.exists():

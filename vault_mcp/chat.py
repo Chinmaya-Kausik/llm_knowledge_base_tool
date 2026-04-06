@@ -231,7 +231,8 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             query,
         )
 
-        mcp_config = vault_root / ".claude" / "mcp.json"
+        # MCP config is in the repo directory, not the vault
+        mcp_config = Path(__file__).parent.parent / ".claude" / "mcp.json"
         system_prompt = build_system_prompt(session_id, vault_root, context_level)
 
         # Use the SDK's session ID for resume (not our browser session ID)
