@@ -2060,7 +2060,13 @@ function createPanelHeader(panelId, label = 'Chat') {
       chatWs = null;
       syncToPanel(activePanel);
     } else {
-      // Floating panel: close and remove
+      // Floating panel: save transcript, close and remove
+      if (panel && panel.messages.length > 0 && !panel.isTemporary) {
+        fetch('/api/chat/save', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages }),
+        }).catch(() => {});
+      }
       if (panel?.ws) panel.ws.close();
       chatPanels.delete(panelId);
       chatFocusHistory = chatFocusHistory.filter(id => id !== panelId);
