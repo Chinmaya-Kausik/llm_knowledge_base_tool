@@ -1868,45 +1868,43 @@ function createFloatingPanel(options = {}) {
     }
   }
 
-  // Send handler
+  // Send handler — uses panel directly, never touches activePanel/globals
   sendBtn.onclick = () => {
     const text = input.value.trim();
     if (!text) return;
-    syncToPanel(activePanel);
-    activePanel = panel;
-    syncFromPanel(panel);
 
-    if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
+    if (!panel.ws || panel.ws.readyState !== WebSocket.OPEN) {
       connectPanelChat(panel, messagesEl);
+      // Wait for connection before sending
+      setTimeout(() => sendBtn.click(), 500);
+      return;
     }
 
     const userEl = document.createElement('div');
     userEl.className = 'chat-msg chat-msg-user';
     userEl.textContent = text;
     messagesEl.appendChild(userEl);
-    chatMessages.push({ role: 'user', content: text });
+    panel.messages.push({ role: 'user', content: text });
     input.value = '';
 
-    chatWs.send(JSON.stringify({
+    panel.ws.send(JSON.stringify({
       type: 'message', text,
-      context_level: chatContextLevel,
-      context: { page_path: currentLevel().parentPath || '' },
+      context_level: panel.contextLevel,
+      context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
     }));
 
-    chatGenerating = true;
-    chatStartTime = Date.now();
-    chatTokenCount = 0;
+    panel.generating = true;
+    panel.startTime = Date.now();
+    panel.tokenCount = 0;
 
-    currentAssistantEl = document.createElement('div');
-    currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+    const assistantEl = document.createElement('div');
+    assistantEl.className = 'chat-msg chat-msg-assistant';
     const sb = document.createElement('div');
     sb.className = 'chat-status-bar';
-    sb.id = 'chat-active-status';
     sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span>`;
-    currentAssistantEl.appendChild(sb);
-    messagesEl.appendChild(currentAssistantEl);
-
-    syncToPanel(panel);
+    assistantEl.appendChild(sb);
+    messagesEl.appendChild(assistantEl);
+    panel.assistantEl = assistantEl;
   };
 
   input.onkeydown = (e) => {
