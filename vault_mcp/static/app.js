@@ -1121,7 +1121,6 @@ function renderTree(items, depth) {
 // --- Other views (files, tag cloud, health, search) ---
 let filesTreeData = null;
 let filesMode = 'tree'; // 'tree' or 'tiles'
-let filesLastClickedFolder = null; // Last folder clicked in tree mode
 let filesTilePath = []; // breadcrumb path for tile navigation
 
 let filesInitialized = false;
@@ -1184,7 +1183,6 @@ function renderTreeItems(container, items, depth) {
         e.stopPropagation();
         childContainer.classList.toggle('open');
         icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
-        filesLastClickedFolder = item.id || null;
       };
       row.ondblclick = (e) => {
         e.stopPropagation();
@@ -1465,9 +1463,9 @@ function switchView(name) {
     if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     initFilesView();
   }
-  if (name==='graph') {
-    // Sync canvas to the folder we were browsing in Files
-    const tilePath = filesMode === 'tiles' ? filesTilePath.join('/') : filesLastClickedFolder;
+  if (name==='graph' && filesMode === 'tiles' && filesTilePath.length > 0) {
+    // Sync canvas to the folder we were browsing in Files tile mode
+    const tilePath = filesTilePath.join('/');
     if (tilePath && currentLevel().parentPath !== tilePath) {
       // Navigate canvas to match
       const nd = nodeById(tilePath);
