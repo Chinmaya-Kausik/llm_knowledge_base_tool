@@ -421,10 +421,10 @@ body {
 .toolbar-menu-label {
   font-size: 11px; font-weight: 600; color: var(--text-muted);
   margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
-  cursor: pointer; padding: 2px 0; border-bottom: 1px dotted var(--border);
+  cursor: pointer; padding: 2px 0;
 }
 .toolbar-menu-label:hover { color: var(--text); }
-.toolbar-menu-body { max-height: 150px; overflow-y: auto; }
+.toolbar-menu-body { max-height: 150px; overflow-y: auto; border-top: 1px dotted var(--border); margin-top: 2px; padding-top: 4px; }
 .toolbar-menu-body.collapsed { display: none; }
 .toolbar-menu-row { display: flex; gap: 6px; margin-top: 4px; }
 .toolbar-menu-row button { font-size: 11px; padding: 2px 8px; }

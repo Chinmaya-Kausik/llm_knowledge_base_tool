@@ -1507,20 +1507,13 @@ function createPanelHeader(panelId, label = 'Chat') {
     const isTemp = panel.isTemporary;
 
     menu.innerHTML = `
-      <div class="panel-menu-item" style="position:relative">Model: ${model} ▸
-        <div class="panel-menu-sub">
-          <div class="panel-menu-item${model==='sonnet'?' active':''}" data-action="model" data-value="sonnet">Sonnet</div>
-          <div class="panel-menu-item${model==='opus'?' active':''}" data-action="model" data-value="opus">Opus</div>
-          <div class="panel-menu-item${model==='haiku'?' active':''}" data-action="model" data-value="haiku">Haiku</div>
-        </div>
-      </div>
-      <div class="panel-menu-item" style="position:relative">Context: ${ctx} ▸
-        <div class="panel-menu-sub">
-          <div class="panel-menu-item${ctx==='page'?' active':''}" data-action="context" data-value="page">Page</div>
-          <div class="panel-menu-item${ctx==='folder'?' active':''}" data-action="context" data-value="folder">Folder</div>
-          <div class="panel-menu-item${ctx==='global'?' active':''}" data-action="context" data-value="global">Global</div>
-        </div>
-      </div>
+      <div class="panel-menu-item" data-action="model" data-value="sonnet"${model==='sonnet'?' class="panel-menu-item active"':''}>Sonnet</div>
+      <div class="panel-menu-item" data-action="model" data-value="opus"${model==='opus'?' class="panel-menu-item active"':''}>Opus</div>
+      <div class="panel-menu-item" data-action="model" data-value="haiku"${model==='haiku'?' class="panel-menu-item active"':''}>Haiku</div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="context" data-value="page"${ctx==='page'?' class="panel-menu-item active"':''}>Page context</div>
+      <div class="panel-menu-item" data-action="context" data-value="folder"${ctx==='folder'?' class="panel-menu-item active"':''}>Folder context</div>
+      <div class="panel-menu-item" data-action="context" data-value="global"${ctx==='global'?' class="panel-menu-item active"':''}>Global context</div>
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="new">+ New Chat</div>
       <div class="panel-menu-item" data-action="fork">⑂ Fork Conversation</div>
@@ -1554,14 +1547,20 @@ function createPanelHeader(panelId, label = 'Chat') {
     const value = item.dataset.value;
     const panel = chatPanels.get(panelId) || activePanel;
 
+    let closeMenu = true;
+
     if (action === 'model') {
       panel.model = value;
       if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
         panel.ws.send(JSON.stringify({ type: 'set_model', model: value }));
       }
+      renderMenu(); // Re-render to show new active state
+      closeMenu = false;
     } else if (action === 'context') {
       panel.contextLevel = value;
       syncFromPanel(panel);
+      renderMenu();
+      closeMenu = false;
     } else if (action === 'new') {
       createFloatingPanel();
     } else if (action === 'fork') {
@@ -1574,8 +1573,9 @@ function createPanelHeader(panelId, label = 'Chat') {
       syncFromPanel(prev);
     } else if (action === 'temp') {
       panel.isTemporary = !panel.isTemporary;
+      renderMenu();
+      closeMenu = false;
     } else if (action === 'dock-right' || action === 'dock-bottom' || action === 'float') {
-      // For main panel, use existing dock logic
       const chatPanel = document.getElementById('chat-panel');
       const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
       allStates.forEach(c => chatPanel.classList.remove(c));
@@ -1596,7 +1596,7 @@ function createPanelHeader(panelId, label = 'Chat') {
       syncToPanel(panel);
     }
 
-    menu.classList.remove('open');
+    if (closeMenu) menu.classList.remove('open');
   });
 
   // Label editing
@@ -3322,7 +3322,9 @@ function initSettings() {
     }
   });
 
+  // Keep toolbar menu open when interacting with its contents
   toolbarMenu.addEventListener('click', (e) => e.stopPropagation());
+  toolbarMenu.addEventListener('change', (e) => e.stopPropagation());
   document.addEventListener('click', () => toolbarMenu.classList.remove('open'));
 
   // Save vault root
