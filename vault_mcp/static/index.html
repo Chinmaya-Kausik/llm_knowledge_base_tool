@@ -33,44 +33,50 @@
     </div>
     <div class="toolbar-right">
       <input type="search" id="search-input" placeholder="Search... (Ctrl+F)">
-      <div class="filter-dropdown" id="filter-type-dropdown">
-        <button class="filter-btn" id="filter-type-btn">Type: All</button>
-        <div class="filter-menu" id="filter-type-menu">
-          <label><input type="checkbox" value="concept" checked> concept</label>
-          <label><input type="checkbox" value="summary" checked> summary</label>
-          <label><input type="checkbox" value="index" checked> index</label>
-          <label><input type="checkbox" value="answer" checked> answer</label>
-          <label><input type="checkbox" value="structure-note" checked> structure-note</label>
+      <div class="filter-dropdown" id="toolbar-menu-dropdown">
+        <button class="filter-btn" id="btn-toolbar-menu" title="Settings &amp; Filters">⚙<span id="filter-active-dot" style="display:none">●</span></button>
+        <div class="filter-menu toolbar-menu" id="toolbar-menu">
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label">Canvas</div>
+            <div class="toolbar-menu-row">
+              <button id="btn-auto-layout">Layout</button>
+              <button id="btn-fit">Fit</button>
+            </div>
+          </div>
           <hr>
-          <button id="filter-select-all">Select All</button>
-          <button id="filter-clear-all">Clear All</button>
-        </div>
-      </div>
-      <div class="filter-dropdown" id="filter-tag-dropdown">
-        <button class="filter-btn" id="filter-tag-btn">Tags: All</button>
-        <div class="filter-menu" id="filter-tag-menu">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-      <div class="filter-dropdown" id="filter-filetype-dropdown">
-        <button class="filter-btn" id="filter-filetype-btn">Files: All</button>
-        <div class="filter-menu" id="filter-filetype-menu">
-          <label><input type="checkbox" value="folder" checked> Folders</label>
-          <label><input type="checkbox" value="markdown" checked> Markdown</label>
-          <label><input type="checkbox" value="code" checked> Code</label>
-          <label><input type="checkbox" value="papers" checked> Papers</label>
-          <label><input type="checkbox" value="data" checked> Data</label>
-          <label><input type="checkbox" value="misc" checked> Misc</label>
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label">Type Filter</div>
+            <div id="filter-type-menu">
+              <label><input type="checkbox" value="concept" checked> concept</label>
+              <label><input type="checkbox" value="summary" checked> summary</label>
+              <label><input type="checkbox" value="index" checked> index</label>
+              <label><input type="checkbox" value="answer" checked> answer</label>
+              <label><input type="checkbox" value="structure-note" checked> structure-note</label>
+              <div class="toolbar-menu-row"><button id="filter-select-all">All</button><button id="filter-clear-all">None</button></div>
+            </div>
+          </div>
           <hr>
-          <button id="filetype-select-all">Select All</button>
-          <button id="filetype-clear-all">Clear All</button>
-        </div>
-      </div>
-      <button id="btn-auto-layout" title="Auto-layout">Layout</button>
-      <button id="btn-fit" title="Fit all">Fit</button>
-      <div class="filter-dropdown" id="settings-dropdown">
-        <button class="filter-btn" id="btn-settings">Settings</button>
-        <div class="filter-menu settings-menu" id="settings-menu">
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label">Tag Filter</div>
+            <div id="filter-tag-menu"><!-- Populated by JS --></div>
+          </div>
+          <hr>
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label">File Type Filter</div>
+            <div id="filter-filetype-menu">
+              <label><input type="checkbox" value="folder" checked> Folders</label>
+              <label><input type="checkbox" value="markdown" checked> Markdown</label>
+              <label><input type="checkbox" value="code" checked> Code</label>
+              <label><input type="checkbox" value="papers" checked> Papers</label>
+              <label><input type="checkbox" value="data" checked> Data</label>
+              <label><input type="checkbox" value="misc" checked> Misc</label>
+              <div class="toolbar-menu-row"><button id="filetype-select-all">All</button><button id="filetype-clear-all">None</button></div>
+            </div>
+          </div>
+          <hr>
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label">Settings</div>
+            <div id="settings-menu">
           <div class="settings-section">
             <label class="settings-label">Vault Root</label>
             <input type="text" id="settings-vault-root" class="settings-input" placeholder="/path/to/vault">
@@ -87,6 +93,8 @@
             <label class="settings-label">Code Font Size</label>
             <input type="range" id="settings-code-font" min="10" max="20" value="13" class="settings-range">
             <span id="settings-code-font-val">13px</span>
+          </div>
+            </div>
           </div>
         </div>
       </div>

@@ -909,16 +909,8 @@ function getActiveFiletypes() {
 function applyFilters() {
   const types = getActiveTypes(), tags = getActiveTags(), filetypes = getActiveFiletypes();
 
-  // Update button labels
-  const typeBtn = document.getElementById('filter-type-btn');
-  const allT = document.querySelectorAll('#filter-type-menu input[type="checkbox"]');
-  const checkedT = [...allT].filter(c=>c.checked);
-  typeBtn.textContent = checkedT.length===allT.length?'Type: All':checkedT.length===0?'Type: None':`Type: ${checkedT.length}`;
-  document.getElementById('filter-tag-btn').textContent = tags===null?'Tags: All':`Tags: ${tags.size}`;
-  const ftBtn = document.getElementById('filter-filetype-btn');
-  const allFt = document.querySelectorAll('#filter-filetype-menu input[type="checkbox"]');
-  const checkedFt = [...allFt].filter(c=>c.checked);
-  ftBtn.textContent = checkedFt.length===allFt.length?'Files: All':checkedFt.length===0?'Files: None':`Files: ${checkedFt.length}`;
+  // Update filter active indicator
+  updateFilterDot();
 
   for (const [path,card] of cardElements) {
     const type = card.dataset.type||'unknown';
@@ -943,6 +935,16 @@ function applyFilters() {
   scheduleEdgeUpdate();
 }
 
+function updateFilterDot() {
+  // Show dot on ⚙ button if any filter is narrowing the view
+  const allType = document.querySelectorAll('#filter-type-menu input[type="checkbox"]');
+  const allFt = document.querySelectorAll('#filter-filetype-menu input[type="checkbox"]');
+  const typeFiltered = [...allType].some(c => !c.checked);
+  const ftFiltered = [...allFt].some(c => !c.checked);
+  const dot = document.getElementById('filter-active-dot');
+  if (dot) dot.style.display = (typeFiltered || ftFiltered) ? '' : 'none';
+}
+
 function initFilterDropdowns() {
   const menus = ['filter-type-menu', 'filter-tag-menu', 'filter-filetype-menu'];
 
@@ -955,12 +957,7 @@ function initFilterDropdowns() {
     if (!wasOpen) menu.classList.add('open');
   }
 
-  document.getElementById('filter-type-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-type-menu', e); });
-  document.getElementById('filter-tag-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-tag-menu', e); });
-  document.getElementById('filter-filetype-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu('filter-filetype-menu', e); });
-  // Close menus on click outside — but stop menus themselves from closing
-  menus.forEach(id => document.getElementById(id)?.addEventListener('click', (e) => e.stopPropagation()));
-  document.addEventListener('click', closeAll);
+  // Filters are now inside the toolbar ⚙ menu — no separate toggle buttons needed
 
   // Type filter
   const typeMenu = document.getElementById('filter-type-menu');
@@ -3275,17 +3272,16 @@ function isCodeFile(path) {
 // Settings
 // ========================================
 function initSettings() {
-  const btn = document.getElementById('btn-settings');
-  const menu = document.getElementById('settings-menu');
+  const btn = document.getElementById('btn-toolbar-menu');
+  const toolbarMenu = document.getElementById('toolbar-menu');
 
   btn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    // Close other dropdowns
-    ['filter-type-menu', 'filter-tag-menu', 'filter-filetype-menu'].forEach(id =>
-      document.getElementById(id)?.classList.remove('open'));
+    const wasOpen = toolbarMenu.classList.contains('open');
+    toolbarMenu.classList.toggle('open');
 
-    const wasOpen = menu.classList.contains('open');
-    menu.classList.toggle('open');
+    // Update filter active dot
+    updateFilterDot();
 
     if (!wasOpen) {
       // Load current settings
@@ -3300,8 +3296,8 @@ function initSettings() {
     }
   });
 
-  menu.addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', () => menu.classList.remove('open'));
+  toolbarMenu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => toolbarMenu.classList.remove('open'));
 
   // Save vault root
   document.getElementById('settings-save-root').addEventListener('click', async () => {
