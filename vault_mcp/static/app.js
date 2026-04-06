@@ -209,6 +209,7 @@ function wireCardButtons(card, hasChildren) {
   // Double-click title: folders → drill into canvas (unless already inside), files → full page
   card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
     e.stopPropagation(); e.preventDefault();
+    if (e.metaKey || e.ctrlKey) { openExternal(path); return; }
     const currentParent = currentLevel().parentPath;
     if (card.dataset.isFolder === 'true' && hasChildren && currentParent !== path) {
       drillInto(path);
