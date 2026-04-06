@@ -1293,33 +1293,37 @@ async function doSearch(query) {
     if (level.parentPath) scope = level.parentPath;
   }
 
+  const scopeLabel = scope === 'all' ? 'vault' : scope.split('/').pop();
+  c.innerHTML = '';
+
+  // Search options bar — always rendered first
+  const opts = document.createElement('div');
+  opts.className = 'search-options';
+  const inFolder = currentLevel().parentPath;
+  const q = query.replace(/'/g, "\\'");
+  const scopeHtml = inFolder
+    ? `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'':'checked'} onchange="searchScopeGlobal=!this.checked;doSearch('${q}')"> 📁 ${inFolder.split('/').pop()}</label>`
+    : '';
+  opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label>`;
+  c.appendChild(opts);
+
   // Determine mode
   let mode = 'both';
   if (searchContent && !searchName) mode = 'content';
   else if (!searchContent && searchName) mode = 'name';
-  else if (!searchContent && !searchName) { c.innerHTML='<div class="empty-state">Select at least one search mode</div>'; return; }
+  else if (!searchContent && !searchName) {
+    c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: 'Select at least one search mode' }));
+    return;
+  }
 
-  const scopeLabel = scope === 'all' ? 'vault' : scope.split('/').pop();
-  c.innerHTML=`<div class="empty-state">Searching ${scopeLabel}...</div>`;
+  c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: `Searching ${scopeLabel}...` }));
   try {
     const results = await api.search(query, scope, mode);
-    c.innerHTML='';
-
-    // Search options bar — always shown
-    const opts = document.createElement('div');
-    opts.className = 'search-options';
-    const inFolder = currentLevel().parentPath;
-    const scopeHtml = inFolder
-      ? `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'':'checked'}  onchange="searchScopeGlobal=!this.checked;doSearch(document.getElementById('search-input').value)"> 📁 ${inFolder.split('/').pop()}</label>`
-      : '';
-    opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''}  onchange="searchContent=this.checked;doSearch(document.getElementById('search-input').value)"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''}  onchange="searchName=this.checked;doSearch(document.getElementById('search-input').value)"> Name</label>`;
-    c.appendChild(opts);
+    // Remove "Searching..." but keep options bar
+    c.querySelectorAll('.empty-state').forEach(e => e.remove());
 
     if (!results.length) {
-      const empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = 'No results';
-      c.appendChild(empty);
+      c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: 'No results' }));
       return;
     }
     for (const r of results) {
