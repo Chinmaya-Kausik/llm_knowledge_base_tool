@@ -193,6 +193,7 @@ function wireCardButtons(card, hasChildren) {
   // Single-click title: toggle expand/collapse
   card.querySelector('.doc-handle').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (card._wasDragged) { card._wasDragged = false; return; }
     if (card.dataset.expanded === 'false' || body.style.display === 'none') {
       card.dataset.expanded = 'true';
       card.dataset.collapseState = 'expanded';
@@ -427,9 +428,12 @@ function wireCardDrag(card, pinned) {
       y: parseInt(c.style.top) || 0,
     }));
 
+    let dragged = false;
     function onMove(e) {
       const dx = (e.clientX - startX) / k;
       const dy = (e.clientY - startY) / k;
+      if (!dragged && Math.abs(dx) + Math.abs(dy) < 4) return;
+      dragged = true;
       for (const sp of startPositions) {
         sp.card.style.left = (sp.x + dx) + 'px';
         sp.card.style.top = (sp.y + dy) + 'px';
@@ -439,6 +443,7 @@ function wireCardDrag(card, pinned) {
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      if (dragged) card._wasDragged = true;
       for (const sp of startPositions) {
         layoutData[sp.card.dataset.path] = { x: parseInt(sp.card.style.left), y: parseInt(sp.card.style.top) };
       }
