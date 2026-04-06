@@ -284,8 +284,9 @@ function wireCardButtons(card, hasChildren) {
         summary.className = 'doc-summary';
         card.appendChild(summary);
       }
-      const text = body.textContent?.trim() || '';
-      summary.textContent = text ? text.slice(0, 80) + (text.length > 80 ? '...' : '') : 'Empty';
+      const meta = cardMeta.get(path);
+      const summaryText = meta?.frontmatter?.summary || body.textContent?.trim() || '';
+      summary.textContent = summaryText ? summaryText.slice(0, 100) + (summaryText.length > 100 ? '...' : '') : 'Empty';
       summary.style.display = '';
     }
     scheduleEdgeUpdate();
