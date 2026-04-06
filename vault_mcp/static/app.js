@@ -787,7 +787,7 @@ function focusCard(card) {
   setTimeout(() => card.classList.remove('focused'), 2000);
 }
 
-function expandCardFullPage(card) {
+function expandCardFullPage(card, highlightQuery) {
   if (expandedCard) collapseFullPage();
   // Dismiss any canvas edit
   if (activeEditCard) exitCardEdit(activeEditCard);
@@ -818,16 +818,50 @@ function expandCardFullPage(card) {
 
   if (isCodeFile(path)) {
     // Render code files with CodeMirror
-    overlay.querySelector('.fullpage-toggle').style.display = 'none'; // CodeMirror handles editing
+    overlay.querySelector('.fullpage-toggle').style.display = 'none';
     createCodeEditor(contentEl, rawContent, path).then(view => {
       overlay._cmView = view;
+      // TODO: CodeMirror search highlight via SearchCursor
     });
   } else {
     // Render markdown with marked
     contentEl.innerHTML = marked.parse(rawContent);
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
+    // Highlight search matches
+    if (highlightQuery) highlightMatches(contentEl, highlightQuery);
   }
+}
+
+function highlightMatches(container, query) {
+  if (!query) return;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+  for (const node of textNodes) {
+    if (!regex.test(node.textContent)) continue;
+    const frag = document.createDocumentFragment();
+    const parts = node.textContent.split(regex);
+    for (const part of parts) {
+      if (regex.test(part)) {
+        const mark = document.createElement('mark');
+        mark.className = 'search-highlight';
+        mark.textContent = part;
+        frag.appendChild(mark);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+      regex.lastIndex = 0; // Reset regex state
+    }
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  // Scroll to first match
+  const first = container.querySelector('.search-highlight');
+  if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function wireFullPageLinks(overlay) {
@@ -1342,18 +1376,15 @@ async function doSearch(query) {
     const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const openResult = (path) => {
       const card = cardElements.get(path);
-      if (card) {
-        switchView('graph');
-        expandCardFullPage(card);
-      } else {
-        // Create fake card to open fullpage directly with the result path
+      const target = card || (() => {
         const fakeCard = document.createElement('div');
         fakeCard.dataset.path = path;
         const nd = nodeById(path);
         fakeCard.innerHTML = `<span class="doc-title">${nd?.label || path.split('/').pop()}</span>`;
-        switchView('graph');
-        expandCardFullPage(fakeCard);
-      }
+        return fakeCard;
+      })();
+      switchView('graph');
+      expandCardFullPage(target, query);
     };
 
     if (searchLines) {
