@@ -163,11 +163,15 @@ Permissions:
 - NEVER delete files without asking the user first.
 - Prefer MCP tools over raw shell commands when both can accomplish the task."""]
 
+    # Dynamic boundary — Claude Code caches everything above this marker
+    # and rebuilds everything below per-request
+    parts.append("__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__")
+
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
 
     if not page_path:
-        return parts[0]  # Skip context injection if no page — faster
+        return "\n\n".join(parts)  # Static + boundary only, no dynamic context
 
     if context_level == "page" and page_path:
         # Inject the current page content (truncated to avoid huge prompts)
