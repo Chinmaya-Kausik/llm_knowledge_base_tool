@@ -626,23 +626,20 @@ async def websocket_terminal(websocket: WebSocket):
     import pty, os, signal, fcntl
     await websocket.accept()
 
-    # Spawn shell with pty
-    master_fd, slave_fd = pty.openpty()
     shell = os.environ.get("SHELL", "/bin/zsh")
-    import subprocess
-    proc = subprocess.Popen(
-        [shell, "-l"],
-        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-        cwd=str(VAULT_ROOT),
-        preexec_fn=os.setsid,
-    )
-    os.close(slave_fd)
 
-    # Set master to non-blocking
+    # Use pty.fork() for proper controlling terminal
+    child_pid, master_fd = pty.fork()
+    if child_pid == 0:
+        # Child process — exec the shell
+        os.chdir(str(VAULT_ROOT))
+        os.execvp(shell, [shell, "-l"])
+        os._exit(1)  # Shouldn't reach here
+
+    # Parent — set non-blocking
     fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
 
     try:
-        # Read from shell → send to WebSocket
         async def read_pty():
             while True:
                 await asyncio.sleep(0.01)
@@ -651,12 +648,16 @@ async def websocket_terminal(websocket: WebSocket):
                     if data:
                         await websocket.send_bytes(data)
                 except (OSError, BlockingIOError):
-                    if proc.poll() is not None:
+                    # Check if child exited
+                    try:
+                        pid, status = os.waitpid(child_pid, os.WNOHANG)
+                        if pid != 0:
+                            break
+                    except ChildProcessError:
                         break
 
         read_task = asyncio.create_task(read_pty())
 
-        # Read from WebSocket → write to shell
         while True:
             msg = await websocket.receive()
             if msg["type"] == "websocket.receive":
@@ -664,7 +665,6 @@ async def websocket_terminal(websocket: WebSocket):
                     os.write(master_fd, msg["bytes"])
                 elif "text" in msg:
                     text = msg["text"]
-                    # Handle resize messages
                     if text.startswith("RESIZE:"):
                         try:
                             _, cols, rows = text.split(":")
@@ -683,10 +683,13 @@ async def websocket_terminal(websocket: WebSocket):
     finally:
         read_task.cancel()
         try:
-            os.kill(proc.pid, signal.SIGTERM)
+            os.kill(child_pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
-        os.close(master_fd)
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
 
 
 # --- Media serving (downloaded images) ---
