@@ -1269,7 +1269,7 @@ function updateBreadcrumbs() {
 
 // SVG file icons (Lucide-inspired, monochrome)
 const _fileIcons = {
-  folder: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v1H2V6z" fill="#4a90d9"/><rect x="1" y="9" width="22" height="12" rx="2" fill="#5ba0e6"/><line x1="1" y1="9" x2="23" y2="9" stroke="#3a78c0" stroke-width="1"/></svg>`,
+  folder: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7a2 2 0 0 1 2-2h4l1.5 1.5H19a2 2 0 0 1 2 2V7H3z" fill="#4a90d9"/><rect x="2.5" y="7.5" width="19" height="12.5" rx="1.5" fill="#5ba0e6"/><line x1="2.5" y1="8" x2="21.5" y2="8" stroke="#3a78c0" stroke-width="0.75"/></svg>`,
   md: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   py: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">PY</text></svg>`,
   js: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="18" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">JS</text></svg>`,
