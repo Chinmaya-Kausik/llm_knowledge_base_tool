@@ -554,7 +554,10 @@ function renderCurrentLevel() {
   }
 
   scheduleEdgeUpdate();
-  requestAnimationFrame(() => requestAnimationFrame(fitView));
+  // Zoom to 100% and center on top, rather than fitView which zooms out too much for tall cards
+  requestAnimationFrame(() => {
+    zoomSelection.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity.translate(40, 20).scale(1));
+  });
 }
 
 function renderRootCanvas(world) {
@@ -587,7 +590,7 @@ function renderSubCanvas(world, parentPath) {
   cardElements.set(parentPath, parentCard);
 
   // Layout children below
-  const cardW = 400, cardH = 380, gap = 40;
+  const cardW = 400, cardH = 500, gap = 40;
   const cols = Math.max(1, Math.ceil(Math.sqrt(childNodes.length)));
 
   childNodes.forEach((nd, i) => {
