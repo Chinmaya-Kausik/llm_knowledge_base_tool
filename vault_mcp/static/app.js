@@ -2032,18 +2032,38 @@ function createPanelHeader(panelId, label = 'Chat') {
   header.querySelector('.panel-close').onclick = (e) => {
     e.stopPropagation();
     const panel = chatPanels.get(panelId);
+
+    // Don't close the last remaining panel — just clear it
+    if (chatPanels.size <= 1) {
+      if (panelId === 'main') {
+        saveChatTranscript();
+        document.getElementById('chat-messages').innerHTML = '';
+        syncFromPanel(activePanel);
+        chatMessages = [];
+        chatSessionId = crypto.randomUUID();
+        syncToPanel(activePanel);
+      }
+      return;
+    }
+
     if (panelId === 'main') {
-      // Main panel: just clear conversation
+      // Close main: collapse and clear
       saveChatTranscript();
+      const cp = document.getElementById('chat-panel');
+      cp.removeAttribute('style');
+      ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
+      cp.classList.add('chat-collapsed');
       document.getElementById('chat-messages').innerHTML = '';
+      if (panel?.ws) { panel.ws.close(); panel.ws = null; }
       syncFromPanel(activePanel);
       chatMessages = [];
-      chatSessionId = crypto.randomUUID();
+      chatWs = null;
       syncToPanel(activePanel);
     } else {
       // Floating panel: close and remove
       if (panel?.ws) panel.ws.close();
       chatPanels.delete(panelId);
+      chatFocusHistory = chatFocusHistory.filter(id => id !== panelId);
       panel?.container?.remove();
     }
   };
