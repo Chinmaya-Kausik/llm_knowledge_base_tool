@@ -623,8 +623,9 @@ async def websocket_chat(websocket: WebSocket):
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
-    import os, fcntl, traceback
+    import os, fcntl, asyncio, traceback
     from ptyprocess import PtyProcess
+    from starlette.websockets import WebSocketDisconnect
 
     try:
         await websocket.accept()
