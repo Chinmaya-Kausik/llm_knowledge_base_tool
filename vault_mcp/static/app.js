@@ -198,11 +198,24 @@ function wireCardButtons(card, hasChildren) {
       card.dataset.collapseState = 'expanded';
       body.style.display = '';
       card.querySelector('.btn-collapse').textContent = '-';
+      const summary = card.querySelector('.doc-summary');
+      if (summary) summary.style.display = 'none';
       if (!isMarkdown && !cardMeta.has(path)) expandCardContent(card, path);
     } else {
       card.dataset.expanded = 'false';
       card.dataset.collapseState = 'summary';
+      body.style.display = 'none';
       card.querySelector('.btn-collapse').textContent = '~';
+      // Show summary line
+      let summary = card.querySelector('.doc-summary');
+      if (!summary) {
+        summary = document.createElement('div');
+        summary.className = 'doc-summary';
+        card.appendChild(summary);
+      }
+      const text = body.textContent?.trim() || '';
+      summary.textContent = text ? text.slice(0, 80) + (text.length > 80 ? '...' : '') : 'Empty';
+      summary.style.display = '';
     }
     scheduleEdgeUpdate();
   });

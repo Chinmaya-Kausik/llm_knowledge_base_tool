@@ -231,8 +231,10 @@ body {
 
 /* Compact file cards (non-expanded) */
 .doc-card[data-expanded="false"] { width: 300px; }
-.doc-card[data-expanded="false"] .doc-body {
-  max-height: 60px; overflow: hidden;
+.doc-card[data-expanded="false"] .doc-body { display: none; }
+.doc-summary {
+  padding: 6px 14px; font-size: 11px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* Handle (title bar) */
