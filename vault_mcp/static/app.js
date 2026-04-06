@@ -2945,7 +2945,7 @@ function handleChatEvent(msg) {
         } else {
           statusParts.push(`~${chatTokenCount} tokens`);
         }
-        if (lastResultCost) statusParts.push(`$${lastResultCost.toFixed(4)}`);
+        // Cost available but not shown — user prefers token count only
         activeStatus.innerHTML = statusParts.map(s => `<span>${s}</span>`).join(' ');
         activeStatus.id = '';
       }
