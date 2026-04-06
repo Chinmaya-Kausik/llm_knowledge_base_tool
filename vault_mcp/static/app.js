@@ -1775,6 +1775,33 @@ function createPanelHeader(panelId, label = 'Chat') {
     _clickTimer = setTimeout(() => { _clickTimer = null; toggleMinimize(); }, 250);
   });
 
+  // Double-click header to maximize/restore (floating panels)
+  let _floatMaximized = false;
+  let _floatPreMaxState = null;
+  header.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
+    e.stopPropagation();
+    if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; }
+
+    if (panelId === 'main') return; // Main panel dblclick handled in initChat
+
+    const card = chatPanels.get(panelId)?.container;
+    if (!card) return;
+
+    if (_floatMaximized) {
+      card.style.left = _floatPreMaxState.left;
+      card.style.top = _floatPreMaxState.top;
+      card.style.width = _floatPreMaxState.width;
+      card.style.height = _floatPreMaxState.height;
+      _floatMaximized = false;
+    } else {
+      _floatPreMaxState = { left: card.style.left, top: card.style.top, width: card.style.width, height: card.style.height };
+      card.style.left = '0'; card.style.top = '0';
+      card.style.width = '100%'; card.style.height = '100%';
+      _floatMaximized = true;
+    }
+  });
+
   // Close button
   header.querySelector('.panel-close').onclick = (e) => {
     e.stopPropagation();
