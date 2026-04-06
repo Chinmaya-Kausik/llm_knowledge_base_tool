@@ -332,7 +332,7 @@ body {
 
 /* === Zoom Level of Detail === */
 #world[data-lod="readable"] .doc-card { }
-#world[data-lod="readable"] .doc-body { max-height: 320px; }
+#world[data-lod="readable"] .doc-body { max-height: 500px; }
 
 #world[data-lod="overview"] .doc-body {
   max-height: 60px; overflow: hidden;
