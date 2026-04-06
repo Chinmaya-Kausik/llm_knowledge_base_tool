@@ -47,11 +47,11 @@ function matchesBinding(e, action) {
 
 function bindingToString(b) {
   const parts = [];
-  if (b.mod) parts.push('⌘');
-  if (b.alt) parts.push('⌥');
-  if (b.shift) parts.push('⇧');
+  if (b.mod) parts.push('Cmd');
+  if (b.alt) parts.push('Opt');
+  if (b.shift) parts.push('Shift');
   parts.push(b.key === '\\' ? '\\' : b.key === ' ' ? 'Space' : b.key.toUpperCase());
-  return parts.join('');
+  return parts.join('+');
 }
 
 function saveKeyBindings() {

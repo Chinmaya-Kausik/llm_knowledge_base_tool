@@ -465,21 +465,21 @@ body {
   background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px;
 }
 .keybinding-panel-header button:hover { color: var(--text); }
-.keybinding-panel-body { overflow-y: auto; padding: 8px 14px; }
+.keybinding-panel-body { overflow-y: auto; padding: 10px 16px; }
 
 /* Keybinding editor rows */
-.keybind-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11px; }
+.keybind-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .keybind-label { flex: 1; color: var(--text); }
 .keybind-key {
   background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
-  padding: 2px 8px; border-radius: 3px; font-family: var(--font); font-size: 11px;
-  cursor: pointer; min-width: 50px; text-align: center;
+  padding: 3px 10px; border-radius: 4px; font-family: var(--font); font-size: 12px;
+  cursor: pointer; min-width: 60px; text-align: center;
 }
 .keybind-key:hover { border-color: var(--accent); color: var(--text); }
 .keybind-key.listening { border-color: var(--accent); color: var(--accent); animation: status-pulse 1s infinite; }
 .keybind-reset {
   background: none; border: none; color: var(--text-muted); cursor: pointer;
-  font-size: 13px; padding: 0 2px;
+  font-size: 18px; padding: 0 4px;
 }
 .keybind-reset:hover { color: var(--text); }
 
