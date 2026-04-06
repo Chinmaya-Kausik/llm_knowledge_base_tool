@@ -329,8 +329,14 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
 
                 elif isinstance(event, ResultMessage):
                     result = getattr(event, 'result', '')
-                    if result:
-                        await websocket.send_json({"type": "result", "content": result})
+                    usage = getattr(event, 'usage', None) or {}
+                    cost = getattr(event, 'total_cost_usd', None)
+                    await websocket.send_json({
+                        "type": "result",
+                        "content": result or '',
+                        "usage": usage,
+                        "cost_usd": cost,
+                    })
 
                 elif isinstance(event, TaskStartedMessage):
                     current_subagent_task_id = getattr(event, 'task_id', '')

@@ -1406,6 +1406,8 @@ let checkpointMode = false;
 let redirectSnapshot = new Map(); // Snapshot of activeSubagents at time of redirect
 let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool call to redirect from)
 let wasUserInterrupt = false; // Set when user presses Escape
+let lastResultUsage = null; // Token usage from ResultMessage
+let lastResultCost = null; // Cost in USD from ResultMessage
 let activePlanPath = null; // Path to the active plan file
 let activePlanContent = ''; // Raw markdown of the plan
 let sessionEditedFiles = new Set(); // Files modified by the agent this session
@@ -2652,13 +2654,24 @@ function handleChatEvent(msg) {
         sessionEditedFiles.clear();
       }
 
-      // Finalize status bar
+      // Finalize status bar with real usage if available
       const activeStatus = document.getElementById('chat-active-status');
       if (activeStatus && chatStartTime) {
         const elapsed = ((Date.now() - chatStartTime) / 1000).toFixed(1);
-        activeStatus.innerHTML = `<span>${elapsed}s</span> <span>${chatTokenCount} tokens</span>`;
-        activeStatus.id = ''; // Remove id so next message gets a fresh one
+        let statusParts = [`${elapsed}s`];
+        if (lastResultUsage) {
+          const inp = lastResultUsage.input_tokens || lastResultUsage.inputTokens || 0;
+          const out = lastResultUsage.output_tokens || lastResultUsage.outputTokens || 0;
+          if (inp || out) statusParts.push(`${inp + out} tokens`);
+        } else {
+          statusParts.push(`~${chatTokenCount} tokens`);
+        }
+        if (lastResultCost) statusParts.push(`$${lastResultCost.toFixed(4)}`);
+        activeStatus.innerHTML = statusParts.map(s => `<span>${s}</span>`).join(' ');
+        activeStatus.id = '';
       }
+      lastResultUsage = null;
+      lastResultCost = null;
       currentAssistantEl = null;
       currentThinkingEl = null;
       currentThinkingWrapper = null;
@@ -2677,6 +2690,9 @@ function handleChatEvent(msg) {
     }
 
     case 'result':
+      // Store usage info for status bar
+      if (msg.usage) lastResultUsage = msg.usage;
+      if (msg.cost_usd) lastResultCost = msg.cost_usd;
       // Use result as authoritative text if we missed streaming
       if (msg.content && !currentResponseText) {
         currentResponseText = msg.content;
