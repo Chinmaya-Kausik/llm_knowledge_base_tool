@@ -2047,6 +2047,30 @@ function createFloatingPanel(options = {}) {
   card.className = 'floating-chat-panel';
   card.dataset.panelId = panelId;
 
+  // Resize handles
+  for (const dir of ['right', 'bottom', 'left', 'top', 'corner']) {
+    const handle = document.createElement('div');
+    handle.className = `fcp-resize fcp-resize-${dir}`;
+    handle.addEventListener('pointerdown', (re) => {
+      re.preventDefault(); re.stopPropagation();
+      const rect = card.getBoundingClientRect();
+      const startX = re.clientX, startY = re.clientY;
+      const startW = rect.width, startH = rect.height;
+      const startL = rect.left, startT = rect.top;
+      function onMove(me) {
+        const dx = me.clientX - startX, dy = me.clientY - startY;
+        if (dir === 'right' || dir === 'corner') card.style.width = Math.max(280, startW + dx) + 'px';
+        if (dir === 'bottom' || dir === 'corner') card.style.height = Math.max(200, startH + dy) + 'px';
+        if (dir === 'left') { card.style.width = Math.max(280, startW - dx) + 'px'; card.style.left = Math.max(0, startL + dx) + 'px'; }
+        if (dir === 'top') { card.style.height = Math.max(200, startH - dy) + 'px'; card.style.top = Math.max(0, startT + dy) + 'px'; }
+      }
+      function onUp() { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+    card.appendChild(handle);
+  }
+
   // Universal header
   const { wrapper: headerWrapper, header: headerEl } = createPanelHeader(panelId, label);
   card.appendChild(headerWrapper);
@@ -2178,8 +2202,8 @@ function createFloatingPanel(options = {}) {
     if (!dragging && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 4) return;
     dragging = true;
     headerEl._setDragged();
-    card.style.left = (e.clientX - dx) + 'px';
-    card.style.top = (e.clientY - dy) + 'px';
+    card.style.left = Math.max(0, Math.min(e.clientX - dx, window.innerWidth - 100)) + 'px';
+    card.style.top = Math.max(0, Math.min(e.clientY - dy, window.innerHeight - 50)) + 'px';
   });
   headerEl.addEventListener('pointerup', (e) => {
     if (dragging) {
