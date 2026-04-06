@@ -1445,7 +1445,7 @@ function initChat() {
     chatIsTemporary = false;
     chatSessionId = crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
-    resetChatState();
+    currentAssistantEl = null; currentThinkingEl = null; currentThinkingWrapper = null; currentActivityGroup = null;
     if (chatWs && chatWs.readyState === WebSocket.OPEN) {
       chatWs.send(JSON.stringify({ type: 'init', session_id: chatSessionId, page_path: currentLevel().parentPath || '' }));
     }
@@ -1662,15 +1662,6 @@ function sendChatMessage() {
   }, 100);
 }
 
-// ========================================
-// Chat Event Handling (clean rewrite)
-// ========================================
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 function formatToolDesc(tool, input) {
   // Format like Claude Code terminal output
   const i = input || {};
@@ -1712,87 +1703,13 @@ function toolIcon(tool) {
   return icons[tool] || '⚡';
 }
 
-// Get the target context for an event — subagent state or null (parent)
+// Get the target container for an event — subagent body or parent assistant
 function getEventTarget(msg) {
   const subId = msg.subagent_id;
-  if (subId && activeSubagents.has(subId)) return activeSubagents.get(subId);
-  return null;
-}
-
-// Get the container element for an event (subagent body or parent assistant)
-function getContainer(msg) {
-  const sub = getEventTarget(msg);
-  return sub ? sub.body : currentAssistantEl;
-}
-
-// Get or create a .chat-text element in the right container
-function getTextEl(msg) {
-  const sub = getEventTarget(msg);
-  const container = sub ? sub.body : currentAssistantEl;
-  if (!container) return null;
-  // Use per-context text tracking
-  const key = sub || currentAssistantEl;
-  if (!key._currentTextEl || !container.contains(key._currentTextEl)) {
-    const el = document.createElement('div');
-    el.className = 'chat-text';
-    container.appendChild(el);
-    key._currentTextEl = el;
+  if (subId && activeSubagents.has(subId)) {
+    return activeSubagents.get(subId);
   }
-  return key._currentTextEl;
-}
-
-// Reset text tracking so next text goes after new content
-function resetTextEl(msg) {
-  const sub = getEventTarget(msg);
-  const key = sub || currentAssistantEl;
-  if (key) key._currentTextEl = null;
-}
-
-// Finalize a thinking wrapper (stop animation, show elapsed time)
-function finalizeThinking(sub) {
-  const tw = sub ? sub.thinkingWrapper : currentThinkingWrapper;
-  if (!tw) return;
-  const hdr = tw.querySelector('.chat-thinking-header');
-  if (hdr) {
-    const elapsed = ((Date.now() - tw._startTime) / 1000).toFixed(1);
-    const pond = hdr.querySelector('.pondering');
-    if (pond) { pond.textContent = `Thought (${elapsed}s)`; pond.classList.remove('pondering'); }
-  }
-  if (sub) { sub.thinkingWrapper = null; sub.thinkingEl = null; }
-  else { currentThinkingWrapper = null; currentThinkingEl = null; }
-}
-
-// Finalize an activity group (stop animation, collapse, show summary)
-function finalizeActivityGroup(sub) {
-  const ag = sub ? sub.activityGroup : currentActivityGroup;
-  if (!ag) return;
-  const hdr = ag.querySelector('.chat-activity-header');
-  const elapsed = ((Date.now() - ag._startTime) / 1000).toFixed(1);
-  const count = ag._tools.length;
-  const unique = [...new Set(ag._tools)];
-  if (hdr) {
-    const latest = hdr.querySelector('.activity-latest');
-    if (latest) { latest.classList.remove('pondering'); latest.innerHTML = `${unique.join(', ')} &mdash; ${count} call${count>1?'s':''} (${elapsed}s)`; }
-  }
-  const body = ag.querySelector('.chat-activity-body');
-  if (body) body.classList.remove('open');
-  const toggle = ag.querySelector('.chat-thinking-toggle');
-  if (toggle) toggle.classList.remove('open');
-  if (sub) sub.activityGroup = null;
-  else currentActivityGroup = null;
-}
-
-// Reset ALL chat state (called on done, stopped, error, new chat)
-function resetChatState() {
-  currentAssistantEl = null;
-  currentThinkingEl = null;
-  currentThinkingWrapper = null;
-  currentActivityGroup = null;
-  activeSubagents.clear();
-  chatStartTime = null;
-  currentResponseText = '';
-  pendingAgentPrompt = null;
-  if (checkpointMode) exitCheckpointMode();
+  return null; // Use parent (currentAssistantEl)
 }
 
 function buildRedirectMessage(generalText) {
@@ -1842,42 +1759,47 @@ function buildRedirectMessage(generalText) {
   return msg;
 }
 
+function chatAutoScroll() {
+  // User controls scroll — no auto-scroll
+}
+
 function handleChatEvent(msg) {
-  // Ensure we have an assistant element for content events
-  const contentTypes = ['thinking', 'text', 'tool_use', 'tool_result', 'result', 'subagent_started', 'subagent_progress', 'subagent_done'];
-  if (!currentAssistantEl && contentTypes.includes(msg.type)) {
+  const messages = document.getElementById('chat-messages');
+
+  if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
+
+  // Ensure we have an assistant element for content
+  if (!currentAssistantEl && ['thinking', 'text', 'tool_use', 'tool_result', 'result'].includes(msg.type)) {
     currentAssistantEl = document.createElement('div');
     currentAssistantEl.className = 'chat-msg chat-msg-assistant';
     document.getElementById('chat-messages').appendChild(currentAssistantEl);
   }
 
   switch (msg.type) {
-
-    // --- THINKING ---
     case 'thinking': {
       const sub = getEventTarget(msg);
+      // Get the right thinking wrapper (subagent's or parent's)
       let tw = sub ? sub.thinkingWrapper : currentThinkingWrapper;
       let te = sub ? sub.thinkingEl : currentThinkingEl;
-      const container = getContainer(msg);
-      if (!container) break;
+      const container = sub ? sub.body : currentAssistantEl;
 
       if (!tw) {
         tw = document.createElement('div');
         tw.className = 'chat-thinking-wrapper';
         tw._startTime = Date.now();
         tw._tokens = 0;
-        const hdr = document.createElement('div');
-        hdr.className = 'chat-thinking-header';
-        hdr.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">${randomPonderingWord()}...</span> <span class="thinking-time"></span>`;
+        const header = document.createElement('div');
+        header.className = 'chat-thinking-header';
+        header.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">${randomPonderingWord()}...</span> <span class="thinking-time"></span>`;
         te = document.createElement('div');
         te.className = 'chat-thinking-body';
-        const bodyRef = te;
-        hdr.addEventListener('click', (e) => {
+        const thinkBody = te;
+        header.addEventListener('click', (e) => {
           e.stopPropagation();
-          bodyRef.classList.toggle('open');
-          hdr.querySelector('.chat-thinking-toggle').classList.toggle('open');
+          thinkBody.classList.toggle('open');
+          header.querySelector('.chat-thinking-toggle').classList.toggle('open');
         });
-        tw.appendChild(hdr);
+        tw.appendChild(header);
         tw.appendChild(te);
         container.appendChild(tw);
         if (sub) { sub.thinkingWrapper = tw; sub.thinkingEl = te; }
@@ -1887,49 +1809,88 @@ function handleChatEvent(msg) {
         te.textContent += msg.content;
         tw._tokens += Math.ceil(msg.content.length / 4);
         chatTokenCount += Math.ceil(msg.content.length / 4);
-        const el = ((Date.now() - tw._startTime) / 1000).toFixed(1);
-        tw.querySelector('.thinking-time').textContent = `${el}s, ~${tw._tokens} tokens`;
+        const elapsed = ((Date.now() - tw._startTime) / 1000).toFixed(1);
+        tw.querySelector('.thinking-time').textContent = `${elapsed}s, ~${tw._tokens} tokens`;
         chatMessages.push({ role: 'thinking', content: msg.content, subagent_id: msg.subagent_id || null });
       }
       break;
     }
 
-    // --- TEXT ---
-    case 'text': {
-      const sub = getEventTarget(msg);
-      finalizeThinking(sub);
-      finalizeActivityGroup(sub);
-      resetTextEl(msg);
-
-      if (msg.content) {
-        chatTokenCount += Math.ceil(msg.content.length / 4);
-        currentResponseText += msg.content;
-        const textEl = getTextEl(msg);
-        if (textEl) {
-          textEl._rawText = (textEl._rawText || '') + msg.content;
-          textEl.innerHTML = marked.parse(textEl._rawText);
-          textEl.querySelectorAll('.wiki-link').forEach(el => {
-            el.onclick = () => focusCardByTitle(el.dataset.target);
-          });
+    case 'text':
+      // Finalize any open activity group
+      if (currentActivityGroup) {
+        const agHdr = currentActivityGroup.querySelector('.chat-activity-header');
+        const agElapsed = ((Date.now() - currentActivityGroup._startTime) / 1000).toFixed(1);
+        const toolCount = currentActivityGroup._tools.length;
+        const unique = [...new Set(currentActivityGroup._tools)];
+        if (agHdr) {
+          const latest = agHdr.querySelector('.activity-latest');
+          if (latest) {
+            latest.classList.remove('pondering');
+            latest.innerHTML = `${unique.join(', ')} — ${toolCount} call${toolCount > 1 ? 's' : ''} (${agElapsed}s)`;
+          }
         }
+        // Collapse the body by default after completion
+        const agBody = currentActivityGroup.querySelector('.chat-activity-body');
+        if (agBody) agBody.classList.remove('open');
+        const agToggle = currentActivityGroup.querySelector('.chat-thinking-toggle');
+        if (agToggle) agToggle.classList.remove('open');
+        currentActivityGroup = null;
+      }
+      // Finalize any open thinking block (but allow new ones later)
+      if (currentThinkingWrapper) {
+        const hdr = currentThinkingWrapper.querySelector('.chat-thinking-header');
+        const el = ((Date.now() - currentThinkingWrapper._startTime) / 1000).toFixed(1);
+        if (hdr) {
+          const pond = hdr.querySelector('.pondering');
+          if (pond) { pond.textContent = `Thought (${el}s)`; pond.classList.remove('pondering'); }
+        }
+        currentThinkingWrapper = null;
+        currentThinkingEl = null;
+      }
+      if (currentAssistantEl && msg.content) {
+        chatTokenCount += Math.ceil(msg.content.length / 4);
+        currentResponseText += msg.content; // Accumulate for saving
+        // Always append text to the LAST .chat-text, or create a new one at the end
+        // This ensures text after tool calls appears below them
+        let textEl = currentAssistantEl._currentTextEl;
+        if (!textEl || !currentAssistantEl.contains(textEl)) {
+          textEl = document.createElement('div');
+          textEl.className = 'chat-text';
+          currentAssistantEl.appendChild(textEl);
+          currentAssistantEl._currentTextEl = textEl;
+        }
+        textEl._rawText = (textEl._rawText || '') + msg.content;
+        textEl.innerHTML = marked.parse(textEl._rawText);
+        textEl.querySelectorAll('.wiki-link').forEach(el => {
+          el.onclick = () => focusCardByTitle(el.dataset.target);
+        });
       }
       break;
-    }
 
-    // --- TOOL USE ---
     case 'tool_use': {
       const sub = getEventTarget(msg);
-      const container = getContainer(msg);
+      const container = sub ? sub.body : currentAssistantEl;
       if (!container) break;
 
       const toolName = msg.tool || 'tool';
       if (!toolName || toolName === 'unknown') break;
-      const toolDesc = escapeHtml(formatToolDesc(toolName, msg.input || {}));
+      const toolDesc = formatToolDesc(toolName, msg.input || {});
 
-      finalizeThinking(sub);
-      resetTextEl(msg);
+      // Finalize thinking (for the right context)
+      const tw2 = sub ? sub.thinkingWrapper : currentThinkingWrapper;
+      if (tw2) {
+        const hdr2 = tw2.querySelector('.chat-thinking-header');
+        const el2 = ((Date.now() - tw2._startTime) / 1000).toFixed(1);
+        if (hdr2) { const p = hdr2.querySelector('.pondering'); if (p) { p.textContent = `Thought (${el2}s)`; p.classList.remove('pondering'); } }
+        if (sub) { sub.thinkingWrapper = null; sub.thinkingEl = null; }
+        else { currentThinkingWrapper = null; currentThinkingEl = null; }
+      }
 
-      // Get or create activity group
+      // Reset text element so text after tools goes below
+      if (!sub && currentAssistantEl) currentAssistantEl._currentTextEl = null;
+
+      // Get or create activity group (per-subagent or parent)
       let ag = sub ? sub.activityGroup : currentActivityGroup;
       if (!ag) {
         ag = document.createElement('div');
@@ -1938,36 +1899,38 @@ function handleChatEvent(msg) {
         ag._lastToolName = null;
         ag._lastToolGroup = null;
         ag._startTime = Date.now();
-        const hdr = document.createElement('div');
-        hdr.className = 'chat-activity-header';
-        hdr.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="activity-latest pondering"></span>`;
-        const body = document.createElement('div');
-        body.className = 'chat-activity-body';
-        hdr.addEventListener('click', (e) => {
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'chat-activity-header';
+        groupHeader.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="activity-latest pondering"></span>`;
+        const groupBody = document.createElement('div');
+        groupBody.className = 'chat-activity-body';
+        groupHeader.addEventListener('click', (e) => {
           e.stopPropagation();
-          body.classList.toggle('open');
-          hdr.querySelector('.chat-thinking-toggle').classList.toggle('open');
+          groupBody.classList.toggle('open');
+          groupHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
         });
-        ag.appendChild(hdr);
-        ag.appendChild(body);
+        ag.appendChild(groupHeader);
+        ag.appendChild(groupBody);
         container.appendChild(ag);
         if (sub) sub.activityGroup = ag;
         else currentActivityGroup = ag;
       }
 
       // Update header
-      const latest = ag.querySelector('.activity-latest');
-      if (latest) latest.innerHTML = `${toolIcon(toolName)} <b>${escapeHtml(toolName)}</b> ${toolDesc}`;
+      const latestEl = ag.querySelector('.activity-latest');
+      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${toolName}</b> ${toolDesc}`;
 
-      // Same-tool grouping
+      // Same-tool grouping: if same tool as last, increment counter
       const agBody = ag.querySelector('.chat-activity-body');
       if (ag._lastToolName === toolName && ag._lastToolGroup) {
+        // Increment existing group
         ag._lastToolGroup._count = (ag._lastToolGroup._count || 1) + 1;
         const countEl = ag._lastToolGroup.querySelector('.tool-count');
         if (countEl) countEl.textContent = `(${ag._lastToolGroup._count})`;
+        // Add sub-entry
         const subEntry = document.createElement('div');
         subEntry.className = 'chat-tool-subentry';
-        subEntry.textContent = formatToolDesc(toolName, msg.input || {});
+        subEntry.textContent = toolDesc;
         subEntry._startTime = Date.now();
         const subResult = document.createElement('div');
         subResult.className = 'chat-tool-result';
@@ -1975,86 +1938,90 @@ function handleChatEvent(msg) {
         ag._lastToolGroup._subList.appendChild(subEntry);
         ag._lastToolGroup._subList.appendChild(subResult);
       } else {
-        const entry = document.createElement('div');
-        entry.className = 'chat-tool-entry';
-        entry._startTime = Date.now();
-        entry._count = 1;
-        entry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint"></span>`;
-        entry.dataset.msgIndex = chatMessages.length;
-        const result = document.createElement('div');
-        result.className = 'chat-tool-result';
+        // New tool entry
+        const toolEntry = document.createElement('div');
+        toolEntry.className = 'chat-tool-entry';
+        toolEntry._startTime = Date.now();
+        toolEntry._count = 1;
+        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
+        // Store the message index for this tool call (for checkpoint truncation)
+        toolEntry.dataset.msgIndex = chatMessages.length - 1;
+        const toolResult = document.createElement('div');
+        toolResult.className = 'chat-tool-result';
         const subList = document.createElement('div');
         subList.className = 'chat-tool-sublist';
         subList.style.display = 'none';
-        entry._subList = subList;
-        entry.addEventListener('click', (e) => {
+        toolEntry._subList = subList;
+        toolEntry.addEventListener('click', (e) => {
           e.stopPropagation();
-          result.classList.toggle('open');
-          if (entry._count > 1) subList.style.display = subList.style.display === 'none' ? '' : 'none';
+          toolResult.classList.toggle('open');
+          if (toolEntry._count > 1) subList.style.display = subList.style.display === 'none' ? '' : 'none';
         });
-        agBody.appendChild(entry);
+        agBody.appendChild(toolEntry);
         agBody.appendChild(subList);
-        agBody.appendChild(result);
+        agBody.appendChild(toolResult);
         ag._lastToolName = toolName;
-        ag._lastToolGroup = entry;
+        ag._lastToolGroup = toolEntry;
       }
 
       ag._tools.push(toolName);
-      chatMessages.push({ role: 'tool', content: `${toolName}: ${formatToolDesc(toolName, msg.input || {})}`, subagent_id: msg.subagent_id || null });
+      chatMessages.push({ role: 'tool', content: `${toolName}: ${toolDesc}`, subagent_id: msg.subagent_id || null });
 
-      // Capture Agent tool prompt for upcoming subagent
+      // Capture Agent tool prompt for the upcoming subagent
       if (toolName === 'Agent' && msg.input) {
         pendingAgentPrompt = msg.input.prompt || msg.input.description || null;
       }
       break;
     }
 
-    // --- TOOL RESULT ---
     case 'tool_result': {
-      const sub = getEventTarget(msg);
-      const ag = sub ? sub.activityGroup : currentActivityGroup;
-      if (ag && ag._lastToolGroup) {
-        const lastGroup = ag._lastToolGroup;
-        const subList = lastGroup._subList;
-        const subEntries = subList?.querySelectorAll('.chat-tool-subentry');
-        let targetEntry = lastGroup;
-        let targetResult;
-        if (subEntries && subEntries.length > 0) {
-          targetEntry = subEntries[subEntries.length - 1];
-          targetResult = targetEntry.nextElementSibling;
-        } else {
-          targetResult = lastGroup.nextElementSibling?.nextElementSibling;
-          if (!targetResult?.classList?.contains('chat-tool-result')) targetResult = null;
+      const sub3 = getEventTarget(msg);
+      const ag3 = sub3 ? sub3.activityGroup : currentActivityGroup;
+      if (ag3) {
+        // Find the last tool entry or subentry
+        const lastGroup = ag3._lastToolGroup;
+        if (lastGroup) {
+          const subList = lastGroup._subList;
+          const subEntries = subList?.querySelectorAll('.chat-tool-subentry');
+          let targetEntry = lastGroup;
+          let targetResult;
+          if (subEntries && subEntries.length > 0) {
+            targetEntry = subEntries[subEntries.length - 1];
+            targetResult = targetEntry.nextElementSibling;
+          } else {
+            targetResult = lastGroup.nextElementSibling?.nextElementSibling; // skip subList
+            if (!targetResult?.classList?.contains('chat-tool-result')) targetResult = null;
+          }
+          if (targetResult?.classList?.contains('chat-tool-result')) {
+            targetResult.textContent = msg.output || '';
+          }
+          const elapsed = ((Date.now() - (targetEntry._startTime || Date.now())) / 1000).toFixed(1);
+          const timeEl = lastGroup.querySelector('.tool-time');
+          if (timeEl) timeEl.textContent = elapsed + 's';
+          const pond = lastGroup.querySelector('.pondering');
+          if (pond) pond.classList.remove('pondering');
         }
-        if (targetResult?.classList?.contains('chat-tool-result')) {
-          targetResult.textContent = msg.output || '';
-        }
-        const elapsed = ((Date.now() - (targetEntry._startTime || Date.now())) / 1000).toFixed(1);
-        const timeEl = lastGroup.querySelector('.tool-time');
-        if (timeEl) timeEl.textContent = elapsed + 's';
-        const pond = lastGroup.querySelector('.pondering');
-        if (pond) pond.classList.remove('pondering');
       }
       chatMessages.push({ role: 'tool_result', content: (msg.output || '').slice(0, 500), subagent_id: msg.subagent_id || null });
       break;
     }
 
-    // --- SUBAGENT STARTED ---
     case 'subagent_started': {
       if (!currentAssistantEl) break;
       const taskId = msg.task_id || '';
-      const subDesc = escapeHtml(msg.description || msg.task_type || 'Subagent');
-      const agentPrompt = pendingAgentPrompt || '';
-      pendingAgentPrompt = null;
-
       const subEl = document.createElement('div');
       subEl.className = 'chat-subagent';
       subEl.dataset.taskId = taskId;
-      subEl.dataset.prompt = agentPrompt;
 
       const subHeader = document.createElement('div');
       subHeader.className = 'chat-subagent-header';
+      const subDesc = msg.description || msg.task_type || 'Subagent';
+      const agentPrompt = pendingAgentPrompt || '';
+      pendingAgentPrompt = null;
+
       subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span>`;
+
+      subEl.dataset.prompt = agentPrompt;
 
       const subBody = document.createElement('div');
       subBody.className = 'chat-subagent-body';
@@ -2062,7 +2029,7 @@ function handleChatEvent(msg) {
       if (agentPrompt) {
         const promptEl = document.createElement('div');
         promptEl.className = 'chat-subagent-prompt';
-        promptEl.innerHTML = `<span class="prompt-label">Prompt:</span> <span class="prompt-text">${escapeHtml(agentPrompt.slice(0, 100))}${agentPrompt.length > 100 ? '...' : ''}</span>`;
+        promptEl.innerHTML = `<span class="prompt-label">Prompt:</span> <span class="prompt-text">${agentPrompt.slice(0, 100)}${agentPrompt.length > 100 ? '...' : ''}</span>`;
         promptEl.title = agentPrompt;
         const fullPrompt = document.createElement('div');
         fullPrompt.className = 'chat-subagent-prompt-full';
@@ -2073,6 +2040,7 @@ function handleChatEvent(msg) {
       }
 
       subHeader.addEventListener('click', (e) => {
+        if (e.target.closest('.subagent-redirect')) return;
         e.stopPropagation();
         subBody.classList.toggle('collapsed');
         subHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
@@ -2089,101 +2057,111 @@ function handleChatEvent(msg) {
       break;
     }
 
-    // --- SUBAGENT PROGRESS ---
     case 'subagent_progress': {
       const sub = activeSubagents.get(msg.task_id);
       if (sub) {
+        // Update the header with latest tool
         const desc = sub.header.querySelector('.chat-subagent-desc');
-        if (desc && msg.last_tool) desc.textContent = `${escapeHtml(msg.description || '')} — ${formatToolDesc(msg.last_tool, {})}`;
+        if (desc && msg.last_tool) desc.textContent = `${msg.description || ''} — ${formatToolDesc(msg.last_tool, {})}`;
         const status = sub.header.querySelector('.chat-subagent-status');
-        if (status) status.textContent = escapeHtml(msg.description || 'working');
+        if (status) status.textContent = msg.description || 'working';
       }
       break;
     }
 
-    // --- SUBAGENT DONE ---
     case 'subagent_done': {
-      const sub = activeSubagents.get(msg.task_id);
-      if (sub) {
-        // Finalize any open thinking/activity in this subagent
-        finalizeThinking(sub);
-        finalizeActivityGroup(sub);
-
-        const status = sub.header.querySelector('.chat-subagent-status');
-        if (status) {
-          status.textContent = msg.status || 'done';
-          status.className = 'chat-subagent-status ' + (msg.status === 'completed' ? 'status-ok' : msg.status === 'failed' ? 'status-err' : '');
+      const sub2 = activeSubagents.get(msg.task_id);
+      if (sub2) {
+        const status2 = sub2.header.querySelector('.chat-subagent-status');
+        if (status2) {
+          status2.textContent = msg.status || 'done';
+          status2.style.color = msg.status === 'completed' ? 'var(--green)' : msg.status === 'failed' ? 'var(--red)' : 'var(--text-muted)';
         }
-        const pond = sub.header.querySelector('.pondering');
+        const pond = sub2.header.querySelector('.pondering');
         if (pond) pond.classList.remove('pondering');
 
+        // Show summary
         if (msg.summary) {
           const summaryEl = document.createElement('div');
           summaryEl.className = 'chat-subagent-summary';
           summaryEl.textContent = msg.summary.slice(0, 200);
-          sub.el.appendChild(summaryEl);
+          sub2.el.appendChild(summaryEl);
         }
 
-        sub.body.classList.add('collapsed');
-        const toggle = sub.header.querySelector('.chat-thinking-toggle');
+        // Collapse the body by default after completion
+        sub2.body.classList.add('collapsed');
+        const toggle = sub2.header.querySelector('.chat-thinking-toggle');
         if (toggle) toggle.classList.remove('open');
+
         activeSubagents.delete(msg.task_id);
       }
       chatMessages.push({ role: 'subagent', content: `Done (${msg.status}): ${msg.summary || ''}` });
       break;
     }
 
-    // --- DONE / STOPPED ---
     case 'done':
     case 'stopped':
+      // Track assistant response (from accumulator, not DOM)
       if (currentResponseText) {
         chatMessages.push({ role: 'assistant', content: currentResponseText });
+        currentResponseText = '';
       }
       chatGenerating = false;
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
       document.getElementById('chat-redirect').style.display = 'none';
+      // Finalize status bar
       const activeStatus = document.getElementById('chat-active-status');
       if (activeStatus && chatStartTime) {
         const elapsed = ((Date.now() - chatStartTime) / 1000).toFixed(1);
         activeStatus.innerHTML = `<span>${elapsed}s</span> <span>${chatTokenCount} tokens</span>`;
-        activeStatus.id = '';
+        activeStatus.id = ''; // Remove id so next message gets a fresh one
       }
-      resetChatState();
+      currentAssistantEl = null;
+      currentThinkingEl = null;
+      currentThinkingWrapper = null;
+      currentActivityGroup = null;
+      activeSubagents.clear();
+      chatStartTime = null;
       break;
 
-    // --- RESULT (full text, use as fallback) ---
     case 'result':
-      if (msg.content && !currentResponseText) currentResponseText = msg.content;
+      // Use result as authoritative text if we missed streaming
+      if (msg.content && !currentResponseText) {
+        currentResponseText = msg.content;
+      }
+      // Only render if we haven't already streamed the text
       if (currentAssistantEl && msg.content) {
-        const container = getContainer(msg);
-        if (container) {
-          let textEl = container.querySelector('.chat-text');
-          if (!textEl) {
-            textEl = document.createElement('div');
-            textEl.className = 'chat-text';
-            container.appendChild(textEl);
-            textEl.innerHTML = marked.parse(msg.content);
-            textEl.querySelectorAll('.wiki-link').forEach(el => {
-              el.onclick = () => focusCardByTitle(el.dataset.target);
-            });
-          }
+        let textEl = currentAssistantEl.querySelector('.chat-text');
+        if (!textEl) {
+          textEl = document.createElement('div');
+          textEl.className = 'chat-text';
+          currentAssistantEl.appendChild(textEl);
+          textEl.innerHTML = marked.parse(msg.content);
+          textEl.querySelectorAll('.wiki-link').forEach(el => {
+            el.onclick = () => focusCardByTitle(el.dataset.target);
+          });
         }
       }
       break;
 
-    // --- ERROR ---
     case 'error':
-      appendChatMessage('system', `Error: ${escapeHtml(msg.message || 'Unknown error')}`);
+      appendChatMessage('system', `Error: ${msg.message || 'Unknown error'}`);
       chatGenerating = false;
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
       document.getElementById('chat-redirect').style.display = 'none';
-      resetChatState();
+      currentAssistantEl = null;
+      currentThinkingEl = null;
+      currentThinkingWrapper = null;
+      currentActivityGroup = null;
+      chatStartTime = null;
       break;
   }
+
+  chatAutoScroll();
 }
 
 async function saveChatTranscript() {
@@ -2213,6 +2191,7 @@ function appendChatMessage(role, text) {
   el.className = `chat-msg chat-msg-${role}`;
   el.textContent = text;
   messages.appendChild(el);
+  chatAutoScroll();
 }
 
 // ========================================

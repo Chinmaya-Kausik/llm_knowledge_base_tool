@@ -644,11 +644,6 @@ body {
 .chat-subagent-header:hover { color: var(--text); }
 .chat-subagent-desc { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-subagent-status { font-size: 10px; color: var(--text-muted); }
-.chat-subagent-status.status-ok { color: var(--green); }
-.chat-subagent-status.status-err { color: var(--red); }
-/* Ensure consistent font size inside subagent bodies */
-.chat-subagent-body .chat-text { font-size: 13px; }
-.chat-subagent-body .chat-activity-group { font-size: 11px; }
 .chat-subagent-body { padding: 2px 0; }
 .chat-subagent-body.collapsed { display: none; }
 /* Global redirect button */
