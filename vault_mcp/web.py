@@ -407,11 +407,17 @@ def api_tree():
 
 
 @app.get("/api/search")
-def api_search(q: str = Query(...), scope: str = Query("all"), file_glob: str = Query("*")):
+def api_search(q: str = Query(...), scope: str = Query("all"), file_glob: str = Query("*"), mode: str = Query("both")):
+    """Search vault. mode: 'content', 'name', or 'both' (default)."""
+    results = []
     try:
-        return search_tools.ripgrep_search(VAULT_ROOT, q, scope, file_glob=file_glob)
+        if mode in ("name", "both"):
+            results.extend(search_tools.filename_search(VAULT_ROOT, q, scope))
+        if mode in ("content", "both"):
+            results.extend(search_tools.ripgrep_search(VAULT_ROOT, q, scope, file_glob=file_glob))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return results
 
 
 @app.get("/api/health")

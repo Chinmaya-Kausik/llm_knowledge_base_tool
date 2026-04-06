@@ -6,7 +6,7 @@ const api = {
   graph:       () => fetch('/api/graph').then(r => r.json()),
   page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
   tree:        () => fetch('/api/tree').then(r => r.json()),
-  search:      (q, s='all') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}`).then(r => r.json()),
+  search:      (q, s='all', mode='both') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
   health:      () => fetch('/api/health').then(r => r.json()),
   brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
   orphans:     () => fetch('/api/orphans').then(r => r.json()),
@@ -1277,18 +1277,45 @@ async function initHealth() {
     }
   } catch(e) { c.innerHTML=`<div class="empty-state">Error: ${e.message}</div>`; }
 }
+let searchScope = 'auto'; // 'auto' = current folder if in sub-canvas, else 'all'
+let searchMode = 'both'; // 'both', 'content', 'name'
+
 async function doSearch(query) {
   if (!query.trim()) return;
   switchView('search');
-  const c = document.getElementById('search-results'); c.innerHTML='<div class="empty-state">Searching...</div>';
+  const c = document.getElementById('search-results');
+
+  // Determine scope: if in a sub-canvas, scope to that folder
+  let scope = 'all';
+  if (searchScope === 'auto') {
+    const level = currentLevel();
+    if (level.parentPath) scope = level.parentPath;
+  } else {
+    scope = searchScope;
+  }
+
+  const scopeLabel = scope === 'all' ? 'vault' : scope;
+  c.innerHTML=`<div class="empty-state">Searching ${scopeLabel}...</div>`;
   try {
-    const results = await api.search(query);
-    if (!results.length) { c.innerHTML='<div class="empty-state">No results</div>'; return; }
+    const results = await api.search(query, scope, searchMode);
     c.innerHTML='';
+
+    // Search options bar
+    const opts = document.createElement('div');
+    opts.className = 'search-options';
+    const scopeToggle = scope !== 'all'
+      ? `<button class="search-opt${searchScope==='auto'?' active':''}" onclick="searchScope='auto';doSearch('${query.replace(/'/g,"\\'")}')">📁 ${scope.split('/').pop()}</button><button class="search-opt${searchScope==='all'?' active':''}" onclick="searchScope='all';doSearch('${query.replace(/'/g,"\\'")}')">🌐 All</button>`
+      : `<button class="search-opt active">🌐 All</button>`;
+    const modeToggles = `<button class="search-opt${searchMode==='both'?' active':''}" onclick="searchMode='both';doSearch('${query.replace(/'/g,"\\'")}')">Both</button><button class="search-opt${searchMode==='content'?' active':''}" onclick="searchMode='content';doSearch('${query.replace(/'/g,"\\'")}')">Content</button><button class="search-opt${searchMode==='name'?' active':''}" onclick="searchMode='name';doSearch('${query.replace(/'/g,"\\'")}')">Name</button>`;
+    opts.innerHTML = scopeToggle + '<span class="search-opt-sep">|</span>' + modeToggles;
+    c.appendChild(opts);
+
+    if (!results.length) { c.innerHTML += '<div class="empty-state">No results</div>'; return; }
     for (const r of results) {
       const div=document.createElement('div'); div.className='search-result';
       const esc=query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      div.innerHTML=`<div class="result-path">${r.path}:${r.line}</div><div class="result-context">${r.context.replace(new RegExp(`(${esc})`,'gi'),'<mark>$1</mark>')}</div>`;
+      const lineInfo = r.line ? `:${r.line}` : '';
+      div.innerHTML=`<div class="result-path">${r.path}${lineInfo}</div><div class="result-context">${r.context.replace(new RegExp(`(${esc})`,'gi'),'<mark>$1</mark>')}</div>`;
       div.onclick=()=>{ switchView('graph'); const card=cardElements.get(r.path); if(card) focusCard(card); };
       c.appendChild(div);
     }

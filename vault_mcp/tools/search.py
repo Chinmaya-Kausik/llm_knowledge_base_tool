@@ -31,7 +31,15 @@ def ripgrep_search(
         "projects": vault_root / "projects",
         "all": vault_root,
     }
-    search_path = scope_map.get(scope, vault_root)
+    if scope in scope_map:
+        search_path = scope_map[scope]
+    else:
+        # Treat scope as a relative path within the vault
+        candidate = (vault_root / scope).resolve()
+        if str(candidate).startswith(str(vault_root.resolve())) and candidate.exists():
+            search_path = candidate
+        else:
+            search_path = vault_root
 
     # Find ripgrep — check common locations including Claude Code's vendored copy
     import shutil
@@ -85,6 +93,41 @@ def ripgrep_search(
                 "context": match_data["lines"]["text"].rstrip(),
             })
 
+    return matches
+
+
+def filename_search(vault_root: Path, query: str, scope: str = "all") -> list[dict]:
+    """Search for files by name using glob-style matching.
+
+    Returns: [{path, line: 0, context: filename}]
+    """
+    import re
+    scope_map = {
+        "raw": vault_root / "raw",
+        "wiki": vault_root / "wiki",
+        "projects": vault_root / "projects",
+        "all": vault_root,
+    }
+    if scope in scope_map:
+        search_path = scope_map[scope]
+    else:
+        candidate = (vault_root / scope).resolve()
+        if str(candidate).startswith(str(vault_root.resolve())) and candidate.exists():
+            search_path = candidate
+        else:
+            search_path = vault_root
+
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    matches = []
+    for p in search_path.rglob("*"):
+        if p.is_file() and pattern.search(p.name):
+            try:
+                rel = str(p.relative_to(vault_root))
+            except ValueError:
+                rel = str(p)
+            matches.append({"path": rel, "line": 0, "context": p.name})
+            if len(matches) >= 50:
+                break
     return matches
 
 

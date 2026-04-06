@@ -459,6 +459,16 @@ body {
 .health-card li:last-child { border-bottom: none; }
 
 /* Search */
+.search-options {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.search-opt {
+  background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
+  font-size: 11px; padding: 3px 8px; border-radius: var(--radius); cursor: pointer;
+}
+.search-opt:hover { color: var(--text); }
+.search-opt.active { color: var(--accent); border-color: var(--accent); }
+.search-opt-sep { color: var(--border); font-size: 11px; margin: 0 2px; }
 .search-result {
   padding: 8px 10px; border-bottom: 1px solid var(--border);
   cursor: pointer; border-radius: var(--radius);
