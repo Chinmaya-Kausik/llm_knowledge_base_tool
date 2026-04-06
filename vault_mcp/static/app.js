@@ -1150,6 +1150,7 @@ let currentActivityGroup = null; // Groups consecutive tool uses
 let selectedCards = new Set(); // Multi-select with Cmd+click
 let activeSubagents = new Map(); // task_id → {el, body, header, activityGroup, thinkingWrapper}
 let currentResponseText = ''; // Accumulate assistant text for saving
+let pendingAgentPrompt = null; // Captured from Agent tool_use for the next subagent_started
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1626,6 +1627,10 @@ function getEventTarget(msg) {
   return null; // Use parent (currentAssistantEl)
 }
 
+function chatAutoScroll() {
+  // User controls scroll — no auto-scroll
+}
+
 function handleChatEvent(msg) {
   const messages = document.getElementById('chat-messages');
 
@@ -1827,6 +1832,11 @@ function handleChatEvent(msg) {
 
       ag._tools.push(toolName);
       chatMessages.push({ role: 'tool', content: `${toolName}: ${toolDesc}` });
+
+      // Capture Agent tool prompt for the upcoming subagent
+      if (toolName === 'Agent' && msg.input) {
+        pendingAgentPrompt = msg.input.prompt || msg.input.description || null;
+      }
       break;
     }
 
@@ -1872,15 +1882,51 @@ function handleChatEvent(msg) {
       const subHeader = document.createElement('div');
       subHeader.className = 'chat-subagent-header';
       const subDesc = msg.description || msg.task_type || 'Subagent';
+      const agentPrompt = pendingAgentPrompt || '';
+      pendingAgentPrompt = null;
+
       subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span> <button class="subagent-redirect" title="Stop and redirect">Redirect</button>`;
+
+      // Store prompt for display and redirect context
+      subEl.dataset.prompt = agentPrompt;
 
       const subBody = document.createElement('div');
       subBody.className = 'chat-subagent-body';
 
+      // Show prompt if we have it
+      if (agentPrompt) {
+        const promptEl = document.createElement('div');
+        promptEl.className = 'chat-subagent-prompt';
+        promptEl.innerHTML = `<span class="prompt-label">Prompt:</span> <span class="prompt-text">${agentPrompt.slice(0, 100)}${agentPrompt.length > 100 ? '...' : ''}</span>`;
+        promptEl.title = agentPrompt;
+        const fullPrompt = document.createElement('div');
+        fullPrompt.className = 'chat-subagent-prompt-full';
+        fullPrompt.textContent = agentPrompt;
+        promptEl.addEventListener('click', (e) => { e.stopPropagation(); fullPrompt.classList.toggle('open'); });
+        subBody.appendChild(promptEl);
+        subBody.appendChild(fullPrompt);
+      }
+
       function doRedirect() {
         if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
+        // Build context with other agents' prompts for proper restart
+        const otherAgents = [];
+        for (const [tid, sub] of activeSubagents) {
+          if (tid !== taskId) {
+            const desc2 = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'unknown';
+            const prompt2 = sub.el?.dataset?.prompt || '';
+            otherAgents.push({ desc: desc2, prompt: prompt2 });
+          }
+        }
         const input = document.getElementById('chat-input');
-        input.value = `The subagent "${subDesc}" was going in the wrong direction. Instead, `;
+        let prefill = `The subagent "${subDesc}" was going in the wrong direction. Instead, `;
+        if (otherAgents.length > 0) {
+          prefill += '\n\nThe following other agents were running and should be restarted with their original tasks:\n';
+          for (const oa of otherAgents) {
+            prefill += `- "${oa.desc}"${oa.prompt ? ': ' + oa.prompt.slice(0, 100) : ''}\n`;
+          }
+        }
+        input.value = prefill;
         input.focus();
       }
 
@@ -2013,7 +2059,7 @@ function handleChatEvent(msg) {
       break;
   }
 
-  messages.scrollTop = messages.scrollHeight;
+  chatAutoScroll();
 }
 
 async function saveChatTranscript() {
@@ -2043,7 +2089,7 @@ function appendChatMessage(role, text) {
   el.className = `chat-msg chat-msg-${role}`;
   el.textContent = text;
   messages.appendChild(el);
-  messages.scrollTop = messages.scrollHeight;
+  chatAutoScroll();
 }
 
 // ========================================

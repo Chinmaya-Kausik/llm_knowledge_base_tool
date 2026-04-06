@@ -665,6 +665,20 @@ body {
 .chat-tool-subentry:hover { color: var(--text); }
 .tool-count { font-size: 10px; color: var(--cyan); margin-left: 2px; }
 
+/* Subagent prompt display */
+.chat-subagent-prompt {
+  font-size: 10px; color: var(--text-muted); padding: 3px 0; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chat-subagent-prompt:hover { color: var(--text); }
+.prompt-label { color: var(--accent2); font-weight: 500; }
+.chat-subagent-prompt-full {
+  display: none; font-size: 11px; color: var(--text-muted);
+  padding: 4px 8px; background: var(--bg); border-radius: var(--radius);
+  white-space: pre-wrap; max-height: 200px; overflow-y: auto; margin: 2px 0;
+}
+.chat-subagent-prompt-full.open { display: block; }
+
 .chat-subagent-summary {
   font-size: 11px; color: var(--text-muted); padding: 4px 0;
   border-top: 1px solid var(--border); margin-top: 4px;
