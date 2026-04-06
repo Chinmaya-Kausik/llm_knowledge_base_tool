@@ -2019,7 +2019,7 @@ function connectPanelChat(panel, messagesEl) {
     lastResultUsage = saved.lastResultUsage; lastResultCost = saved.lastResultCost;
 
     processing = false;
-    if (eventQueue.length > 0) requestAnimationFrame(processQueue);
+    if (eventQueue.length > 0) setTimeout(processQueue, 0);
   }
 
   thisWs.onmessage = (e) => {
