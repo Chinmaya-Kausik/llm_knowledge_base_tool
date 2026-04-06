@@ -664,18 +664,6 @@ body {
 .checkpoint-marker.selected { background: var(--orange); }
 .checkpoint-marker:hover { background: rgba(255,158,100,0.3); }
 
-/* Redirect input area per agent */
-.redirect-agent-input {
-  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
-  background: var(--bg); border-radius: var(--radius); margin: 4px 0;
-  font-size: 11px;
-}
-.redirect-agent-input .agent-label { color: var(--orange); font-weight: 500; white-space: nowrap; }
-.redirect-agent-input input {
-  flex: 1; background: transparent; border: none; color: var(--text);
-  font-family: var(--font); font-size: 11px; outline: none;
-}
-.redirect-agent-input .continue-label { color: var(--green); font-size: 10px; }
 
 /* Tool sub-entries (grouped same-tool calls) */
 .chat-tool-sublist { padding-left: 20px; border-left: 1px solid var(--border); margin-left: 10px; }

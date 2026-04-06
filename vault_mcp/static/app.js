@@ -1502,47 +1502,28 @@ function initChat() {
 
   function updateRedirectInputArea() {
     const preview = document.getElementById('chat-context-preview');
-    const inputArea = document.getElementById('chat-input-area');
 
-    // Remove old redirect inputs
-    inputArea.querySelectorAll('.redirect-agent-input').forEach(el => el.remove());
-
-    // Build redirect input for each agent with a checkpoint
-    const agentCount = activeSubagents.size;
-    const redirectedCount = redirectCheckpoints.size;
-
-    // Show context block
-    preview.innerHTML = `<span class="ctx-file">Redirect mode: select breakpoints on tool calls above</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
-    preview.style.display = 'flex';
-    preview.querySelector('.ctx-remove').onclick = () => exitCheckpointMode();
-
-    // Add per-agent input fields (only for agents with checkpoints)
-    for (const [agentId, msgIdx] of redirectCheckpoints) {
-      const sub = activeSubagents.get(agentId);
-      const desc = sub?.header?.querySelector('.chat-subagent-desc')?.textContent || agentId;
-
-      const row = document.createElement('div');
-      row.className = 'redirect-agent-input';
-      row.dataset.agentId = agentId;
-      row.innerHTML = `<span class="agent-label">${desc}:</span><input type="text" placeholder="Redirect instructions for this agent..." class="redirect-instruction">`;
-      inputArea.insertBefore(row, document.getElementById('chat-input'));
-    }
-
-    // Show which agents will just continue
+    // Build compact one-line summary
+    const parts = [];
     for (const [tid, sub] of activeSubagents) {
-      if (!redirectCheckpoints.has(tid)) {
-        const desc = sub?.header?.querySelector('.chat-subagent-desc')?.textContent || tid;
-        const row = document.createElement('div');
-        row.className = 'redirect-agent-input';
-        row.innerHTML = `<span class="agent-label">${desc}:</span><span class="continue-label">will continue as-is</span>`;
-        inputArea.insertBefore(row, document.getElementById('chat-input'));
+      const desc = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'Agent';
+      const shortDesc = desc.length > 20 ? desc.slice(0, 20) + '...' : desc;
+      if (redirectCheckpoints.has(tid)) {
+        parts.push(`<b>${shortDesc}</b>: redirecting`);
+      } else {
+        parts.push(`${shortDesc}: continues`);
       }
     }
 
-    // Change main input placeholder
-    document.getElementById('chat-input').placeholder = redirectedCount > 0
-      ? 'Press Enter to send redirect (or add general instructions here)'
-      : 'Select breakpoints above, then type redirect instructions';
+    const summaryText = parts.length > 0 ? parts.join('. ') + '.' : 'Select breakpoints above.';
+    preview.innerHTML = `<span class="ctx-text">${summaryText}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
+    preview.style.display = 'flex';
+    preview.querySelector('.ctx-remove').onclick = () => exitCheckpointMode();
+
+    const input = document.getElementById('chat-input');
+    input.placeholder = redirectCheckpoints.size > 0
+      ? 'Type redirect instructions...'
+      : 'Select breakpoints on tool calls above, then type here...';
   }
 
   function exitCheckpointMode() {
@@ -1550,7 +1531,6 @@ function initChat() {
     redirectCheckpoints.clear();
     document.getElementById('chat-messages').classList.remove('checkpoint-mode');
     document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
-    document.querySelectorAll('.redirect-agent-input').forEach(el => el.remove());
     document.getElementById('chat-context-preview').style.display = 'none';
     document.getElementById('chat-input').placeholder = 'Message Claude... (Enter to send)';
     pendingSelection = null;
@@ -1768,10 +1748,7 @@ function buildRedirectMessage(generalText) {
     if (progressText) msg += `Progress:\n${progressText}\n`;
 
     if (hasCheckpoint) {
-      // Get per-agent redirect instruction
-      const instrInput = document.querySelector(`.redirect-agent-input[data-agent-id="${tid}"] .redirect-instruction`);
-      const instr = instrInput?.value?.trim() || '';
-      msg += `REDIRECT: ${instr || 'Change approach from this point.'}\n`;
+      msg += `REDIRECT: Apply the user's instructions below from this point.\n`;
     } else {
       msg += `ACTION: Continue exactly where this agent left off.\n`;
     }
