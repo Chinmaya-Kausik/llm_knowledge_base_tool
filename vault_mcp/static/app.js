@@ -1684,9 +1684,8 @@ function createPanelHeader(panelId, label = 'Chat') {
   labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); } });
   labelEl.addEventListener('focus', () => { labelEl.style.cursor = 'text'; });
 
-  // Minimize button
-  header.querySelector('.panel-minimize').onclick = (e) => {
-    e.stopPropagation();
+  // Minimize button + header click both toggle minimize
+  function toggleMinimize() {
     const panel = chatPanels.get(panelId);
     if (panelId === 'main') {
       const chatPanel = document.getElementById('chat-panel');
@@ -1694,18 +1693,31 @@ function createPanelHeader(panelId, label = 'Chat') {
       if (isOpen) {
         const mode = chatPanel.classList.contains('chat-right') ? 'right' : chatPanel.classList.contains('chat-float') ? 'float' : 'bottom';
         ['chat-bottom','chat-right','chat-float'].forEach(c => chatPanel.classList.remove(c));
+        chatPanel.style.left = ''; chatPanel.style.top = ''; chatPanel.style.right = '';
+        chatPanel.style.bottom = ''; chatPanel.style.width = ''; chatPanel.style.height = '';
+        chatPanel.style.inset = '';
         chatPanel.classList.add(mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed');
       } else {
         ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => chatPanel.classList.remove(c));
+        chatPanel.style.left = ''; chatPanel.style.top = ''; chatPanel.style.right = '';
+        chatPanel.style.bottom = ''; chatPanel.style.width = ''; chatPanel.style.height = '';
+        chatPanel.style.inset = '';
         chatPanel.classList.add('chat-bottom');
         connectChat();
       }
     } else {
-      // Floating panel: toggle minimized
       const card = panel?.container;
       if (card) card.classList.toggle('minimized');
     }
-  };
+  }
+
+  header.querySelector('.panel-minimize').onclick = (e) => { e.stopPropagation(); toggleMinimize(); };
+
+  // Header click (not on buttons/menu/label) toggles minimize
+  header.addEventListener('click', (e) => {
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
+    toggleMinimize();
+  });
 
   // Close button
   header.querySelector('.panel-close').onclick = (e) => {
@@ -1951,27 +1963,15 @@ function initChat() {
     }
   }
 
-  // Header click/dblclick handling with timer to distinguish
+  // Header click is handled by universal panel header (toggleMinimize)
+  // Keep dblclick for maximize and drag state tracking
   let chatDragOccurred = false;
-  let chatClickTimer = null;
-
-  document.getElementById('chat-header').addEventListener('click', (e) => {
-    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
-    if (chatDragOccurred) { chatDragOccurred = false; return; }
-    // Delay click to allow double-click detection
-    if (chatClickTimer) return; // Already waiting
-    chatClickTimer = setTimeout(() => {
-      chatClickTimer = null;
-      toggleChat();
-    }, 250);
-  });
 
   let chatMaximized = false;
   let chatPreMaxState = null; // {dockMode, left, top, width, height}
 
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
-    if (chatClickTimer) { clearTimeout(chatClickTimer); chatClickTimer = null; }
     e.stopPropagation();
 
     if (chatMaximized) {
