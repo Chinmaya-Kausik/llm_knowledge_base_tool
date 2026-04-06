@@ -115,84 +115,96 @@ class TestSubagentProgressFiltering:
 # ============================================================
 
 class TestRedirectContext:
-    def _build_redirect_context(self, msgs, redirected_id, all_agents):
-        """Simulate the JS doRedirect function's context building."""
-        def get_progress(agent_id):
-            progress = []
-            for m in msgs:
-                if m.get("subagent_id") == agent_id:
-                    if m["role"] == "thinking":
-                        progress.append(f'[Thinking]: {m["content"]}')
-                    elif m["role"] == "tool":
-                        progress.append(f'[Tool]: {m["content"]}')
-                    elif m["role"] == "tool_result":
-                        progress.append(f'[Result]: {m["content"]}')
-            return "\n".join(progress)
+    def _build_redirect_context(self, msgs, agents, checkpoints):
+        """Simulate the JS buildRedirectMessage function.
 
-        context = "All subagents were interrupted and need to be restarted.\n\n"
-        for agent in all_agents:
-            progress = get_progress(agent["id"])
-            if agent["id"] == redirected_id:
-                context += f'--- REDIRECTED AGENT: "{agent["desc"]}" ---\n'
-                context += f'Original prompt: {agent["prompt"]}\n'
-                if progress:
-                    context += f'Progress before redirect:\n{progress}\n'
-                context += f'User\'s redirect instructions: '
+        Args:
+            msgs: full chatMessages array
+            agents: list of {id, desc, prompt}
+            checkpoints: dict of agent_id → msg_index (or absent = continue as-is)
+        """
+        context = "All subagents were interrupted. Please restart them.\n\n"
+        for agent in agents:
+            agent_msgs = [m for m in msgs if m.get("subagent_id") == agent["id"]]
+            checkpoint_idx = checkpoints.get(agent["id"])
+            has_checkpoint = checkpoint_idx is not None
+
+            if has_checkpoint:
+                # Truncate to checkpoint
+                progress = [m for m in agent_msgs if msgs.index(m) <= checkpoint_idx]
             else:
-                context += f'--- AGENT TO CONTINUE: "{agent["desc"]}" ---\n'
-                context += f'Original prompt: {agent["prompt"]}\n'
-                if progress:
-                    context += f'Progress (continue from here):\n{progress}\n'
-                context += 'Action: Restart this agent to continue exactly where it left off.\n\n'
+                progress = agent_msgs
+
+            progress_text = "\n".join(
+                f'[{m["role"].title()}]: {m["content"]}'
+                for m in progress if m["role"] in ("thinking", "tool", "tool_result")
+            )
+
+            context += f'--- Agent: "{agent["desc"]}" ---\n'
+            context += f'Original prompt: {agent["prompt"]}\n'
+            if progress_text:
+                context += f'Progress:\n{progress_text}\n'
+
+            if has_checkpoint:
+                context += f'REDIRECT: Change approach from this point.\n'
+            else:
+                context += f'ACTION: Continue exactly where this agent left off.\n'
+            context += '\n'
         return context
 
-    def test_redirect_includes_redirected_agent_progress(self):
+    def test_redirect_with_checkpoint_truncates(self):
         msgs = make_chat_with_subagents()
         agents = [
             {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
             {"id": "agent-b", "desc": "Search projects", "prompt": "Search projects for code"},
         ]
-        ctx = self._build_redirect_context(msgs, "agent-a", agents)
-        assert "REDIRECTED AGENT" in ctx
-        assert "Search wiki" in ctx
-        assert "machine learning" in ctx  # Agent A's thinking
-        assert "Found 5 results" in ctx  # Agent A's tool result
-        assert "User's redirect instructions:" in ctx
+        # Set checkpoint for agent-a at the first tool_result (index ~6)
+        first_result_idx = next(i for i, m in enumerate(msgs) if m.get("subagent_id") == "agent-a" and m["role"] == "tool_result")
+        ctx = self._build_redirect_context(msgs, agents, {"agent-a": first_result_idx})
 
-    def test_redirect_includes_other_agent_progress(self):
+        # Agent A should have progress up to the checkpoint only
+        assert "machine learning" in ctx  # Agent A's thinking (before checkpoint)
+        assert "Found 5 results" in ctx  # First tool result (at checkpoint)
+        assert "REDIRECT" in ctx
+
+        # Agent B should have ALL progress (no checkpoint)
+        assert "Python files" in ctx
+        assert "attention.py" in ctx
+        assert "ACTION: Continue" in ctx
+
+    def test_redirect_without_checkpoint_includes_all(self):
+        msgs = make_chat_with_subagents()
+        agents = [
+            {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
+        ]
+        ctx = self._build_redirect_context(msgs, agents, {})  # No checkpoints
+        # All of Agent A's progress should be included
+        assert "machine learning" in ctx
+        assert "Found 5 results" in ctx
+        assert "Backpropagation" in ctx  # Later tool result
+        assert "ACTION: Continue" in ctx
+
+    def test_redirect_checkpoint_excludes_later_entries(self):
+        msgs = make_chat_with_subagents()
+        agents = [
+            {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
+        ]
+        # Checkpoint at first tool_result — should exclude later reads
+        first_result_idx = next(i for i, m in enumerate(msgs) if m.get("subagent_id") == "agent-a" and m["role"] == "tool_result")
+        ctx = self._build_redirect_context(msgs, agents, {"agent-a": first_result_idx})
+        # Backpropagation is from a LATER tool result — should NOT be included
+        assert "Backpropagation" not in ctx
+
+    def test_redirect_multiple_agents_checkpointed(self):
         msgs = make_chat_with_subagents()
         agents = [
             {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
             {"id": "agent-b", "desc": "Search projects", "prompt": "Search projects for code"},
         ]
-        ctx = self._build_redirect_context(msgs, "agent-a", agents)
-        assert "AGENT TO CONTINUE" in ctx
-        assert "Search projects" in ctx
-        assert "Python files" in ctx  # Agent B's thinking
-        assert "attention.py" in ctx  # Agent B's tool result
-        assert "continue exactly where it left off" in ctx
-
-    def test_redirect_keeps_agents_separate(self):
-        msgs = make_chat_with_subagents()
-        agents = [
-            {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
-            {"id": "agent-b", "desc": "Search projects", "prompt": "Search projects for code"},
-        ]
-        ctx = self._build_redirect_context(msgs, "agent-a", agents)
-        # Agent A section should not contain Agent B's content
-        parts = ctx.split("---")
-        redirected_section = [p for p in parts if "REDIRECTED" in p][0]
-        assert "Python files" not in redirected_section
-        assert "attention.py" not in redirected_section
-
-    def test_redirect_single_agent(self):
-        msgs = make_chat_with_subagents()
-        agents = [
-            {"id": "agent-a", "desc": "Search wiki", "prompt": "Search wiki for ML concepts"},
-        ]
-        ctx = self._build_redirect_context(msgs, "agent-a", agents)
-        assert "REDIRECTED AGENT" in ctx
-        assert "AGENT TO CONTINUE" not in ctx  # No other agents
+        a_idx = next(i for i, m in enumerate(msgs) if m.get("subagent_id") == "agent-a" and m["role"] == "tool_result")
+        b_idx = next(i for i, m in enumerate(msgs) if m.get("subagent_id") == "agent-b" and m["role"] == "tool_result")
+        ctx = self._build_redirect_context(msgs, agents, {"agent-a": a_idx, "agent-b": b_idx})
+        assert ctx.count("REDIRECT") == 2  # Both agents redirected
 
 
 # ============================================================

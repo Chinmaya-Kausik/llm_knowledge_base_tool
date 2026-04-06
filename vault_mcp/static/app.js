@@ -1150,7 +1150,9 @@ let currentActivityGroup = null; // Groups consecutive tool uses
 let selectedCards = new Set(); // Multi-select with Cmd+click
 let activeSubagents = new Map(); // task_id → {el, body, header, activityGroup, thinkingWrapper}
 let currentResponseText = ''; // Accumulate assistant text for saving
-let pendingAgentPrompt = null; // Captured from Agent tool_use for the next subagent_started
+let pendingAgentPrompt = null;
+let checkpointMode = false; // When true, tool entries show checkpoint markers
+let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool call to redirect from)
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1460,6 +1462,99 @@ function initChat() {
       chatWs.send(JSON.stringify({ type: 'stop' }));
     }
   };
+
+  // Global redirect button
+  const redirectBtn = document.getElementById('chat-redirect');
+  redirectBtn.onclick = () => {
+    // Stop everything
+    if (chatWs && chatGenerating) chatWs.send(JSON.stringify({ type: 'stop' }));
+
+    // Enter checkpoint mode
+    checkpointMode = true;
+    redirectCheckpoints.clear();
+    document.getElementById('chat-messages').classList.add('checkpoint-mode');
+
+    // Wire checkpoint markers on all tool entries
+    document.querySelectorAll('.chat-tool-entry .checkpoint-marker').forEach(marker => {
+      marker.onclick = (e) => {
+        e.stopPropagation();
+        const entry = marker.closest('.chat-tool-entry');
+        const subagent = marker.closest('.chat-subagent');
+        const agentId = subagent?.dataset?.taskId || 'parent';
+
+        // Toggle selection
+        if (marker.classList.contains('selected')) {
+          marker.classList.remove('selected');
+          redirectCheckpoints.delete(agentId);
+        } else {
+          // Deselect previous checkpoint for this agent
+          if (subagent) subagent.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
+          else document.querySelectorAll('.chat-activity-group .checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
+          marker.classList.add('selected');
+          redirectCheckpoints.set(agentId, parseInt(entry.dataset.msgIndex) || 0);
+        }
+        updateRedirectInputArea();
+      };
+    });
+
+    updateRedirectInputArea();
+  };
+
+  function updateRedirectInputArea() {
+    const preview = document.getElementById('chat-context-preview');
+    const inputArea = document.getElementById('chat-input-area');
+
+    // Remove old redirect inputs
+    inputArea.querySelectorAll('.redirect-agent-input').forEach(el => el.remove());
+
+    // Build redirect input for each agent with a checkpoint
+    const agentCount = activeSubagents.size;
+    const redirectedCount = redirectCheckpoints.size;
+
+    // Show context block
+    preview.innerHTML = `<span class="ctx-file">Redirect mode: select breakpoints on tool calls above</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
+    preview.style.display = 'flex';
+    preview.querySelector('.ctx-remove').onclick = () => exitCheckpointMode();
+
+    // Add per-agent input fields (only for agents with checkpoints)
+    for (const [agentId, msgIdx] of redirectCheckpoints) {
+      const sub = activeSubagents.get(agentId);
+      const desc = sub?.header?.querySelector('.chat-subagent-desc')?.textContent || agentId;
+
+      const row = document.createElement('div');
+      row.className = 'redirect-agent-input';
+      row.dataset.agentId = agentId;
+      row.innerHTML = `<span class="agent-label">${desc}:</span><input type="text" placeholder="Redirect instructions for this agent..." class="redirect-instruction">`;
+      inputArea.insertBefore(row, document.getElementById('chat-input'));
+    }
+
+    // Show which agents will just continue
+    for (const [tid, sub] of activeSubagents) {
+      if (!redirectCheckpoints.has(tid)) {
+        const desc = sub?.header?.querySelector('.chat-subagent-desc')?.textContent || tid;
+        const row = document.createElement('div');
+        row.className = 'redirect-agent-input';
+        row.innerHTML = `<span class="agent-label">${desc}:</span><span class="continue-label">will continue as-is</span>`;
+        inputArea.insertBefore(row, document.getElementById('chat-input'));
+      }
+    }
+
+    // Change main input placeholder
+    document.getElementById('chat-input').placeholder = redirectedCount > 0
+      ? 'Press Enter to send redirect (or add general instructions here)'
+      : 'Select breakpoints above, then type redirect instructions';
+  }
+
+  function exitCheckpointMode() {
+    checkpointMode = false;
+    redirectCheckpoints.clear();
+    document.getElementById('chat-messages').classList.remove('checkpoint-mode');
+    document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
+    document.querySelectorAll('.redirect-agent-input').forEach(el => el.remove());
+    document.getElementById('chat-context-preview').style.display = 'none';
+    document.getElementById('chat-input').placeholder = 'Message Claude... (Enter to send)';
+    pendingSelection = null;
+  }
 }
 
 function connectChat() {
@@ -1516,21 +1611,31 @@ function connectChat() {
 function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
 
-  // Track and display user message
-  chatMessages.push({ role: 'user', content: text });
+  // Build the actual message — might include redirect context
+  let fullText = text;
+
+  if (checkpointMode) {
+    // Build redirect context with truncated progress per agent
+    fullText = buildRedirectMessage(text);
+    exitCheckpointMode();
+    if (!fullText) return;
+  } else if (!text) {
+    return;
+  }
+
+  chatMessages.push({ role: 'user', content: fullText });
   currentResponseText = '';
-  appendChatMessage('user', text);
+  appendChatMessage('user', text || '(redirect)'); // Show user's text only, not the full context
   input.value = '';
 
-  // Prepare context
   const level = currentLevel();
   const contextLevel = chatContextLevel;
 
   chatWs.send(JSON.stringify({
     type: 'message',
-    text: text,
+    text: fullText,
     context_level: contextLevel,
     context: {
       page_path: level.parentPath || '',
@@ -1548,6 +1653,7 @@ function sendChatMessage() {
   chatTokenCount = 0;
   document.getElementById('chat-send').style.display = 'none';
   document.getElementById('chat-stop').style.display = '';
+  document.getElementById('chat-redirect').style.display = '';
 
   // Prepare assistant message area
   currentAssistantEl = document.createElement('div');
@@ -1625,6 +1731,56 @@ function getEventTarget(msg) {
     return activeSubagents.get(subId);
   }
   return null; // Use parent (currentAssistantEl)
+}
+
+function buildRedirectMessage(generalText) {
+  // Build redirect context with truncated progress per checkpoint
+  let msg = 'All subagents were interrupted. Please restart them with the following instructions.\n\n';
+
+  for (const [tid, sub] of activeSubagents) {
+    const desc = sub.header?.querySelector('.chat-subagent-desc')?.textContent || tid;
+    const prompt = sub.el?.dataset?.prompt || '';
+    const checkpointIdx = redirectCheckpoints.get(tid);
+    const hasCheckpoint = checkpointIdx !== undefined;
+
+    // Get this agent's messages, truncated to checkpoint if set
+    const agentMsgs = chatMessages.filter(m => m.subagent_id === tid);
+    let progress;
+    if (hasCheckpoint) {
+      // Include only messages up to and including the checkpoint index
+      progress = agentMsgs.filter(m => {
+        const idx = chatMessages.indexOf(m);
+        return idx <= checkpointIdx;
+      });
+    } else {
+      progress = agentMsgs;
+    }
+
+    const progressText = progress.map(m => {
+      if (m.role === 'thinking') return `[Thinking]: ${m.content}`;
+      if (m.role === 'tool') return `[Tool]: ${m.content}`;
+      if (m.role === 'tool_result') return `[Result]: ${m.content}`;
+      return '';
+    }).filter(Boolean).join('\n');
+
+    msg += `--- Agent: "${desc}" ---\n`;
+    msg += `Original prompt: ${prompt}\n`;
+    if (progressText) msg += `Progress:\n${progressText}\n`;
+
+    if (hasCheckpoint) {
+      // Get per-agent redirect instruction
+      const instrInput = document.querySelector(`.redirect-agent-input[data-agent-id="${tid}"] .redirect-instruction`);
+      const instr = instrInput?.value?.trim() || '';
+      msg += `REDIRECT: ${instr || 'Change approach from this point.'}\n`;
+    } else {
+      msg += `ACTION: Continue exactly where this agent left off.\n`;
+    }
+    msg += '\n';
+  }
+
+  if (generalText) msg += `Additional instructions: ${generalText}\n`;
+
+  return msg;
 }
 
 function chatAutoScroll() {
@@ -1811,7 +1967,9 @@ function handleChatEvent(msg) {
         toolEntry.className = 'chat-tool-entry';
         toolEntry._startTime = Date.now();
         toolEntry._count = 1;
-        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span>`;
+        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${toolName}</span> <span class="tool-desc">${toolDesc}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
+        // Store the message index for this tool call (for checkpoint truncation)
+        toolEntry.dataset.msgIndex = chatMessages.length - 1;
         const toolResult = document.createElement('div');
         toolResult.className = 'chat-tool-result';
         const subList = document.createElement('div');
@@ -1885,15 +2043,13 @@ function handleChatEvent(msg) {
       const agentPrompt = pendingAgentPrompt || '';
       pendingAgentPrompt = null;
 
-      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span> <button class="subagent-redirect" title="Stop and redirect">Redirect</button>`;
+      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span>`;
 
-      // Store prompt for display and redirect context
       subEl.dataset.prompt = agentPrompt;
 
       const subBody = document.createElement('div');
       subBody.className = 'chat-subagent-body';
 
-      // Show prompt if we have it
       if (agentPrompt) {
         const promptEl = document.createElement('div');
         promptEl.className = 'chat-subagent-prompt';
@@ -1906,64 +2062,6 @@ function handleChatEvent(msg) {
         subBody.appendChild(promptEl);
         subBody.appendChild(fullPrompt);
       }
-
-      function doRedirect() {
-        if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
-
-        // Build each subagent's progress from chatMessages
-        function getAgentProgress(agentTaskId) {
-          const progress = [];
-          for (const m of chatMessages) {
-            if (m.subagent_id === agentTaskId) {
-              if (m.role === 'thinking') progress.push(`[Thinking]: ${m.content}`);
-              else if (m.role === 'tool') progress.push(`[Tool]: ${m.content}`);
-              else if (m.role === 'tool_result') progress.push(`[Result]: ${m.content}`);
-            }
-          }
-          return progress.join('\n');
-        }
-
-        // Build hidden context with full progress for all agents
-        let autoContext = 'All subagents were interrupted and need to be restarted. Here is each subagent\'s progress so they can continue exactly where they left off.\n\n';
-
-        for (const [tid, sub] of activeSubagents) {
-          const d = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'unknown';
-          const p = sub.el?.dataset?.prompt || '';
-          const progress = getAgentProgress(tid);
-
-          if (tid === taskId) {
-            autoContext += `--- REDIRECTED AGENT: "${d}" ---\n`;
-            autoContext += `Original prompt: ${p}\n`;
-            if (progress) autoContext += `Progress before redirect:\n${progress}\n`;
-            autoContext += `User's redirect instructions: `;
-          } else {
-            autoContext += `--- AGENT TO CONTINUE: "${d}" ---\n`;
-            autoContext += `Original prompt: ${p}\n`;
-            if (progress) autoContext += `Progress (continue from here):\n${progress}\n`;
-            autoContext += `Action: Restart this agent to continue exactly where it left off.\n\n`;
-          }
-        }
-
-        // Show context block (user sees a clean summary, not the full progress)
-        const preview = document.getElementById('chat-context-preview');
-        const otherCount = activeSubagents.size - 1;
-        const otherNote = otherCount > 0 ? ` + ${otherCount} other agent${otherCount > 1 ? 's' : ''} will restart` : '';
-        preview.innerHTML = `<span class="ctx-file">Redirecting: ${subDesc}${otherNote}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
-        preview.style.display = 'flex';
-        preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
-
-        pendingSelection = { text: autoContext, file: '' };
-
-        const input = document.getElementById('chat-input');
-        input.value = '';
-        input.placeholder = 'Type your redirect instructions for this agent...';
-        input.focus();
-        input.style.height = 'auto';
-      }
-
-      subHeader.querySelector('.subagent-redirect').addEventListener('click', (e) => {
-        e.stopPropagation(); doRedirect();
-      });
 
       subHeader.addEventListener('click', (e) => {
         if (e.target.closest('.subagent-redirect')) return;
@@ -2036,6 +2134,7 @@ function handleChatEvent(msg) {
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
+      document.getElementById('chat-redirect').style.display = 'none';
       // Finalize status bar
       const activeStatus = document.getElementById('chat-active-status');
       if (activeStatus && chatStartTime) {
@@ -2077,6 +2176,7 @@ function handleChatEvent(msg) {
       clearInterval(chatTimerInterval);
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
+      document.getElementById('chat-redirect').style.display = 'none';
       currentAssistantEl = null;
       currentThinkingEl = null;
       currentThinkingWrapper = null;

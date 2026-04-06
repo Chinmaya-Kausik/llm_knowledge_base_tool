@@ -646,16 +646,36 @@ body {
 .chat-subagent-status { font-size: 10px; color: var(--text-muted); }
 .chat-subagent-body { padding: 2px 0; }
 .chat-subagent-body.collapsed { display: none; }
-.subagent-redirect {
-  background: transparent !important; border: 1px solid var(--orange) !important;
-  color: var(--orange) !important; font-size: 10px !important; padding: 1px 6px !important;
-  border-radius: 3px !important; cursor: pointer; margin-left: auto;
+/* Global redirect button */
+#chat-redirect {
+  background: var(--bg-surface2) !important; border: 1px solid var(--orange) !important;
+  color: var(--orange) !important; font-family: var(--font); font-size: 11px;
+  padding: 4px 12px; border-radius: var(--radius); cursor: pointer;
 }
-.subagent-redirect:hover { background: var(--orange) !important; color: var(--bg) !important; }
-.subagent-redirect-bar {
-  padding: 4px 8px; border-top: 1px solid var(--border);
-  position: sticky; bottom: 0; background: var(--bg-surface);
+#chat-redirect:hover { background: var(--orange) !important; color: var(--bg) !important; }
+
+/* Checkpoint mode: markers on tool entries */
+.checkpoint-marker {
+  display: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--orange); background: transparent;
+  cursor: pointer; flex-shrink: 0; margin-left: auto;
 }
+.checkpoint-mode .checkpoint-marker { display: inline-block; }
+.checkpoint-marker.selected { background: var(--orange); }
+.checkpoint-marker:hover { background: rgba(255,158,100,0.3); }
+
+/* Redirect input area per agent */
+.redirect-agent-input {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  background: var(--bg); border-radius: var(--radius); margin: 4px 0;
+  font-size: 11px;
+}
+.redirect-agent-input .agent-label { color: var(--orange); font-weight: 500; white-space: nowrap; }
+.redirect-agent-input input {
+  flex: 1; background: transparent; border: none; color: var(--text);
+  font-family: var(--font); font-size: 11px; outline: none;
+}
+.redirect-agent-input .continue-label { color: var(--green); font-size: 10px; }
 
 /* Tool sub-entries (grouped same-tool calls) */
 .chat-tool-sublist { padding-left: 20px; border-left: 1px solid var(--border); margin-left: 10px; }
