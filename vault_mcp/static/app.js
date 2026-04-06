@@ -1852,17 +1852,21 @@ function handleChatEvent(msg) {
         currentThinkingWrapper = null;
         currentThinkingEl = null;
       }
-      if (currentAssistantEl && msg.content) {
+      if (msg.content) {
+        // Route text to subagent body or parent
+        const sub = msg.subagent_id ? activeSubagents.get(msg.subagent_id) : null;
+        const container = sub ? sub.body : currentAssistantEl;
+        if (!container) break;
+
         chatTokenCount += Math.ceil(msg.content.length / 4);
-        currentResponseText += msg.content; // Accumulate for saving
-        // Always append text to the LAST .chat-text, or create a new one at the end
-        // This ensures text after tool calls appears below them
-        let textEl = currentAssistantEl._currentTextEl;
-        if (!textEl || !currentAssistantEl.contains(textEl)) {
+        currentResponseText += msg.content;
+        // Get or create .chat-text in the right container
+        let textEl = container._currentTextEl;
+        if (!textEl || !container.contains(textEl)) {
           textEl = document.createElement('div');
           textEl.className = 'chat-text';
-          currentAssistantEl.appendChild(textEl);
-          currentAssistantEl._currentTextEl = textEl;
+          container.appendChild(textEl);
+          container._currentTextEl = textEl;
         }
         textEl._rawText = (textEl._rawText || '') + msg.content;
         textEl.innerHTML = marked.parse(textEl._rawText);
