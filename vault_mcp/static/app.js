@@ -39,9 +39,10 @@ function matchesBinding(e, action) {
   const b = keyBindings[action];
   if (!b) return false;
   if (b.mod && !(e.ctrlKey || e.metaKey)) return false;
+  if (!b.mod && (e.ctrlKey || e.metaKey)) return false;
   if (b.alt && !e.altKey) return false;
+  if (!b.alt && e.altKey) return false;
   if (b.shift && !e.shiftKey) return false;
-  if (!b.shift && e.shiftKey && !b.mod) return false;
   return e.key === b.key || e.key.toLowerCase() === b.key.toLowerCase();
 }
 
