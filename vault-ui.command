@@ -17,4 +17,4 @@ echo ""
 # Open browser once server is ready
 (while ! curl -s http://localhost:8420 > /dev/null 2>&1; do sleep 0.2; done; open "http://localhost:8420") &
 
-uv run --frozen --extra web python -m vault_mcp.web
+uv run --extra web python -m vault_mcp.web
