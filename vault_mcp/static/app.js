@@ -1517,7 +1517,7 @@ function createFloatingPanel(options = {}) {
   card.style.left = (150 + panelCounter * 30) + 'px';
   card.style.top = (100 + panelCounter * 30) + 'px';
 
-  document.getElementById('world').appendChild(card);
+  document.getElementById('canvas-container').appendChild(card);
   panel.container = card;
   chatPanels.set(panelId, panel);
 
