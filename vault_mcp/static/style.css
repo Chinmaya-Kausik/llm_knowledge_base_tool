@@ -556,12 +556,7 @@ body {
 .fcp-resize-bottom { bottom: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
 .fcp-resize-top { top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
 .fcp-resize-corner { bottom: -4px; right: -4px; width: 16px; height: 16px; cursor: nwse-resize; }
-.floating-chat-panel.minimized { height: auto !important; overflow: hidden !important; }
-.floating-chat-panel.minimized > .fcp-messages,
-.floating-chat-panel.minimized > .fcp-input-area,
-.floating-chat-panel.minimized > .terminal-container,
-.floating-chat-panel.minimized > .fcp-resize { display: none !important; }
-.floating-chat-panel.minimized .panel-menu { display: none !important; }
+.floating-chat-panel.minimized { height: 36px !important; overflow: hidden !important; max-height: 36px !important; }
 .fcp-header {
   display: flex; align-items: center; gap: 6px; padding: 6px 10px;
   background: var(--bg-surface2); border-bottom: 1px solid var(--border);
