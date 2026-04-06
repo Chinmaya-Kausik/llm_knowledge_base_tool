@@ -870,6 +870,7 @@ body {
 .chat-redirect-label { font-weight: 600; color: var(--warning, #e8a838); font-size: 11px; }
 .chat-msg-queued { opacity: 0.5; }
 .chat-interrupted { color: var(--text-muted); font-size: 12px; font-style: italic; margin: 6px 0; }
+.chat-fork-separator { color: var(--text-muted); font-size: 11px; text-align: center; margin: 8px 0; padding: 4px 0; border-top: 1px dashed var(--border); }
 .chat-file-notification { font-size: 11px; color: var(--text-muted); margin: 4px 0; padding: 3px 8px; background: var(--bg-surface2); border-radius: var(--radius); cursor: default; }
 .chat-msg-assistant { color: var(--text); }
 .chat-msg-assistant p { margin: 4px 0; }

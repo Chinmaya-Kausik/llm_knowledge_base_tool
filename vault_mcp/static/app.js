@@ -2077,16 +2077,28 @@ function createFloatingPanel(options = {}) {
   panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
 
-  // Render forked messages
+  // Render forked messages with full content
   if (options.fork && panel.messages.length) {
     for (const msg of panel.messages) {
-      if (msg.role === 'user' || msg.role === 'assistant') {
+      if (msg.role === 'user') {
         const el = document.createElement('div');
-        el.className = `chat-msg chat-msg-${msg.role}`;
-        el.textContent = msg.content?.slice(0, 200) || '';
+        el.className = 'chat-msg chat-msg-user';
+        el.textContent = msg.content || '';
+        messagesEl.appendChild(el);
+      } else if (msg.role === 'assistant') {
+        const el = document.createElement('div');
+        el.className = 'chat-msg chat-msg-assistant';
+        el.innerHTML = marked.parse(msg.content || '');
         messagesEl.appendChild(el);
       }
     }
+    // Add a visual separator
+    const sep = document.createElement('div');
+    sep.className = 'chat-fork-separator';
+    sep.textContent = '— forked from here —';
+    messagesEl.appendChild(sep);
+    // Store history for first message context injection
+    panel._forkedHistory = panel.messages.filter(m => m.role === 'user' || m.role === 'assistant');
   }
 
   // Send handler — uses panel directly, never touches activePanel/globals
@@ -2107,8 +2119,18 @@ function createFloatingPanel(options = {}) {
     panel.messages.push({ role: 'user', content: text });
     input.value = '';
 
+    // If forked, prepend conversation history to first message
+    let sendText = text;
+    if (panel._forkedHistory) {
+      const historyStr = panel._forkedHistory.map(m =>
+        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+      ).join('\n\n');
+      sendText = `This is a forked conversation. Here is the prior conversation history:\n\n${historyStr}\n\n---\n\nNow continuing from here:\n\n${text}`;
+      panel._forkedHistory = null; // Only inject once
+    }
+
     panel.ws.send(JSON.stringify({
-      type: 'message', text,
+      type: 'message', text: sendText,
       context_level: panel.contextLevel,
       context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
     }));
