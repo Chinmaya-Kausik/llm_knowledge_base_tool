@@ -2668,7 +2668,6 @@ source = { editable = "." }
 dependencies = [
     { name = "mcp" },
     { name = "mdformat" },
-    { name = "pymupdf4llm" },
     { name = "python-frontmatter" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -2684,6 +2683,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
+pdf = [
+    { name = "pymupdf4llm" },
+]
 web = [
     { name = "claude-agent-sdk" },
     { name = "fastapi" },
@@ -2697,7 +2699,7 @@ requires-dist = [
     { name = "marker-pdf", marker = "extra == 'complex-pdf'", specifier = ">=1.0.0" },
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "mdformat", specifier = ">=0.7.19" },
-    { name = "pymupdf4llm", specifier = ">=0.0.17" },
+    { name = "pymupdf4llm", marker = "extra == 'pdf'", specifier = ">=0.0.17" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "python-frontmatter", specifier = ">=1.1.0" },
@@ -2707,7 +2709,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.15.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.32.0" },
 ]
-provides-extras = ["dev", "complex-pdf", "web"]
+provides-extras = ["dev", "pdf", "complex-pdf", "web"]
 
 [[package]]
 name = "virtualenv"

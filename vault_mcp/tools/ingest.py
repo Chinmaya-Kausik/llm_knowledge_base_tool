@@ -139,9 +139,14 @@ def ingest_url(vault_root: Path, url: str, download_images: bool = True) -> dict
 def ingest_pdf(vault_root: Path, filepath: str) -> dict:
     """Extract PDF to markdown via PyMuPDF4LLM and write to raw/inbox/.
 
+    Requires the 'pdf' extra: pip install vault-mcp[pdf]
+
     Returns: {path, title, content_hash}
     """
-    import pymupdf4llm
+    try:
+        import pymupdf4llm
+    except ImportError:
+        raise ImportError("pymupdf4llm is required for PDF ingestion. Install with: pip install vault-mcp[pdf]")
 
     source = Path(filepath)
     if not source.exists():

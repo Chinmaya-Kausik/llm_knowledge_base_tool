@@ -15,9 +15,9 @@ def test_save_basic_conversation():
         ]
         result = save_chat_transcript(root, "test-basic", messages)
         content = (root / result["path"]).read_text()
-        assert "## User" in content
+        assert "## You" in content
         assert "Hello" in content
-        assert "## Assistant" in content
+        assert "## Claude" in content
         assert "Hi there!" in content
 
 
@@ -31,7 +31,8 @@ def test_save_includes_thinking():
         ]
         result = save_chat_transcript(root, "test-think", messages)
         content = (root / result["path"]).read_text()
-        assert "Thinking" in content or "thinking" in content.lower()
+        assert "<details>" in content
+        assert "Thought" in content
         assert "arithmetic" in content
 
 
@@ -46,10 +47,12 @@ def test_save_includes_tool_calls():
         ]
         result = save_chat_transcript(root, "test-tools", messages)
         content = (root / result["path"]).read_text()
-        assert "Tool" in content or "tool" in content.lower()
+        assert "<details>" in content
         assert "Grep" in content
         assert "Found 3 matches" in content
         assert "I found 3 pages" in content
+        # Activity summary
+        assert "Searched 1 pattern" in content
 
 
 def test_save_includes_subagent():
@@ -65,9 +68,10 @@ def test_save_includes_subagent():
         ]
         result = save_chat_transcript(root, "test-sub", messages)
         content = (root / result["path"]).read_text()
-        assert "Subagent" in content or "subagent" in content.lower()
-        assert "Searching wiki" in content
-        assert "Found 5 pages" in content
+        assert "Agent: Searching wiki" in content
+        assert "completed" in content
+        assert "Read" in content
+        assert "Attention mechanisms" in content
 
 
 def test_save_text_after_tools():
@@ -83,7 +87,6 @@ def test_save_text_after_tools():
         ]
         result = save_chat_transcript(root, "test-after", messages)
         content = (root / result["path"]).read_text()
-        # Both text segments must be saved
         assert "Let me search first" in content
         assert "attention is key" in content
 
@@ -109,7 +112,27 @@ def test_save_complex_conversation():
         result = save_chat_transcript(root, "test-complex", messages)
         assert result["message_count"] == 12
         content = (root / result["path"]).read_text()
-        # All types present
         assert "machine learning" in content.lower()
         assert "Deep search" in content
         assert "comprehensive overview" in content
+        # Collapsible sections
+        assert content.count("<details>") >= 3  # thinking + activity + subagent
+
+
+def test_save_activity_summary():
+    """Activity group should have human-readable summary."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        messages = [
+            {"role": "user", "content": "Read some files"},
+            {"role": "tool", "content": "Read: file1.md"},
+            {"role": "tool_result", "content": "content1"},
+            {"role": "tool", "content": "Read: file2.md"},
+            {"role": "tool_result", "content": "content2"},
+            {"role": "tool", "content": "Read: file3.md"},
+            {"role": "tool_result", "content": "content3"},
+            {"role": "assistant", "content": "Done reading."},
+        ]
+        result = save_chat_transcript(root, "test-summary", messages)
+        content = (root / result["path"]).read_text()
+        assert "Read 3 files" in content

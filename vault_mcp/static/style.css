@@ -560,6 +560,67 @@ body {
 }
 #chat-header button:hover { color: var(--text); }
 
+/* Chat body — wraps plan pane + chat messages for split layout */
+#chat-body { display: flex; flex: 1; overflow: hidden; flex-direction: row; }
+#chat-body.split-horizontal { flex-direction: column; }
+#chat-main { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* Plan pane */
+#plan-pane {
+  flex: 0 0 50%; overflow-y: auto; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; font-size: 13px;
+}
+#chat-body.split-horizontal #plan-pane { border-right: none; border-bottom: 1px solid var(--border); }
+#plan-header {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600;
+  background: var(--bg-surface2);
+}
+#plan-header button {
+  background: var(--bg-surface2); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 10px; padding: 2px 6px;
+  border-radius: var(--radius); cursor: pointer;
+}
+#plan-header button:hover { color: var(--text); }
+#plan-content {
+  flex: 1; overflow-y: auto; padding: 10px 12px; line-height: 1.55;
+}
+#plan-content h1 { font-size: 16px; margin: 8px 0 4px; }
+#plan-content h2 { font-size: 14px; margin: 8px 0 4px; }
+#plan-content h3 { font-size: 13px; margin: 6px 0 3px; }
+#plan-content p { margin: 4px 0; }
+#plan-content ul, #plan-content ol { margin: 4px 0; padding-left: 20px; }
+#plan-content li { margin: 2px 0; }
+#plan-content label { cursor: pointer; }
+#plan-content input[type="checkbox"] { margin-right: 6px; cursor: pointer; }
+#plan-editor {
+  flex: 1; padding: 10px 12px; font-family: var(--font); font-size: 13px;
+  background: var(--bg); color: var(--text); border: none; resize: none;
+  line-height: 1.55;
+}
+#plan-actions {
+  display: flex; gap: 8px; padding: 8px 10px;
+  border-top: 1px solid var(--border); background: var(--bg-surface2);
+}
+#plan-approve {
+  background: var(--accent); color: var(--bg); border: none;
+  padding: 5px 14px; border-radius: var(--radius); cursor: pointer;
+  font-size: 12px; font-weight: 600;
+}
+#plan-approve:hover { opacity: 0.9; }
+#plan-changes {
+  background: var(--bg-surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 5px 14px; border-radius: var(--radius);
+  cursor: pointer; font-size: 12px;
+}
+#plan-changes:hover { color: var(--text-bright); }
+#plan-divider {
+  width: 4px; cursor: col-resize; background: var(--border); flex-shrink: 0;
+}
+#chat-body.split-horizontal #plan-divider {
+  width: 100%; height: 4px; cursor: row-resize;
+}
+
 #chat-messages {
   flex: 1; overflow-y: auto; padding: 10px 12px;
   font-size: 13px; line-height: 1.55;
@@ -567,6 +628,9 @@ body {
 .chat-msg { margin-bottom: 12px; }
 .chat-msg-user { color: var(--text-bright); }
 .chat-msg-user::before { content: "You: "; font-weight: 600; color: var(--accent); }
+.chat-redirect-label { font-weight: 600; color: var(--warning, #e8a838); font-size: 11px; }
+.chat-msg-queued { opacity: 0.5; }
+.chat-interrupted { color: var(--text-muted); font-size: 12px; font-style: italic; margin: 6px 0; }
 .chat-msg-assistant { color: var(--text); }
 .chat-msg-assistant p { margin: 4px 0; }
 .chat-msg-assistant code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 12px; }

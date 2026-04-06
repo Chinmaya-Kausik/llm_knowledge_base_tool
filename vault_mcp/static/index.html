@@ -152,7 +152,27 @@
       <button id="chat-dock-bottom" title="Dock bottom">↓</button>
       <button id="chat-dock-float" title="Float">◻</button>
     </div>
-    <div id="chat-messages"></div>
+    <div id="chat-body">
+      <div id="plan-pane" style="display:none">
+        <div id="plan-header">
+          <span id="plan-title">Plan</span>
+          <span style="flex:1"></span>
+          <button id="plan-edit-toggle" title="Toggle edit">Edit</button>
+          <button id="plan-split-toggle" title="Toggle split direction">⇄</button>
+          <button id="plan-close" title="Close plan">✕</button>
+        </div>
+        <div id="plan-content"></div>
+        <textarea id="plan-editor" style="display:none"></textarea>
+        <div id="plan-actions">
+          <button id="plan-approve">Approve Plan</button>
+          <button id="plan-changes">Request Changes</button>
+        </div>
+      </div>
+      <div id="plan-divider" style="display:none"></div>
+      <div id="chat-main">
+        <div id="chat-messages"></div>
+      </div>
+    </div>
     <div id="chat-input-area">
       <div id="chat-context-preview" style="display:none"></div>
       <textarea id="chat-input" placeholder="Message Claude... (Enter to send)" rows="1"></textarea>

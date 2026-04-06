@@ -408,11 +408,11 @@ def get_stale_readmes(vault_root: Path) -> list[dict]:
 
 
 def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]) -> dict:
-    """Save a chat transcript to raw/chats/.
+    """Save a chat transcript to raw/chats/ with collapsible sections.
 
     Args:
         session_id: Chat session ID.
-        messages: List of {role, content} message dicts.
+        messages: List of {role, content, subagent_id?} message dicts.
 
     Returns: {path, message_count}
     """
@@ -424,39 +424,157 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
     path = chats_dir / filename
 
     lines = [
-        f"# Chat Transcript — {now.strftime('%Y-%m-%d %H:%M')} UTC",
+        f"# Chat — {now.strftime('%Y-%m-%d %H:%M')} UTC",
         f"Session: {session_id}",
         "",
     ]
 
-    for msg in messages:
+    # Group consecutive thinking/tool/tool_result messages into activity blocks
+    i = 0
+    while i < len(messages):
+        msg = messages[i]
         role = msg.get("role", "unknown")
         content = msg.get("content", "")
+        subagent_id = msg.get("subagent_id")
+
         if role == "user":
-            lines.append("## User")
+            lines.append("## You")
             lines.append("")
             lines.append(content)
             lines.append("")
+            i += 1
+
         elif role == "assistant":
-            lines.append("## Assistant")
+            lines.append("## Claude")
             lines.append("")
             lines.append(content)
             lines.append("")
+            i += 1
+
         elif role == "thinking":
-            lines.append(f"> *Thinking: {content[:200]}{'...' if len(content) > 200 else ''}*")
+            # Collect consecutive thinking blocks (same subagent)
+            thinking_parts = []
+            while i < len(messages) and messages[i].get("role") == "thinking" and messages[i].get("subagent_id") == subagent_id:
+                thinking_parts.append(messages[i].get("content", ""))
+                i += 1
+            full_thinking = "".join(thinking_parts)
+            lines.append("<details>")
+            lines.append("<summary>Thought</summary>")
             lines.append("")
+            lines.append(full_thinking)
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
         elif role == "tool":
-            lines.append(f"- **Tool**: {content}")
-        elif role == "tool_result":
-            lines.append(f"  - Result: {content[:200]}{'...' if len(content) > 200 else ''}")
-        elif role == "subagent":
-            lines.append(f"- **Subagent**: {content}")
+            # Collect consecutive tool/tool_result pairs into an activity group
+            tool_counts: dict[str, int] = {}
+            tool_lines: list[str] = []
+            while i < len(messages) and messages[i].get("role") in ("tool", "tool_result") and messages[i].get("subagent_id") == subagent_id:
+                m = messages[i]
+                if m["role"] == "tool":
+                    tool_content = m.get("content", "")
+                    # Parse "ToolName: description" format
+                    if ": " in tool_content:
+                        tname, tdesc = tool_content.split(": ", 1)
+                    else:
+                        tname, tdesc = tool_content, ""
+                    tool_counts[tname] = tool_counts.get(tname, 0) + 1
+                    tool_lines.append(f"- **{tname}** — {tdesc}")
+                    # Check if next message is the result
+                    if i + 1 < len(messages) and messages[i + 1].get("role") == "tool_result":
+                        i += 1
+                        result = messages[i].get("content", "")
+                        if result:
+                            tool_lines.append(f"  - {result}")
+                i += 1
+
+            # Build summary like "Read 3 files, ran 2 commands"
+            summary_parts = _summarize_tools(tool_counts)
+            summary = ", ".join(summary_parts) if summary_parts else "Activity"
+
+            lines.append("<details>")
+            lines.append(f"<summary>{summary}</summary>")
             lines.append("")
+            lines.extend(tool_lines)
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
+        elif role == "tool_result":
+            # Orphaned tool_result (no preceding tool) — just emit it
+            lines.append(f"  - {content}")
+            i += 1
+
+        elif role == "subagent":
+            if content.startswith("Started:"):
+                desc = content[len("Started:"):].strip()
+                # Collect messages belonging to this subagent until "Done" or a boundary
+                subagent_lines: list[str] = []
+                i += 1
+                done_status = ""
+                while i < len(messages):
+                    m = messages[i]
+                    mr = m.get("role", "")
+                    mc = m.get("content", "")
+                    # Stop at Done for this subagent
+                    if mr == "subagent" and mc.startswith("Done"):
+                        done_status = mc
+                        i += 1
+                        break
+                    # Stop at boundaries: new subagent, user, assistant
+                    if mr in ("user", "assistant") or (mr == "subagent" and mc.startswith("Started:")):
+                        break
+                    # Render inner messages (thinking/tool/tool_result)
+                    if mr == "thinking":
+                        subagent_lines.append(f"> {mc[:500]}{'...' if len(mc) > 500 else ''}")
+                    elif mr == "tool":
+                        if ": " in mc:
+                            tname, tdesc = mc.split(": ", 1)
+                        else:
+                            tname, tdesc = mc, ""
+                        subagent_lines.append(f"- **{tname}** — {tdesc}")
+                    elif mr == "tool_result":
+                        if mc:
+                            subagent_lines.append(f"  - {mc}")
+                    i += 1
+
+                status = ""
+                if "completed" in done_status:
+                    status = " — completed"
+                elif "failed" in done_status:
+                    status = " — failed"
+
+                lines.append("<details>")
+                lines.append(f"<summary>Agent: {desc}{status}</summary>")
+                lines.append("")
+                lines.extend(subagent_lines)
+                lines.append("")
+                lines.append("</details>")
+                lines.append("")
+            else:
+                # "Done" without matching "Started" — emit as-is
+                lines.append(f"*{content}*")
+                lines.append("")
+                i += 1
+        elif role == "plan":
+            status = msg.get("status", "")
+            label = "Plan" + (f" — {status}" if status else "")
+            lines.append("<details>")
+            lines.append(f"<summary>{label}</summary>")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+            i += 1
+
         else:
             lines.append(f"## {role.title()}")
             lines.append("")
             lines.append(content)
             lines.append("")
+            i += 1
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -464,3 +582,24 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
         "path": str(path.relative_to(vault_root)),
         "message_count": len(messages),
     }
+
+
+def _summarize_tools(tool_counts: dict[str, int]) -> list[str]:
+    """Build human-readable summary from tool counts, e.g. 'Read 3 files, ran 2 commands'."""
+    summaries = []
+    friendly = {
+        "Read": ("Read", "file"),
+        "Bash": ("Ran", "command"),
+        "Grep": ("Searched", "pattern"),
+        "Glob": ("Found", "pattern"),
+        "Edit": ("Edited", "file"),
+        "Write": ("Wrote", "file"),
+        "Agent": ("Spawned", "agent"),
+    }
+    for tool, count in tool_counts.items():
+        if tool in friendly:
+            verb, noun = friendly[tool]
+            summaries.append(f"{verb} {count} {noun}{'s' if count != 1 else ''}")
+        else:
+            summaries.append(f"{tool} x{count}" if count > 1 else tool)
+    return summaries

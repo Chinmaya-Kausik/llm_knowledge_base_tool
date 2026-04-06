@@ -537,6 +537,55 @@ async def api_save_chat(request: Request):
     return {"ok": True, **result}
 
 
+# --- Plan file API ---
+
+@app.get("/api/plan")
+async def api_get_plan():
+    """Get the current plan file content."""
+    plans_dir = VAULT_ROOT / ".claude" / "plans"
+    if not plans_dir.exists():
+        return {"ok": False, "error": "No plans directory"}
+    # Find the most recent plan file
+    plan_files = sorted(plans_dir.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)
+    if not plan_files:
+        return {"ok": False, "error": "No plan files"}
+    plan = plan_files[0]
+    return {"ok": True, "path": str(plan.relative_to(VAULT_ROOT)), "content": plan.read_text(encoding="utf-8")}
+
+
+def _validate_plan_path(path: str) -> Path | None:
+    """Resolve and validate a plan file path, preventing traversal attacks."""
+    if not path:
+        return None
+    full_path = (VAULT_ROOT / path).resolve()
+    plans_dir = (VAULT_ROOT / ".claude" / "plans").resolve()
+    if not str(full_path).startswith(str(plans_dir)):
+        return None
+    return full_path
+
+
+@app.put("/api/plan")
+async def api_put_plan(request: Request):
+    """Update the current plan file content."""
+    body = await request.json()
+    full_path = _validate_plan_path(body.get("path", ""))
+    if not full_path or not full_path.exists():
+        return {"ok": False, "error": "Invalid plan path"}
+    full_path.write_text(body.get("content", ""), encoding="utf-8")
+    return {"ok": True}
+
+
+@app.delete("/api/plan")
+async def api_delete_plan(request: Request):
+    """Delete a plan file after approval."""
+    body = await request.json()
+    full_path = _validate_plan_path(body.get("path", ""))
+    if not full_path or not full_path.exists():
+        return {"ok": False, "error": "Invalid plan path"}
+    full_path.unlink()
+    return {"ok": True}
+
+
 # --- Chat WebSocket ---
 
 @app.websocket("/ws/chat")

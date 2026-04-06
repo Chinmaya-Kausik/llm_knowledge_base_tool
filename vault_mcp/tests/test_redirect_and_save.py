@@ -254,8 +254,8 @@ class TestChatSaveCompleteness:
             # Parent events
             assert "comprehensive search" in content
             assert "compiling results" in content
-            # Subagent markers
-            assert "Started" in content
+            # Subagent blocks (rendered as collapsible Agent: sections)
+            assert "Agent: Search wiki" in content
             # Subagent tool calls
             assert "Grep" in content
             assert "Glob" in content

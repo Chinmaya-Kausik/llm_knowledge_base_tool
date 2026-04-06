@@ -1155,6 +1155,9 @@ let pendingAgentPrompt = null;
 let checkpointMode = false;
 let redirectSnapshot = new Map(); // Snapshot of activeSubagents at time of redirect
 let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool call to redirect from)
+let wasUserInterrupt = false; // Set when user presses Escape
+let activePlanPath = null; // Path to the active plan file
+let activePlanContent = ''; // Raw markdown of the plan
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -1317,7 +1320,7 @@ function initChat() {
   // Send message
   sendBtn.onclick = () => sendChatMessage();
   input.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); console.log('Enter pressed, calling sendChatMessage'); sendChatMessage(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
   };
 
   // Context level dropdown
@@ -1470,12 +1473,18 @@ function initChat() {
   // Global redirect button
   const redirectBtn = document.getElementById('chat-redirect');
   redirectBtn.onclick = () => {
-    // Stop everything
-    if (chatWs && chatGenerating) chatWs.send(JSON.stringify({ type: 'stop' }));
-
-    // Snapshot subagents before stop clears them
+    // Snapshot subagents BEFORE stop clears them
     redirectSnapshot = new Map(activeSubagents);
-    pendingSelection = null; // Clear any leftover selection context
+    pendingSelection = null;
+
+    // Stop generation and immediately reset state
+    // (Don't wait for 'stopped' event — user needs to send redirect NOW)
+    if (chatWs && chatGenerating) chatWs.send(JSON.stringify({ type: 'stop' }));
+    chatGenerating = false;
+    clearInterval(chatTimerInterval);
+    document.getElementById('chat-send').style.display = '';
+    document.getElementById('chat-stop').style.display = 'none';
+    document.getElementById('chat-redirect').style.display = 'none';
 
     // Enter checkpoint mode
     checkpointMode = true;
@@ -1532,16 +1541,17 @@ function initChat() {
       : 'Choose breakpoints above, then type here...';
   }
 
-  function exitCheckpointMode() {
-    checkpointMode = false;
-    redirectCheckpoints.clear();
-    redirectSnapshot.clear();
-    document.getElementById('chat-messages').classList.remove('checkpoint-mode');
-    document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
-    document.getElementById('chat-context-preview').style.display = 'none';
-    document.getElementById('chat-input').placeholder = 'Message Claude... (Enter to send)';
-    pendingSelection = null;
-  }
+}
+
+function exitCheckpointMode() {
+  checkpointMode = false;
+  redirectCheckpoints.clear();
+  redirectSnapshot.clear();
+  document.getElementById('chat-messages').classList.remove('checkpoint-mode');
+  document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
+  document.getElementById('chat-context-preview').style.display = 'none';
+  document.getElementById('chat-input').placeholder = 'Message Claude... (Enter to send)';
+  pendingSelection = null;
 }
 
 function connectChat() {
@@ -1603,27 +1613,29 @@ function sendChatMessage() {
   // If currently generating, queue the message
   if (chatGenerating) {
     if (text) {
-      messageQueue.push(text);
+      const queuedEl = appendChatMessage('user', text, 'queued');
+      messageQueue.push({ text, el: queuedEl });
       input.value = '';
-      appendChatMessage('user', text + ' (queued)');
     }
     return;
   }
 
   // Build the actual message — might include redirect context
   let fullText = text;
+  let isRedirect = false;
 
   if (checkpointMode) {
     fullText = buildRedirectMessage(text);
     exitCheckpointMode();
-    if (!fullText) { console.log('BLOCKED: buildRedirectMessage returned empty'); return; }
+    if (!fullText) return;
+    isRedirect = true;
   } else if (!text && !pendingSelection?.text) {
-    console.log('BLOCKED: no text and no pending selection'); return;
+    return;
   }
 
   chatMessages.push({ role: 'user', content: fullText });
   currentResponseText = '';
-  appendChatMessage('user', text || '(redirect)'); // Show user's text only, not the full context
+  appendChatMessage('user', text || '', isRedirect ? 'redirect' : null);
   input.value = '';
 
   const level = currentLevel();
@@ -1651,14 +1663,17 @@ function sendChatMessage() {
   document.getElementById('chat-stop').style.display = 'none'; // Hidden — Redirect handles stopping
   document.getElementById('chat-redirect').style.display = '';
 
-  // Show "Sending..." immediately, status bar appears on first event
+  // Show pondering + timer + tokens immediately at dispatch time
   currentAssistantEl = document.createElement('div');
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
-  currentAssistantEl.innerHTML = '<span class="chat-sending" style="font-size:11px;color:var(--text-muted)">Sending...</span>';
+  const statusBar = document.createElement('div');
+  statusBar.className = 'chat-status-bar';
+  statusBar.id = 'chat-active-status';
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
+  currentAssistantEl.appendChild(statusBar);
   document.getElementById('chat-messages').appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
-  chatStartTime = null; // Set when first event arrives
 
   // Timer updates once started
   clearInterval(chatTimerInterval);
@@ -1667,6 +1682,49 @@ function sendChatMessage() {
     if (el && chatStartTime) {
       el.textContent = ((Date.now() - chatStartTime) / 1000).toFixed(1) + 's';
     }
+    const tokEl = document.getElementById('chat-tokens');
+    if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
+  }, 100);
+}
+
+function sendQueuedMessage(text) {
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+  if (chatGenerating) { messageQueue.push({ text, el: null }); return; }
+
+  chatMessages.push({ role: 'user', content: text });
+  currentResponseText = '';
+  // User message element already exists from queue time — don't create another
+
+  const level = currentLevel();
+  chatWs.send(JSON.stringify({
+    type: 'message',
+    text,
+    context_level: chatContextLevel,
+    context: { page_path: level.parentPath || '' },
+  }));
+
+  chatGenerating = true;
+  chatStartTime = Date.now();
+  chatTokenCount = 0;
+  document.getElementById('chat-send').style.display = 'none';
+  document.getElementById('chat-stop').style.display = 'none';
+  document.getElementById('chat-redirect').style.display = '';
+
+  currentAssistantEl = document.createElement('div');
+  currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+  const statusBar = document.createElement('div');
+  statusBar.className = 'chat-status-bar';
+  statusBar.id = 'chat-active-status';
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
+  currentAssistantEl.appendChild(statusBar);
+  document.getElementById('chat-messages').appendChild(currentAssistantEl);
+  currentThinkingEl = null;
+  currentThinkingWrapper = null;
+
+  clearInterval(chatTimerInterval);
+  chatTimerInterval = setInterval(() => {
+    const el = document.getElementById('chat-elapsed');
+    if (el && chatStartTime) el.textContent = ((Date.now() - chatStartTime) / 1000).toFixed(1) + 's';
     const tokEl = document.getElementById('chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
@@ -1716,6 +1774,185 @@ function toolIcon(tool) {
     'ingest_url': '📥', 'ingest_text': '📥', 'auto_commit': '💾',
   };
   return icons[tool] || '⚡';
+}
+
+// ========================================
+// Plan Panel
+// ========================================
+
+function openPlanPanel(path, content) {
+  activePlanPath = path;
+  activePlanContent = content;
+
+  const pane = document.getElementById('plan-pane');
+  const divider = document.getElementById('plan-divider');
+  const planContent = document.getElementById('plan-content');
+  const planEditor = document.getElementById('plan-editor');
+
+  // Render markdown with interactive checkboxes
+  planContent.innerHTML = renderPlanMarkdown(content);
+  wireCheckboxes(planContent);
+  planEditor.value = content;
+
+  pane.style.display = '';
+  divider.style.display = '';
+  planEditor.style.display = 'none';
+  planContent.style.display = '';
+
+  // Log plan in chat
+  chatMessages.push({ role: 'plan', content, status: 'proposed' });
+
+  // Wire buttons
+  document.getElementById('plan-approve').onclick = approvePlan;
+  document.getElementById('plan-changes').onclick = requestPlanChanges;
+  document.getElementById('plan-edit-toggle').onclick = togglePlanEdit;
+  document.getElementById('plan-close').onclick = closePlanPanel;
+  document.getElementById('plan-split-toggle').onclick = () => {
+    document.getElementById('chat-body').classList.toggle('split-horizontal');
+  };
+}
+
+function renderPlanMarkdown(md) {
+  // Convert checkbox markdown to interactive HTML before parsing
+  const withCheckboxes = md.replace(/^(\s*)- \[ \] (.+)$/gm, '$1- <label><input type="checkbox" data-line="$2"> $2</label>')
+    .replace(/^(\s*)- \[x\] (.+)$/gm, '$1- <label><input type="checkbox" checked data-line="$2"> $2</label>');
+  return marked.parse(withCheckboxes);
+}
+
+function wireCheckboxes(container) {
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const lineText = cb.dataset.line;
+      if (!lineText || !activePlanContent) return;
+      // Toggle in raw markdown
+      const unchecked = `- [ ] ${lineText}`;
+      const checked = `- [x] ${lineText}`;
+      if (cb.checked) {
+        activePlanContent = activePlanContent.replace(unchecked, checked);
+      } else {
+        activePlanContent = activePlanContent.replace(checked, unchecked);
+      }
+      // Save to server
+      savePlanContent(activePlanContent);
+    });
+  });
+}
+
+async function savePlanContent(content) {
+  if (!activePlanPath) return;
+  try {
+    await fetch('/api/plan', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: activePlanPath, content }),
+    });
+  } catch (e) { console.error('Plan save failed:', e); }
+}
+
+function togglePlanEdit() {
+  const planContent = document.getElementById('plan-content');
+  const planEditor = document.getElementById('plan-editor');
+  const btn = document.getElementById('plan-edit-toggle');
+
+  if (planEditor.style.display === 'none') {
+    // Switch to edit mode
+    planEditor.value = activePlanContent;
+    planEditor.style.display = '';
+    planContent.style.display = 'none';
+    btn.textContent = 'Preview';
+  } else {
+    // Switch to preview mode — save edits
+    activePlanContent = planEditor.value;
+    planContent.innerHTML = renderPlanMarkdown(activePlanContent);
+    wireCheckboxes(planContent);
+    planEditor.style.display = 'none';
+    planContent.style.display = '';
+    btn.textContent = 'Edit';
+    savePlanContent(activePlanContent);
+  }
+}
+
+async function approvePlan() {
+  // Log final plan state in chat
+  chatMessages.push({ role: 'plan', content: activePlanContent, status: 'approved' });
+
+  // Send approval message to agent
+  if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+    const input = document.getElementById('chat-input');
+    input.value = 'Plan approved. Proceed with implementation.';
+    sendChatMessage();
+  }
+
+  // Delete plan file
+  if (activePlanPath) {
+    try {
+      await fetch('/api/plan', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: activePlanPath }),
+      });
+    } catch (e) { console.error('Plan delete failed:', e); }
+  }
+
+  closePlanPanel();
+}
+
+function requestPlanChanges() {
+  const input = document.getElementById('chat-input');
+  input.placeholder = 'What changes to the plan?';
+  input.focus();
+}
+
+function closePlanPanel() {
+  document.getElementById('plan-pane').style.display = 'none';
+  document.getElementById('plan-divider').style.display = 'none';
+  document.getElementById('chat-body').classList.remove('split-horizontal');
+  activePlanPath = null;
+  activePlanContent = '';
+}
+
+async function checkForPlanFile(filePath) {
+  // Called when we detect a Write/Edit to a plan file
+  // Fetch the plan content and open the panel
+  try {
+    const resp = await fetch('/api/plan');
+    const data = await resp.json();
+    if (data.ok) {
+      openPlanPanel(data.path, data.content);
+    }
+  } catch (e) { console.error('Plan fetch failed:', e); }
+}
+
+function summarizeTools(tools) {
+  const counts = {};
+  tools.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+  const friendly = {
+    Read: ['Read', 'file'], Bash: ['Ran', 'command'], Grep: ['Searched', 'pattern'],
+    Glob: ['Found', 'pattern'], Edit: ['Edited', 'file'], Write: ['Wrote', 'file'],
+    Agent: ['Spawned', 'agent'],
+  };
+  return Object.entries(counts).map(([tool, n]) => {
+    const f = friendly[tool];
+    if (f) return `${f[0]} ${n} ${f[1]}${n > 1 ? 's' : ''}`;
+    return n > 1 ? `${tool} x${n}` : tool;
+  }).join(', ');
+}
+
+function finalizeActivityGroup(ag) {
+  if (!ag) return;
+  const hdr = ag.querySelector('.chat-activity-header');
+  if (hdr) {
+    const latest = hdr.querySelector('.activity-latest');
+    if (latest) {
+      const elapsed = ((Date.now() - (ag._startTime || Date.now())) / 1000).toFixed(1);
+      latest.classList.remove('pondering');
+      latest.textContent = `${summarizeTools(ag._tools || [])} (${elapsed}s)`;
+    }
+  }
+  const body = ag.querySelector('.chat-activity-body');
+  if (body) body.classList.remove('open');
+  const toggle = ag.querySelector('.chat-thinking-toggle');
+  if (toggle) toggle.classList.remove('open');
 }
 
 // Get the target container for an event — subagent body or parent assistant
@@ -1780,20 +2017,7 @@ function handleChatEvent(msg) {
 
   if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
 
-  // On first content event, replace "Sending..." with status bar
-  const contentTypes = ['thinking', 'text', 'tool_use', 'tool_result', 'result', 'subagent_started'];
-  if (currentAssistantEl && contentTypes.includes(msg.type) && !chatStartTime) {
-    chatStartTime = Date.now();
-    // Remove "Sending..." placeholder
-    const sending = currentAssistantEl.querySelector('.chat-sending');
-    if (sending) sending.remove();
-    // Add status bar
-    const statusBar = document.createElement('div');
-    statusBar.className = 'chat-status-bar';
-    statusBar.id = 'chat-active-status';
-    statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
-    currentAssistantEl.insertBefore(statusBar, currentAssistantEl.firstChild);
-  }
+  // Status bar is created at dispatch time in sendChatMessage() — no swap needed here
 
   switch (msg.type) {
     case 'thinking': {
@@ -1839,22 +2063,7 @@ function handleChatEvent(msg) {
     case 'text':
       // Finalize any open activity group
       if (currentActivityGroup) {
-        const agHdr = currentActivityGroup.querySelector('.chat-activity-header');
-        const agElapsed = ((Date.now() - currentActivityGroup._startTime) / 1000).toFixed(1);
-        const toolCount = currentActivityGroup._tools.length;
-        const unique = [...new Set(currentActivityGroup._tools)];
-        if (agHdr) {
-          const latest = agHdr.querySelector('.activity-latest');
-          if (latest) {
-            latest.classList.remove('pondering');
-            latest.innerHTML = `${unique.join(', ')} — ${toolCount} call${toolCount > 1 ? 's' : ''} (${agElapsed}s)`;
-          }
-        }
-        // Collapse the body by default after completion
-        const agBody = currentActivityGroup.querySelector('.chat-activity-body');
-        if (agBody) agBody.classList.remove('open');
-        const agToggle = currentActivityGroup.querySelector('.chat-thinking-toggle');
-        if (agToggle) agToggle.classList.remove('open');
+        finalizeActivityGroup(currentActivityGroup);
         currentActivityGroup = null;
       }
       // Finalize any open thinking block (but allow new ones later)
@@ -1940,17 +2149,16 @@ function handleChatEvent(msg) {
         else currentActivityGroup = ag;
       }
 
-      // Update header
+      // Update header with live summary
+      ag._tools.push(toolName);
       const latestEl = ag.querySelector('.activity-latest');
-      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${escapeHtml(toolName)}</b> ${escapeHtml(toolDesc)}`;
+      if (latestEl) latestEl.textContent = summarizeTools(ag._tools);
 
       // Same-tool grouping: if same tool as last, increment counter
       const agBody = ag.querySelector('.chat-activity-body');
       if (ag._lastToolName === toolName && ag._lastToolGroup) {
         // Increment existing group
         ag._lastToolGroup._count = (ag._lastToolGroup._count || 1) + 1;
-        const countEl = ag._lastToolGroup.querySelector('.tool-count');
-        if (countEl) countEl.textContent = `(${ag._lastToolGroup._count})`;
         // Add sub-entry
         const subEntry = document.createElement('div');
         subEntry.className = 'chat-tool-subentry';
@@ -1967,7 +2175,7 @@ function handleChatEvent(msg) {
         toolEntry.className = 'chat-tool-entry';
         toolEntry._startTime = Date.now();
         toolEntry._count = 1;
-        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${escapeHtml(toolDesc)}</span> <span class="tool-count"></span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
+        toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${escapeHtml(toolDesc)}</span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
         // Store the message index for this tool call (for checkpoint truncation)
         toolEntry.dataset.msgIndex = chatMessages.length - 1;
         const toolResult = document.createElement('div');
@@ -1988,12 +2196,20 @@ function handleChatEvent(msg) {
         ag._lastToolGroup = toolEntry;
       }
 
-      ag._tools.push(toolName);
       chatMessages.push({ role: 'tool', content: `${toolName}: ${toolDesc}`, subagent_id: msg.subagent_id || null });
 
       // Capture Agent tool prompt for the upcoming subagent
       if (toolName === 'Agent' && msg.input) {
         pendingAgentPrompt = msg.input.prompt || msg.input.description || null;
+      }
+
+      // Detect plan file writes
+      if ((toolName === 'Write' || toolName === 'Edit') && msg.input) {
+        const fp = msg.input.file_path || msg.input.path || '';
+        if (fp.includes('.claude/plans/') && fp.endsWith('.md')) {
+          // Fetch plan after a short delay (let the write complete)
+          setTimeout(() => checkForPlanFile(fp), 500);
+        }
       }
       break;
     }
@@ -2026,7 +2242,7 @@ function handleChatEvent(msg) {
           if (pond) pond.classList.remove('pondering');
         }
       }
-      chatMessages.push({ role: 'tool_result', content: (msg.output || '').slice(0, 500), subagent_id: msg.subagent_id || null });
+      chatMessages.push({ role: 'tool_result', content: (msg.output || '').slice(0, 1000), subagent_id: msg.subagent_id || null });
       break;
     }
 
@@ -2101,6 +2317,11 @@ function handleChatEvent(msg) {
     case 'subagent_done': {
       const sub2 = activeSubagents.get(msg.task_id);
       if (sub2) {
+        // Finalize subagent's own activity group
+        if (sub2.activityGroup) {
+          finalizeActivityGroup(sub2.activityGroup);
+          sub2.activityGroup = null;
+        }
         const status2 = sub2.header.querySelector('.chat-subagent-status');
         if (status2) {
           status2.textContent = msg.status || 'done';
@@ -2127,7 +2348,8 @@ function handleChatEvent(msg) {
     }
 
     case 'done':
-    case 'stopped':
+    case 'stopped': {
+      const wasStopped = msg.type === 'stopped';
       // Finalize any open thinking/activity
       if (currentThinkingWrapper) {
         const tw = currentThinkingWrapper;
@@ -2136,9 +2358,7 @@ function handleChatEvent(msg) {
         currentThinkingWrapper = null; currentThinkingEl = null;
       }
       if (currentActivityGroup) {
-        const ag = currentActivityGroup;
-        const hdr = ag.querySelector('.chat-activity-header');
-        if (hdr) { const l = hdr.querySelector('.activity-latest'); if (l) l.classList.remove('pondering'); }
+        finalizeActivityGroup(currentActivityGroup);
         currentActivityGroup = null;
       }
       // Track assistant response
@@ -2151,6 +2371,20 @@ function handleChatEvent(msg) {
       document.getElementById('chat-send').style.display = '';
       document.getElementById('chat-stop').style.display = 'none';
       document.getElementById('chat-redirect').style.display = 'none';
+
+      // Show interrupt prompt if user pressed Escape
+      if (wasStopped && wasUserInterrupt) {
+        wasUserInterrupt = false;
+        const interruptEl = document.createElement('div');
+        interruptEl.className = 'chat-interrupted';
+        interruptEl.textContent = 'Interrupted \u00b7 What should Claude do instead?';
+        if (currentAssistantEl) {
+          currentAssistantEl.appendChild(interruptEl);
+        } else {
+          document.getElementById('chat-messages').appendChild(interruptEl);
+        }
+        document.getElementById('chat-input').focus();
+      }
       // Finalize status bar
       const activeStatus = document.getElementById('chat-active-status');
       if (activeStatus && chatStartTime) {
@@ -2167,12 +2401,13 @@ function handleChatEvent(msg) {
 
       // Process queued messages
       if (messageQueue.length > 0) {
-        const nextMsg = messageQueue.shift();
-        const input = document.getElementById('chat-input');
-        input.value = nextMsg;
-        setTimeout(() => sendChatMessage(), 100);
+        const next = messageQueue.shift();
+        // Reuse the queued message element — remove queued styling, dispatch directly
+        if (next.el) next.el.classList.remove('chat-msg-queued');
+        setTimeout(() => sendQueuedMessage(next.text), 100);
       }
       break;
+    }
 
     case 'result':
       // Use result as authoritative text if we missed streaming
@@ -2237,12 +2472,28 @@ function saveChatBeacon() {
   navigator.sendBeacon('/api/chat/save', blob);
 }
 
-function appendChatMessage(role, text) {
+function appendChatMessage(role, text, tag) {
   const messages = document.getElementById('chat-messages');
   const el = document.createElement('div');
   el.className = `chat-msg chat-msg-${role}`;
-  el.textContent = text;
+  if (tag === 'redirect') {
+    const label = document.createElement('span');
+    label.className = 'chat-redirect-label';
+    label.textContent = '↻ Redirect';
+    el.appendChild(label);
+    if (text) {
+      const span = document.createElement('span');
+      span.textContent = ' ' + text;
+      el.appendChild(span);
+    }
+  } else if (tag === 'queued') {
+    el.classList.add('chat-msg-queued');
+    el.textContent = text;
+  } else {
+    el.textContent = text;
+  }
   messages.appendChild(el);
+  return el;
 }
 
 // ========================================
@@ -2466,6 +2717,7 @@ async function init() {
     if (e.key === 'Escape') {
       // Stop chat generation first
       if (chatGenerating && chatWs && chatWs.readyState === WebSocket.OPEN) {
+        wasUserInterrupt = true;
         chatWs.send(JSON.stringify({ type: 'stop' }));
         return;
       }
