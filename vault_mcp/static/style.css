@@ -547,7 +547,7 @@ body {
   background: var(--bg-surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow);
   display: flex; flex-direction: column; z-index: 100;
-  overflow: hidden;
+  overflow: hidden; resize: both; min-width: 280px; min-height: 200px;
 }
 .floating-chat-panel.minimized { height: 32px; overflow: hidden; }
 .floating-chat-panel.minimized .fcp-messages,

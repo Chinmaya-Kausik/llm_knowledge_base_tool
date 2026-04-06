@@ -1957,6 +1957,7 @@ function createPanelHeader(panelId, label = 'Chat') {
         ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'].forEach(c => cp.classList.remove(c));
         cp.classList.add('chat-' + mode);
         connectChat();
+        setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
       }
     } else {
       const card = panel?.container;
@@ -2195,6 +2196,9 @@ function createFloatingPanel(options = {}) {
 
   // Connect WebSocket
   connectPanelChat(panel, messagesEl);
+
+  // Focus input
+  setTimeout(() => input.focus(), 100);
 
   return panel;
 }
