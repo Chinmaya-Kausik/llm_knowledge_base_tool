@@ -1965,7 +1965,7 @@ function connectPanelChat(panel, messagesEl) {
     }));
   };
 
-  // Queue events and process them without interleaving with other panels
+  // Queue events and process without corrupting main panel's globals
   const eventQueue = [];
   let processing = false;
 
@@ -1974,17 +1974,51 @@ function connectPanelChat(panel, messagesEl) {
     processing = true;
     const msg = eventQueue.shift();
 
-    // Swap to this panel's state
-    const prevActive = activePanel;
-    syncToPanel(prevActive);
-    activePanel = panel;
-    syncFromPanel(panel);
+    // Save main panel's globals, swap in this panel's state
+    const saved = {
+      ws: chatWs, sessionId: chatSessionId, generating: chatGenerating,
+      assistantEl: currentAssistantEl, thinkingEl: currentThinkingEl,
+      thinkingWrapper: currentThinkingWrapper, activityGroup: currentActivityGroup,
+      subagents: activeSubagents, responseText: currentResponseText,
+      messages: chatMessages, tokenCount: chatTokenCount, startTime: chatStartTime,
+      timerInterval: chatTimerInterval, msgContainer: chatMessagesContainer,
+      pendingAgentPrompt: pendingAgentPrompt, editedFiles: sessionEditedFiles,
+      lastResultUsage: lastResultUsage, lastResultCost: lastResultCost,
+    };
+
+    // Load this panel's state into globals
+    chatWs = panel.ws; chatSessionId = panel.sessionId;
+    chatGenerating = panel.generating; currentAssistantEl = panel.assistantEl;
+    currentThinkingEl = panel.thinkingEl; currentThinkingWrapper = panel.thinkingWrapper;
+    currentActivityGroup = panel.activityGroup; activeSubagents = panel.subagents;
+    currentResponseText = panel.responseText; chatMessages = panel.messages;
+    chatTokenCount = panel.tokenCount; chatStartTime = panel.startTime;
+    chatTimerInterval = panel.timerInterval; chatMessagesContainer = panel.messagesContainer;
+    pendingAgentPrompt = panel.pendingAgentPrompt; sessionEditedFiles = panel.editedFiles;
+    lastResultUsage = panel.lastResultUsage; lastResultCost = panel.lastResultCost;
 
     handleChatEvent(msg);
 
-    syncToPanel(panel);
-    activePanel = prevActive;
-    syncFromPanel(prevActive);
+    // Save this panel's state back
+    panel.ws = chatWs; panel.sessionId = chatSessionId;
+    panel.generating = chatGenerating; panel.assistantEl = currentAssistantEl;
+    panel.thinkingEl = currentThinkingEl; panel.thinkingWrapper = currentThinkingWrapper;
+    panel.activityGroup = currentActivityGroup; panel.subagents = activeSubagents;
+    panel.responseText = currentResponseText; panel.messages = chatMessages;
+    panel.tokenCount = chatTokenCount; panel.startTime = chatStartTime;
+    panel.timerInterval = chatTimerInterval; panel.editedFiles = sessionEditedFiles;
+    panel.lastResultUsage = lastResultUsage; panel.lastResultCost = lastResultCost;
+
+    // Restore main panel's globals
+    chatWs = saved.ws; chatSessionId = saved.sessionId;
+    chatGenerating = saved.generating; currentAssistantEl = saved.assistantEl;
+    currentThinkingEl = saved.thinkingEl; currentThinkingWrapper = saved.thinkingWrapper;
+    currentActivityGroup = saved.activityGroup; activeSubagents = saved.subagents;
+    currentResponseText = saved.responseText; chatMessages = saved.messages;
+    chatTokenCount = saved.tokenCount; chatStartTime = saved.startTime;
+    chatTimerInterval = saved.timerInterval; chatMessagesContainer = saved.msgContainer;
+    pendingAgentPrompt = saved.pendingAgentPrompt; sessionEditedFiles = saved.editedFiles;
+    lastResultUsage = saved.lastResultUsage; lastResultCost = saved.lastResultCost;
 
     processing = false;
     if (eventQueue.length > 0) requestAnimationFrame(processQueue);
