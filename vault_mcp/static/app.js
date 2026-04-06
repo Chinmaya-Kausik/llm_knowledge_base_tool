@@ -1202,6 +1202,23 @@ function sortItems(items) {
   return sorted;
 }
 
+async function refreshFileTree() {
+  // Refresh sidebar tree
+  const treeData = await api.tree();
+  const sidebarContainer = document.getElementById('sidebar-tree');
+  if (sidebarContainer) {
+    sidebarContainer.innerHTML = renderTree(treeData.children || [], 0);
+  }
+  // Refresh Files view data
+  filesTreeData = treeData;
+  if (filesInitialized) {
+    if (filesMode === 'tree') renderFilesTree();
+    else renderFilesTiles();
+  }
+  // Refresh graph data
+  graphData = await api.graph();
+}
+
 async function initFilesView() {
   if (filesInitialized) return;
   filesTreeData = await api.tree();
@@ -2082,7 +2099,7 @@ function createPanelHeader(panelId, label = 'Chat') {
         fetch('/api/chat/save', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages }),
-        }).catch(() => {});
+        }).then(() => refreshFileTree()).catch(() => {});
       }
       if (panel?.ws) panel.ws.close();
       chatPanels.delete(panelId);
@@ -3704,6 +3721,7 @@ function handleChatEvent(msg) {
         if (currentAssistantEl) currentAssistantEl.appendChild(notif);
         else messages.appendChild(notif);
         sessionEditedFiles.clear();
+        refreshFileTree();
       }
 
       // Finalize status bar with real usage if available
@@ -3794,7 +3812,8 @@ async function saveChatTranscript() {
       body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages }),
     });
     const data = await resp.json();
-    console.log('Chat saved:', data, 'messages sent:', chatMessages.length);
+    console.log('Chat saved:', data);
+    refreshFileTree();
   } catch (e) { console.error('Chat save failed:', e); }
 }
 
