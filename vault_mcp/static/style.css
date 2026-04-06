@@ -231,7 +231,14 @@ body {
 
 /* Compact file cards (non-expanded) */
 .doc-card[data-expanded="false"] { width: 300px; }
-.doc-card[data-expanded="false"] .doc-body { max-height: 60px; overflow: hidden; }
+.doc-card[data-expanded="false"] .doc-body {
+  max-height: 60px; overflow: hidden; position: relative;
+}
+.doc-card[data-expanded="false"] .doc-body::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(transparent, var(--bg-surface));
+  pointer-events: none;
+}
 
 /* Handle (title bar) */
 .doc-handle {

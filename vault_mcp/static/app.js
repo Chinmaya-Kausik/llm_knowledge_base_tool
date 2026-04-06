@@ -189,6 +189,22 @@ function wireCardButtons(card, hasChildren) {
   const category = card.dataset.category || 'misc';
   const isMarkdown = category === 'markdown' || category === 'folder';
 
+  // Single-click title: toggle expand/collapse
+  card.querySelector('.doc-handle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (card.dataset.expanded === 'false') {
+      card.dataset.expanded = 'true';
+      card.dataset.collapseState = 'expanded';
+      card.querySelector('.btn-collapse').textContent = '-';
+      if (!isMarkdown && !cardMeta.has(path)) expandCardContent(card, path);
+    } else {
+      card.dataset.expanded = 'false';
+      card.dataset.collapseState = 'summary';
+      card.querySelector('.btn-collapse').textContent = '~';
+    }
+    scheduleEdgeUpdate();
+  });
+
   // Double-click title: folders → drill into canvas, files → full page
   card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
     e.stopPropagation(); e.preventDefault();
