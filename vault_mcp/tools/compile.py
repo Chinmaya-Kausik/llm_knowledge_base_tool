@@ -425,7 +425,7 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
     slug = first_msg[:40].strip().lower()
     slug = "".join(c if c.isalnum() or c == ' ' else '' for c in slug).strip().replace(' ', '-')
     slug = slug or session_id[:8]
-    filename = f"{now.strftime('%Y-%m-%d_%H%M')}_{slug}.md"
+    filename = f"{slug}_{now.strftime('%Y-%m-%d_%H%M')}.md"
     path = chats_dir / filename
 
     lines = [

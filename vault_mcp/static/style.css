@@ -399,6 +399,12 @@ body {
   width: 26px; height: 26px; border-radius: var(--radius); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
+.files-sort {
+  background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
+  font-size: 11px; padding: 2px 4px; border-radius: var(--radius); cursor: pointer;
+  font-family: var(--font);
+}
+.files-sort:hover { color: var(--text); }
 .files-mode:hover { color: var(--text); }
 .files-mode.active { color: var(--accent); border-color: var(--accent); }
 

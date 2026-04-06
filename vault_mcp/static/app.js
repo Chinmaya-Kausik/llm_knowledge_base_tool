@@ -1190,17 +1190,29 @@ function renderTree(items, depth) {
 let filesTreeData = null;
 let filesMode = 'tree'; // 'tree' or 'tiles'
 let filesTilePath = []; // breadcrumb path for tile navigation
+let filesSortBy = 'name'; // 'name', 'modified', 'added'
 
 let filesInitialized = false;
 
+function sortItems(items) {
+  const sorted = [...items];
+  if (filesSortBy === 'modified') sorted.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+  else if (filesSortBy === 'added') sorted.sort((a, b) => (b.ctime || 0) - (a.ctime || 0));
+  else sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return sorted;
+}
+
 async function initFilesView() {
-  // Don't re-render if already initialized (preserves tree expand state)
   if (filesInitialized) return;
   filesTreeData = await api.tree();
 
-  // Wire mode toggles
   document.getElementById('files-mode-tree').onclick = () => setFilesMode('tree');
   document.getElementById('files-mode-tiles').onclick = () => setFilesMode('tiles');
+  document.getElementById('files-sort').onchange = (e) => {
+    filesSortBy = e.target.value;
+    if (filesMode === 'tree') renderFilesTree();
+    else renderFilesTiles();
+  };
 
   setFilesMode(filesMode);
   filesInitialized = true;
@@ -1230,7 +1242,7 @@ function renderFilesTree() {
     else break;
   }
 
-  renderTreeItems(container, currentItems, 0);
+  renderTreeItems(container, sortItems(currentItems), 0);
   updateBreadcrumbs();
 }
 
@@ -1254,7 +1266,7 @@ function renderTreeItems(container, items, depth) {
     if (item.type === 'folder' && item.children?.length) {
       const childContainer = document.createElement('div');
       childContainer.className = 'ftree-children';
-      renderTreeItems(childContainer, item.children, depth + 1);
+      renderTreeItems(childContainer, sortItems(item.children), depth + 1);
       container.appendChild(childContainer);
 
       let lastClickTime = 0;
@@ -1297,9 +1309,9 @@ function renderFilesTiles() {
   // Update breadcrumbs
   updateBreadcrumbs();
 
-  // Render tiles — folders first, then files
-  const folders = currentItems.filter(i => i.type === 'folder');
-  const files = currentItems.filter(i => i.type !== 'folder');
+  // Render tiles — folders first, then files, both sorted
+  const folders = sortItems(currentItems.filter(i => i.type === 'folder'));
+  const files = sortItems(currentItems.filter(i => i.type !== 'folder'));
 
   for (const item of [...folders, ...files]) {
     const tile = document.createElement('div');

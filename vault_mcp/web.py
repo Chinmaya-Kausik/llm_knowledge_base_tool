@@ -327,6 +327,11 @@ def build_tree_v2(vault_root: Path) -> dict[str, Any]:
             page_map[p["parent_id"]]["children"].append(node)
 
     def simplify(node):
+        p = vault_root / node["path"]
+        try:
+            stat = p.stat() if p.exists() else None
+        except OSError:
+            stat = None
         return {
             "id": node["id"],
             "name": Path(node["path"]).name,
@@ -334,6 +339,8 @@ def build_tree_v2(vault_root: Path) -> dict[str, Any]:
             "type": "folder" if node["is_folder"] else "file",
             "category": node["category"],
             "children": [simplify(c) for c in node["children"]] if node["is_folder"] else [],
+            "mtime": stat.st_mtime if stat else 0,
+            "ctime": stat.st_birthtime if stat and hasattr(stat, 'st_birthtime') else (stat.st_ctime if stat else 0),
         }
 
     return {"id": "", "name": "vault", "type": "folder", "children": [simplify(r) for r in roots]}
