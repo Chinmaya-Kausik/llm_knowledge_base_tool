@@ -1416,6 +1416,7 @@ class ChatPanel {
     this.activePlanContent = '';
     this.editedFiles = new Set();
     this.model = null;
+    this.messagesContainer = null; // DOM element for this panel's messages
   }
 }
 
@@ -1441,6 +1442,7 @@ let chatIsTemporary, chatStartTime, chatTokenCount, chatTimerInterval;
 let currentActivityGroup, activeSubagents, currentResponseText, pendingAgentPrompt;
 let checkpointMode, redirectSnapshot, redirectCheckpoints, wasUserInterrupt;
 let lastResultUsage, lastResultCost, activePlanPath, activePlanContent, sessionEditedFiles;
+let chatMessagesContainer = null; // Current panel's messages DOM element
 let selectedCards = new Set();
 
 function syncFromPanel(panel) {
@@ -1458,6 +1460,7 @@ function syncFromPanel(panel) {
   wasUserInterrupt = panel.wasUserInterrupt; lastResultUsage = panel.lastResultUsage;
   lastResultCost = panel.lastResultCost; activePlanPath = panel.activePlanPath;
   activePlanContent = panel.activePlanContent; sessionEditedFiles = panel.editedFiles;
+  chatMessagesContainer = panel.messagesContainer;
 }
 
 function syncToPanel(panel) {
@@ -1475,6 +1478,7 @@ function syncToPanel(panel) {
   panel.wasUserInterrupt = wasUserInterrupt; panel.lastResultUsage = lastResultUsage;
   panel.lastResultCost = lastResultCost; panel.activePlanPath = activePlanPath;
   panel.activePlanContent = activePlanContent; panel.editedFiles = sessionEditedFiles;
+  panel.messagesContainer = chatMessagesContainer;
 }
 
 // Initialize globals from the default panel
@@ -1484,26 +1488,39 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 
 function dockPanel(panelId, action) {
+  console.log('[DOCK-FN] panelId:', panelId, 'action:', action, 'allPanels:', [...chatPanels.keys()]);
   const panel = chatPanels.get(panelId);
-  if (!panel) return;
+  if (!panel) { console.log('[DOCK-FN] panel not found!'); return; }
   const chatPanelEl = document.getElementById('chat-panel');
   const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
 
   if (panelId !== 'main') {
     const mainP = chatPanels.get('main');
     syncToPanel(activePanel);
+    console.log('[DOCK-FN] before swap — panels:', [...chatPanels.keys()]);
 
     // Pop out current main as floating (if it has content)
+    // DON'T create a new WebSocket — close the popped panel's auto-created one
+    // and transfer the main panel's existing WebSocket
     if (mainP.messages.length > 0) {
       const mainLabel = document.querySelector('#chat-header .panel-label')?.textContent || 'Chat';
+      console.log('[DOCK-FN] popping out main as:', mainLabel);
       const poppedPanel = createFloatingPanel({ fork: false, label: mainLabel });
       if (poppedPanel) {
+        // Close the auto-created WebSocket (createFloatingPanel opened one)
+        if (poppedPanel.ws && poppedPanel.ws !== mainP.ws) {
+          console.log('[DOCK-FN] closing popped panel auto-created ws');
+          poppedPanel.ws.onclose = null; // Prevent cleanup
+          poppedPanel.ws.close();
+        }
+        // Transfer main's state
         poppedPanel.messages = [...mainP.messages];
         poppedPanel.ws = mainP.ws;
         poppedPanel.sessionId = mainP.sessionId;
         poppedPanel.model = mainP.model;
         poppedPanel.contextLevel = mainP.contextLevel;
         poppedPanel.contextPath = mainP.contextPath;
+        // Re-render
         const poppedMsgs = poppedPanel.container?.querySelector('.fcp-messages');
         if (poppedMsgs) {
           poppedMsgs.innerHTML = '';
@@ -1516,17 +1533,18 @@ function dockPanel(panelId, action) {
             }
           }
         }
+        console.log('[DOCK-FN] popped panel created with', poppedPanel.messages.length, 'messages');
       }
     }
 
     // Transfer docking panel's state + label to main
+    console.log('[DOCK-FN] transferring panel', panelId, 'to main');
     mainP.ws = panel.ws;
     mainP.sessionId = panel.sessionId;
     mainP.messages = [...panel.messages];
     mainP.model = panel.model;
     mainP.contextLevel = panel.contextLevel;
     mainP.contextPath = panel.contextPath;
-    // Update main panel's label to match the docking panel
     const dockingLabel = panel.container?.querySelector('.panel-label')?.textContent;
     const mainLabelEl = document.querySelector('#chat-header .panel-label');
     if (dockingLabel && mainLabelEl) mainLabelEl.textContent = dockingLabel;
@@ -1544,9 +1562,11 @@ function dockPanel(panelId, action) {
       }
     }
 
-    // Remove the floating panel
+    // Remove ONLY the docking panel (not others)
+    console.log('[DOCK-FN] removing panel', panelId, 'panels before:', [...chatPanels.keys()]);
     chatPanels.delete(panelId);
     if (panel.container) panel.container.remove();
+    console.log('[DOCK-FN] panels after:', [...chatPanels.keys()]);
 
     activePanel = mainP;
     syncFromPanel(mainP);
@@ -1833,6 +1853,7 @@ function createFloatingPanel(options = {}) {
 
   document.getElementById('canvas-container').appendChild(card);
   panel.container = card;
+  panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
 
   // Render forked messages
@@ -1961,13 +1982,7 @@ function connectPanelChat(panel, messagesEl) {
     activePanel = panel;
     syncFromPanel(panel);
 
-    const mainMessages = document.getElementById('chat-messages');
     handleChatEvent(msg);
-
-    // Move any DOM elements that went to main into this panel's container
-    if (currentAssistantEl && currentAssistantEl.parentElement === mainMessages) {
-      messagesEl.appendChild(currentAssistantEl);
-    }
 
     syncToPanel(panel);
     activePanel = prevActive;
@@ -1980,6 +1995,8 @@ function connectPanelChat(panel, messagesEl) {
   thisWs.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
+    const panelKey = [...chatPanels.entries()].find(([k, p]) => p === panel)?.[0] || 'orphaned';
+    if (msg.type !== 'text') console.log('[WS-FLOAT] event:', msg.type, 'panel:', panelKey, 'queueLen:', eventQueue.length);
     eventQueue.push(msg);
     processQueue();
   };
@@ -2004,8 +2021,11 @@ function initChat() {
   const mainHeaderContainer = document.getElementById('chat-header');
   const { wrapper: headerWrapper, statusEl: mainStatusEl } = createPanelHeader('main', 'Chat');
   mainHeaderContainer.appendChild(headerWrapper);
-  // Store status element reference for connectChat
   mainHeaderContainer._statusEl = mainStatusEl;
+
+  // Set the main panel's messages container
+  activePanel.messagesContainer = document.getElementById('chat-messages');
+  chatMessagesContainer = activePanel.messagesContainer;
 
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
     'chat-bottom', 'chat-right', 'chat-float'];
@@ -2329,6 +2349,8 @@ function connectChat() {
     }
     // Find the panel that owns THIS WebSocket (not the global chatWs)
     const ownerPanel = [...chatPanels.values()].find(p => p.ws === thisWs) || activePanel;
+    const ownerKey = [...chatPanels.entries()].find(([k, p]) => p.ws === thisWs)?.[0] || 'unknown';
+    if (msg.type !== 'text') console.log('[WS-MAIN] event:', msg.type, 'owner:', ownerKey, 'activePanel:', [...chatPanels.entries()].find(([k,p]) => p === activePanel)?.[0]);
     syncFromPanel(ownerPanel);
     handleChatEvent(msg);
     syncToPanel(ownerPanel);
@@ -2414,7 +2436,7 @@ function sendChatMessage() {
   statusBar.id = 'chat-active-status';
   statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
   currentAssistantEl.appendChild(statusBar);
-  document.getElementById('chat-messages').appendChild(currentAssistantEl);
+  (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
 
@@ -2462,7 +2484,7 @@ function sendQueuedMessage(text) {
   statusBar.id = 'chat-active-status';
   statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
   currentAssistantEl.appendChild(statusBar);
-  document.getElementById('chat-messages').appendChild(currentAssistantEl);
+  (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
 
@@ -2759,7 +2781,7 @@ function buildRedirectMessage(generalText) {
 
 
 function handleChatEvent(msg) {
-  const messages = document.getElementById('chat-messages');
+  const messages = chatMessagesContainer || document.getElementById('chat-messages');
 
   if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
 
@@ -3139,7 +3161,7 @@ function handleChatEvent(msg) {
         if (currentAssistantEl) {
           currentAssistantEl.appendChild(interruptEl);
         } else {
-          document.getElementById('chat-messages').appendChild(interruptEl);
+          messages.appendChild(interruptEl);
         }
         document.getElementById('chat-input').focus();
       }
@@ -3155,7 +3177,7 @@ function handleChatEvent(msg) {
         notif.textContent = `Modified ${files.length} file${files.length > 1 ? 's' : ''}: ${summary}`;
         notif.title = files.join('\n');
         if (currentAssistantEl) currentAssistantEl.appendChild(notif);
-        else document.getElementById('chat-messages').appendChild(notif);
+        else messages.appendChild(notif);
         sessionEditedFiles.clear();
       }
 
@@ -3261,7 +3283,7 @@ function saveChatBeacon() {
 }
 
 function appendChatMessage(role, text, tag) {
-  const messages = document.getElementById('chat-messages');
+  const messages = chatMessagesContainer || document.getElementById('chat-messages');
   const el = document.createElement('div');
   el.className = `chat-msg chat-msg-${role}`;
   if (tag === 'redirect') {
