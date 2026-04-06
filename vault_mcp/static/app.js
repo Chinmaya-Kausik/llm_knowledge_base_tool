@@ -1153,7 +1153,17 @@ function renderFilesTree() {
   const container = document.getElementById('files-tree');
   container.innerHTML = '';
   if (!filesTreeData) return;
-  renderTreeItems(container, filesTreeData.children || [], 0);
+
+  // Navigate to current path
+  let currentItems = filesTreeData.children || [];
+  for (const pathSegment of filesTilePath) {
+    const folder = currentItems.find(i => i.name === pathSegment && i.type === 'folder');
+    if (folder) currentItems = folder.children || [];
+    else break;
+  }
+
+  renderTreeItems(container, currentItems, 0);
+  updateBreadcrumbs();
 }
 
 function renderTreeItems(container, items, depth) {
@@ -1187,10 +1197,10 @@ function renderTreeItems(container, items, depth) {
       row.ondblclick = (e) => {
         e.stopPropagation();
         if (e.metaKey || e.ctrlKey) { openExternal(item.id); return; }
-        // Enter folder on canvas
-        switchView('graph');
-        const nd = nodeById(item.id);
-        if (nd) drillInto(item.id);
+        // Navigate tree into this folder
+        filesTilePath = item.id.split('/');
+        renderFilesTree();
+        updateBreadcrumbs();
       };
     } else {
       row.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
