@@ -1301,9 +1301,7 @@ async function doSearch(query) {
   opts.className = 'search-options';
   const inFolder = currentLevel().parentPath;
   const q = query.replace(/'/g, "\\'");
-  const scopeHtml = inFolder
-    ? `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'':'checked'} onchange="searchScopeGlobal=!this.checked;doSearch('${q}')"> 📁 ${inFolder.split('/').pop()}</label>`
-    : '';
+  const scopeHtml = `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'checked':''} onchange="searchScopeGlobal=this.checked;doSearch('${q}')"> Global</label>`;
   opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''} onchange="searchContent=this.checked;doSearch('${q}')"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''} onchange="searchName=this.checked;doSearch('${q}')"> Name</label>`;
   c.appendChild(opts);
 
