@@ -1615,55 +1615,54 @@ function createPanelHeader(panelId, label = 'Chat') {
       const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
 
       if (panelId !== 'main') {
-        // Floating panel wants to dock — swap it into the main dock slot
-        // 1. Save current main panel as a floating panel
-        syncToPanel(activePanel);
+        // Floating panel wants to dock — transfer its state into the main dock slot
         const mainP = chatPanels.get('main');
-        if (mainP && mainP.messages.length > 0) {
-          createFloatingPanel({ fork: false }); // Pop out current main as floating
-          // Copy main's messages to the new floating panel
-          const newFloating = [...chatPanels.values()].find(p => p !== mainP && p !== panel);
-          if (newFloating) {
-            newFloating.messages = [...mainP.messages];
-            newFloating.ws = mainP.ws;
-            newFloating.sessionId = mainP.sessionId;
-          }
-        }
+        syncToPanel(activePanel);
 
-        // 2. Move the floating panel's state into main
+        // Transfer state to main
+        mainP.ws = panel.ws;
+        mainP.sessionId = panel.sessionId;
+        mainP.messages = [...panel.messages];
+        mainP.model = panel.model;
+        mainP.contextLevel = panel.contextLevel;
+        mainP.contextPath = panel.contextPath;
+
+        // Re-render main messages
         const messagesEl = document.getElementById('chat-messages');
         messagesEl.innerHTML = '';
         for (const msg of panel.messages) {
           if (msg.role === 'user' || msg.role === 'assistant') {
             const el = document.createElement('div');
             el.className = `chat-msg chat-msg-${msg.role}`;
-            el.textContent = msg.content?.slice(0, 500) || '';
+            if (msg.role === 'assistant') el.innerHTML = marked.parse(msg.content || '');
+            else el.textContent = msg.content || '';
             messagesEl.appendChild(el);
           }
         }
 
-        // 3. Transfer state
-        activePanel = chatPanels.get('main');
-        activePanel.ws = panel.ws;
-        activePanel.sessionId = panel.sessionId;
-        activePanel.messages = panel.messages;
-        activePanel.model = panel.model;
-        activePanel.contextLevel = panel.contextLevel;
-        activePanel.contextPath = panel.contextPath;
-        syncFromPanel(activePanel);
-
-        // 4. Remove the floating panel
-        if (panel.container) panel.container.remove();
+        // Remove floating panel
         chatPanels.delete(panelId);
+        if (panel.container) panel.container.remove();
+
+        // Set main as active
+        activePanel = mainP;
+        syncFromPanel(mainP);
       }
 
-      // Set dock mode
+      // Set dock mode on main panel — clear inline positioning from float/drag
       allStates.forEach(c => chatPanelEl.classList.remove(c));
+      chatPanelEl.style.left = '';
+      chatPanelEl.style.top = '';
+      chatPanelEl.style.right = '';
+      chatPanelEl.style.bottom = '';
+      chatPanelEl.style.width = '';
+      chatPanelEl.style.height = '';
+      chatPanelEl.style.inset = '';
       if (action === 'dock-right') chatPanelEl.classList.add('chat-right');
       else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
       else chatPanelEl.classList.add('chat-float');
 
-      if (panelId === 'main') connectChat();
+      if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
     } else if (action === 'clear') {
       syncToPanel(activePanel);
       activePanel = panel;
@@ -1690,7 +1689,6 @@ function createPanelHeader(panelId, label = 'Chat') {
     e.stopPropagation();
     const panel = chatPanels.get(panelId);
     if (panelId === 'main') {
-      // Main panel: toggle collapsed
       const chatPanel = document.getElementById('chat-panel');
       const isOpen = chatPanel.classList.contains('chat-bottom') || chatPanel.classList.contains('chat-right') || chatPanel.classList.contains('chat-float');
       if (isOpen) {
