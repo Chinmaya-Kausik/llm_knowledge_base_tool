@@ -2151,9 +2151,11 @@ function initChat() {
       clearChatClasses();
       panel.classList.add('chat-float');
       chatDockMode = 'float';
-      panel.style.left = '0'; panel.style.top = '0';
+      const sidebar = document.getElementById('sidebar');
+      const sidebarW = sidebar ? sidebar.offsetWidth : 0;
+      panel.style.left = sidebarW + 'px'; panel.style.top = '36px';
       panel.style.right = '0'; panel.style.bottom = '0';
-      panel.style.width = '100vw'; panel.style.height = '100vh';
+      panel.style.width = `calc(100vw - ${sidebarW}px)`; panel.style.height = 'calc(100vh - 36px)';
       chatMaximized = true;
     }
     connectChat();
