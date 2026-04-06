@@ -490,7 +490,7 @@ body {
 
 /* Floating chat panels */
 .floating-chat-panel {
-  position: absolute; width: 380px; height: 450px;
+  position: absolute; width: 380px; height: 350px;
   background: var(--bg-surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow);
   display: flex; flex-direction: column; z-index: 100;
