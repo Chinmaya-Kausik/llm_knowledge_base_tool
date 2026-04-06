@@ -1137,6 +1137,7 @@ function switchView(name) {
 let chatWs = null;
 let chatSessionId = null;
 let chatGenerating = false;
+let messageQueue = []; // Queue messages sent while generating
 let currentAssistantEl = null;
 let currentThinkingEl = null;
 let currentThinkingWrapper = null;
@@ -1316,7 +1317,7 @@ function initChat() {
   // Send message
   sendBtn.onclick = () => sendChatMessage();
   input.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); console.log('Enter pressed, calling sendChatMessage'); sendChatMessage(); }
   };
 
   // Context level dropdown
@@ -1597,8 +1598,17 @@ function connectChat() {
 function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  console.log('sendChatMessage:', { text: text.slice(0, 30), checkpointMode, wsOpen: chatWs?.readyState === WebSocket.OPEN, redirectSnapshotSize: redirectSnapshot.size });
-  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) { console.log('BLOCKED: WebSocket not open'); return; }
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+
+  // If currently generating, queue the message
+  if (chatGenerating) {
+    if (text) {
+      messageQueue.push(text);
+      input.value = '';
+      appendChatMessage('user', text + ' (queued)');
+    }
+    return;
+  }
 
   // Build the actual message — might include redirect context
   let fullText = text;
@@ -1641,23 +1651,16 @@ function sendChatMessage() {
   document.getElementById('chat-stop').style.display = 'none'; // Hidden — Redirect handles stopping
   document.getElementById('chat-redirect').style.display = '';
 
-  // Prepare assistant message area
+  // Show "Sending..." immediately, status bar appears on first event
   currentAssistantEl = document.createElement('div');
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+  currentAssistantEl.innerHTML = '<span class="chat-sending" style="font-size:11px;color:var(--text-muted)">Sending...</span>';
+  document.getElementById('chat-messages').appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
+  chatStartTime = null; // Set when first event arrives
 
-  // Status bar with elapsed time
-  const statusBar = document.createElement('div');
-  statusBar.className = 'chat-status-bar';
-  statusBar.id = 'chat-active-status';
-  const statusWord = randomPonderingWord();
-  statusBar.innerHTML = `<span class="pondering">${statusWord}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
-  currentAssistantEl.appendChild(statusBar);
-
-  document.getElementById('chat-messages').appendChild(currentAssistantEl);
-
-  // Update elapsed timer
+  // Timer updates once started
   clearInterval(chatTimerInterval);
   chatTimerInterval = setInterval(() => {
     const el = document.getElementById('chat-elapsed');
@@ -1777,11 +1780,19 @@ function handleChatEvent(msg) {
 
   if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
 
-  // Ensure we have an assistant element for content
-  if (!currentAssistantEl && ['thinking', 'text', 'tool_use', 'tool_result', 'result'].includes(msg.type)) {
-    currentAssistantEl = document.createElement('div');
-    currentAssistantEl.className = 'chat-msg chat-msg-assistant';
-    document.getElementById('chat-messages').appendChild(currentAssistantEl);
+  // On first content event, replace "Sending..." with status bar
+  const contentTypes = ['thinking', 'text', 'tool_use', 'tool_result', 'result', 'subagent_started'];
+  if (currentAssistantEl && contentTypes.includes(msg.type) && !chatStartTime) {
+    chatStartTime = Date.now();
+    // Remove "Sending..." placeholder
+    const sending = currentAssistantEl.querySelector('.chat-sending');
+    if (sending) sending.remove();
+    // Add status bar
+    const statusBar = document.createElement('div');
+    statusBar.className = 'chat-status-bar';
+    statusBar.id = 'chat-active-status';
+    statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
+    currentAssistantEl.insertBefore(statusBar, currentAssistantEl.firstChild);
   }
 
   switch (msg.type) {
@@ -2153,6 +2164,14 @@ function handleChatEvent(msg) {
       currentActivityGroup = null;
       activeSubagents.clear();
       chatStartTime = null;
+
+      // Process queued messages
+      if (messageQueue.length > 0) {
+        const nextMsg = messageQueue.shift();
+        const input = document.getElementById('chat-input');
+        input.value = nextMsg;
+        setTimeout(() => sendChatMessage(), 100);
+      }
       break;
 
     case 'result':
@@ -2445,6 +2464,12 @@ async function init() {
     const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
 
     if (e.key === 'Escape') {
+      // Stop chat generation first
+      if (chatGenerating && chatWs && chatWs.readyState === WebSocket.OPEN) {
+        chatWs.send(JSON.stringify({ type: 'stop' }));
+        return;
+      }
+      if (checkpointMode) { exitCheckpointMode(); return; }
       if (expandedCard) { collapseFullPage(); return; }
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }
