@@ -62,6 +62,7 @@ function initCanvas() {
   zoomBehavior = d3.zoom()
     .scaleExtent([0.05, 2])
     .filter(event => {
+      if (event.target.closest('.floating-chat-panel')) return false;
       if (event.type === 'wheel' && event.target.closest('.doc-body')) return false;
       if (event.type === 'wheel' && event.target.closest('.doc-edit-area')) return false;
       const isStart = event.type === 'mousedown' || event.type === 'pointerdown' || event.type === 'touchstart';
