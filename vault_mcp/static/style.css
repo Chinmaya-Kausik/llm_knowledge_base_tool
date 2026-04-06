@@ -700,7 +700,9 @@ body {
 .chat-text pre code { padding: 0; background: none; }
 .chat-text ul, .chat-text ol { padding-left: 18px; margin: 4px 0; }
 .chat-text a { color: var(--accent); }
-.chat-text h1, .chat-text h2, .chat-text h3 { color: var(--text-bright); margin: 8px 0 4px; }
+.chat-text h1 { font-size: 16px; color: var(--text-bright); margin: 8px 0 4px; }
+.chat-text h2 { font-size: 14px; color: var(--text-bright); margin: 8px 0 4px; }
+.chat-text h3 { font-size: 13px; color: var(--text-bright); margin: 6px 0 3px; }
 .chat-text blockquote { border-left: 2px solid var(--accent); padding-left: 8px; color: var(--text-muted); }
 .chat-text table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
 .chat-text th, .chat-text td { border: 1px solid var(--border); padding: 4px 8px; }
