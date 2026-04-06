@@ -831,7 +831,18 @@ async function toggleFullPageEdit(overlay, path) {
   }
 }
 
-function collapseFullPage() { if (expandedCard) { expandedCard.remove(); expandedCard = null; } }
+let fullpageReturnView = null; // View to return to when closing fullpage
+
+function collapseFullPage() {
+  if (expandedCard) {
+    expandedCard.remove();
+    expandedCard = null;
+    if (fullpageReturnView) {
+      switchView(fullpageReturnView);
+      fullpageReturnView = null;
+    }
+  }
+}
 
 // ========================================
 // Layout persistence
@@ -1022,7 +1033,11 @@ let filesTreeData = null;
 let filesMode = 'tree'; // 'tree' or 'tiles'
 let filesTilePath = []; // breadcrumb path for tile navigation
 
+let filesInitialized = false;
+
 async function initFilesView() {
+  // Don't re-render if already initialized (preserves tree expand state)
+  if (filesInitialized) return;
   filesTreeData = await api.tree();
 
   // Wire mode toggles
@@ -1030,6 +1045,7 @@ async function initFilesView() {
   document.getElementById('files-mode-tiles').onclick = () => setFilesMode('tiles');
 
   setFilesMode(filesMode);
+  filesInitialized = true;
 }
 
 function setFilesMode(mode) {
@@ -1167,11 +1183,10 @@ function fileIcon(name) {
 }
 
 function openFileItem(item) {
-  switchView('graph');
+  fullpageReturnView = 'files';
   const card = cardElements.get(item.id);
   if (card) expandCardFullPage(card);
   else {
-    // Create a temporary card reference to open fullpage
     const fakeCard = document.createElement('div');
     fakeCard.dataset.path = item.id;
     const nd = nodeById(item.id);
