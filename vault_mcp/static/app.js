@@ -3674,6 +3674,9 @@ async function init() {
 
   document.getElementById('btn-auto-layout').onclick = autoLayout;
   document.getElementById('btn-fit').onclick = fitView;
+  document.getElementById('sidebar-toggle').onclick = () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  };
   initSettings();
 
   document.addEventListener('keydown', (e) => {
