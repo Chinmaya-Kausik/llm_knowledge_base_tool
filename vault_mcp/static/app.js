@@ -23,7 +23,8 @@ const DEFAULT_KEYBINDINGS = {
   'nav-back':       { key: '[', mod: true, label: 'Navigate back' },
   'nav-forward':    { key: ']', mod: true, label: 'Drill into folder' },
   'show-shortcuts': { key: 'k', mod: true, label: 'Show shortcuts' },
-  'focus-chat':     { key: 'j', mod: true, label: 'Focus chat input' },
+  'cycle-chat-focus': { key: 'j', mod: true, label: 'Cycle chat focus' },
+  'cycle-chat-solo':  { key: '/', mod: true, label: 'Solo cycle chats' },
   'new-terminal':   { key: '`', mod: true, label: 'New terminal' },
 };
 
@@ -1690,6 +1691,25 @@ syncFromPanel(activePanel);
 
 // --- Panel management ---
 let panelCounter = 0;
+let chatFocusHistory = ['main']; // Ordered by recency of focus
+let chatCycleIndex = -1;
+
+function focusChatPanel(panelId) {
+  if (panelId === 'main') {
+    const cp = document.getElementById('chat-panel');
+    if (!cp.classList.contains('chat-bottom') && !cp.classList.contains('chat-right') && !cp.classList.contains('chat-float')) {
+      const ph = document.querySelector('#chat-header .panel-header');
+      if (ph) ph.click();
+    }
+    setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+  } else {
+    const p = chatPanels.get(panelId);
+    if (p?.container) {
+      p.container.classList.remove('minimized');
+      setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
+    }
+  }
+}
 
 function dockPanel(panelId, action) {
   const panel = chatPanels.get(panelId);
@@ -2183,6 +2203,11 @@ function createFloatingPanel(options = {}) {
     }, 100);
   };
 
+  input.addEventListener('focus', () => {
+    chatFocusHistory = chatFocusHistory.filter(id => id !== panelId);
+    chatFocusHistory.unshift(panelId);
+    chatCycleIndex = -1;
+  });
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
   };
@@ -2595,6 +2620,13 @@ function initChat() {
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+  });
+
+  // Track focus for Cmd+J cycling
+  input.addEventListener('focus', () => {
+    chatFocusHistory = chatFocusHistory.filter(id => id !== 'main');
+    chatFocusHistory.unshift('main');
+    chatCycleIndex = -1;
   });
 
   // Send message
@@ -4138,15 +4170,37 @@ async function init() {
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
-    if (matchesBinding(e, 'focus-chat')) {
+    // Cmd+J: cycle focus between chat inputs (in visit order)
+    if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
-      // Focus main chat input, expand if collapsed
-      const cp = document.getElementById('chat-panel');
-      if (cp.classList.contains('chat-collapsed') || cp.classList.contains('chat-collapsed-right') || cp.classList.contains('chat-collapsed-float')) {
-        const ph = document.querySelector('#chat-header .panel-header');
-        if (ph) ph.click();
+      const alive = chatFocusHistory.filter(id => chatPanels.has(id));
+      if (!alive.length) return;
+      chatCycleIndex = (chatCycleIndex + 1) % alive.length;
+      const targetId = alive[chatCycleIndex];
+      focusChatPanel(targetId);
+      return;
+    }
+    // Cmd+/: solo cycle — open target, minimize others
+    if (matchesBinding(e, 'cycle-chat-solo')) {
+      e.preventDefault();
+      const alive = chatFocusHistory.filter(id => chatPanels.has(id));
+      if (!alive.length) return;
+      chatCycleIndex = (chatCycleIndex + 1) % alive.length;
+      const targetId = alive[chatCycleIndex];
+      // Minimize all others
+      for (const [id, p] of chatPanels) {
+        if (id === targetId) continue;
+        if (id === 'main') {
+          const cp = document.getElementById('chat-panel');
+          if (cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float')) {
+            const ph = document.querySelector('#chat-header .panel-header');
+            if (ph) ph.click();
+          }
+        } else if (p.container) {
+          p.container.classList.add('minimized');
+        }
       }
-      setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+      focusChatPanel(targetId);
       return;
     }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
