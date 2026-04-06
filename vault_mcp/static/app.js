@@ -1909,7 +1909,8 @@ function handleChatEvent(msg) {
 
       function doRedirect() {
         if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
-        // Build context with other agents' prompts for proper restart
+
+        // Build context with other agents' full history for seamless restart
         const otherAgents = [];
         for (const [tid, sub] of activeSubagents) {
           if (tid !== taskId) {
@@ -1918,12 +1919,14 @@ function handleChatEvent(msg) {
             otherAgents.push({ desc: desc2, prompt: prompt2 });
           }
         }
+
         const input = document.getElementById('chat-input');
         let prefill = `The subagent "${subDesc}" was going in the wrong direction. Instead, `;
+
         if (otherAgents.length > 0) {
-          prefill += '\n\nThe following other agents were running and should be restarted with their original tasks:\n';
+          prefill += '\n\nThe following other agents were running and should be restarted to continue exactly where they left off. They had the following original prompts — the conversation history already contains their full progress (thinking traces, tool calls, and results), so they should pick up seamlessly:\n';
           for (const oa of otherAgents) {
-            prefill += `- "${oa.desc}"${oa.prompt ? ': ' + oa.prompt.slice(0, 100) : ''}\n`;
+            prefill += `- "${oa.desc}"${oa.prompt ? ': ' + oa.prompt.slice(0, 200) : ''}\n`;
           }
         }
         input.value = prefill;
@@ -1941,16 +1944,8 @@ function handleChatEvent(msg) {
         subHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
       });
 
-      const stopBar = document.createElement('div');
-      stopBar.className = 'subagent-redirect-bar';
-      stopBar.innerHTML = '<button class="subagent-redirect">Redirect</button>';
-      stopBar.querySelector('button').addEventListener('click', (e) => {
-        e.stopPropagation(); doRedirect();
-      });
-
       subEl.appendChild(subHeader);
       subEl.appendChild(subBody);
-      subEl.appendChild(stopBar);
       currentAssistantEl.appendChild(subEl);
       activeSubagents.set(taskId, {
         el: subEl, body: subBody, header: subHeader,
@@ -2029,7 +2024,11 @@ function handleChatEvent(msg) {
       break;
 
     case 'result':
-      // Only render result if we haven't already streamed the text
+      // Use result as authoritative text if we missed streaming
+      if (msg.content && !currentResponseText) {
+        currentResponseText = msg.content;
+      }
+      // Only render if we haven't already streamed the text
       if (currentAssistantEl && msg.content) {
         let textEl = currentAssistantEl.querySelector('.chat-text');
         if (!textEl) {
@@ -2041,7 +2040,6 @@ function handleChatEvent(msg) {
             el.onclick = () => focusCardByTitle(el.dataset.target);
           });
         }
-        // If textEl exists, we already have streamed content — don't overwrite
       }
       break;
 
