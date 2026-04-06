@@ -1597,11 +1597,10 @@ function sendChatMessage() {
   let fullText = text;
 
   if (checkpointMode) {
-    // Build redirect context with truncated progress per agent
     fullText = buildRedirectMessage(text);
     exitCheckpointMode();
     if (!fullText) return;
-  } else if (!text) {
+  } else if (!text && !pendingSelection?.text) {
     return;
   }
 

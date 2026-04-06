@@ -736,7 +736,8 @@ body {
   padding: 4px 12px; border-radius: var(--radius); cursor: pointer;
 }
 #chat-send:hover { border-color: var(--accent); color: var(--accent); }
-#chat-stop { border-color: var(--red); color: var(--red); }
+#chat-stop { border-color: var(--red); color: var(--red); font-size: 10px; padding: 3px 8px; opacity: 0.7; }
+#chat-stop:hover { opacity: 1; }
 
 /* Selection tooltip */
 #selection-tooltip {
