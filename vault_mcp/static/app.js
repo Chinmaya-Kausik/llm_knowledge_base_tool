@@ -4164,7 +4164,6 @@ async function init() {
     if (matchesBinding(e, 'view-health')) { e.preventDefault(); switchView('health'); return; }
     if (matchesBinding(e, 'toggle-tree-tile') && !inInput) { e.preventDefault(); if (filesInitialized) setFilesMode(filesMode === 'tree' ? 'tiles' : 'tree'); return; }
     if (matchesBinding(e, 'toggle-sidebar') && !inInput) { e.preventDefault(); document.getElementById('sidebar').classList.toggle('collapsed'); return; }
-    if (matchesBinding(e, 'toggle-chat')) { e.preventDefault(); const ph = document.querySelector('#chat-header .panel-header'); if (ph) ph.click(); return; }
     if (matchesBinding(e, 'new-chat') && !inInput) { e.preventDefault(); createFloatingPanel(); return; }
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
@@ -4187,7 +4186,6 @@ async function init() {
       if (!alive.length) return;
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
       const targetId = alive[chatCycleIndex];
-      // Minimize/collapse all others
       for (const [id, p] of chatPanels) {
         if (id === targetId) continue;
         if (id === 'main') {
@@ -4205,6 +4203,7 @@ async function init() {
       focusChatPanel(targetId);
       return;
     }
+    if (matchesBinding(e, 'toggle-chat')) { e.preventDefault(); const ph = document.querySelector('#chat-header .panel-header'); if (ph) ph.click(); return; }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
     if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
     if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
