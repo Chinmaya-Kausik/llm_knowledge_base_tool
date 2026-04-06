@@ -624,42 +624,84 @@ async def websocket_chat(websocket: WebSocket):
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     import pty, os, signal, fcntl
+    import logging
+    log = logging.getLogger("terminal")
+    log.setLevel(logging.DEBUG)
+    if not log.handlers:
+        log.addHandler(logging.StreamHandler())
+
     await websocket.accept()
+    log.info("Terminal WebSocket accepted")
 
     shell = os.environ.get("SHELL", "/bin/zsh")
+    log.info(f"Shell: {shell}, CWD: {VAULT_ROOT}")
 
-    # Use pty.fork() for proper controlling terminal
-    child_pid, master_fd = pty.fork()
+    try:
+        child_pid, master_fd = pty.fork()
+    except Exception as e:
+        log.error(f"pty.fork() failed: {e}")
+        await websocket.send_text(f"pty.fork() failed: {e}\r\n")
+        await websocket.close()
+        return
+
     if child_pid == 0:
-        # Child process — exec the shell
-        os.chdir(str(VAULT_ROOT))
-        os.execvp(shell, [shell, "-l"])
-        os._exit(1)  # Shouldn't reach here
+        # Child process
+        try:
+            os.chdir(str(VAULT_ROOT))
+            os.execvp(shell, [shell, "-l"])
+        except Exception:
+            os._exit(1)
 
-    # Parent — set non-blocking
+    log.info(f"Child PID: {child_pid}, Master FD: {master_fd}")
+
+    # Check child is alive
+    try:
+        pid, status = os.waitpid(child_pid, os.WNOHANG)
+        log.info(f"waitpid immediately: pid={pid}, status={status}")
+        if pid != 0:
+            log.error(f"Child exited immediately with status {status}")
+            await websocket.send_text(f"Shell exited immediately (status {status})\r\n")
+            await websocket.close()
+            os.close(master_fd)
+            return
+    except ChildProcessError as e:
+        log.error(f"waitpid error: {e}")
+        await websocket.send_text(f"waitpid error: {e}\r\n")
+        await websocket.close()
+        os.close(master_fd)
+        return
+
     fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+    log.info("Set master_fd non-blocking, starting read loop")
 
     try:
         async def read_pty():
+            log.info("read_pty started")
             while True:
                 await asyncio.sleep(0.01)
                 try:
                     data = os.read(master_fd, 4096)
                     if data:
+                        log.debug(f"PTY read {len(data)} bytes")
                         await websocket.send_bytes(data)
-                except (OSError, BlockingIOError):
-                    # Check if child exited
+                except BlockingIOError:
+                    pass
+                except OSError as e:
+                    log.warning(f"PTY read OSError: {e}")
                     try:
                         pid, status = os.waitpid(child_pid, os.WNOHANG)
                         if pid != 0:
+                            log.info(f"Child exited: pid={pid}, status={status}")
                             break
                     except ChildProcessError:
+                        log.info("Child process gone")
                         break
 
         read_task = asyncio.create_task(read_pty())
 
         while True:
             msg = await websocket.receive()
+            log.debug(f"WS receive: type={msg.get('type')}")
             if msg["type"] == "websocket.receive":
                 if "bytes" in msg:
                     os.write(master_fd, msg["bytes"])
@@ -671,15 +713,19 @@ async def websocket_terminal(websocket: WebSocket):
                             import struct, termios
                             winsize = struct.pack("HHHH", int(rows), int(cols), 0, 0)
                             fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
-                        except Exception:
-                            pass
+                            log.info(f"Resized to {cols}x{rows}")
+                        except Exception as e:
+                            log.warning(f"Resize failed: {e}")
                     else:
                         os.write(master_fd, text.encode())
             elif msg["type"] == "websocket.disconnect":
+                log.info("WebSocket disconnected")
                 break
 
     except WebSocketDisconnect:
-        pass
+        log.info("WebSocket disconnect exception")
+    except Exception as e:
+        log.error(f"Terminal error: {e}")
     finally:
         read_task.cancel()
         try:
@@ -690,6 +736,7 @@ async def websocket_terminal(websocket: WebSocket):
             os.close(master_fd)
         except OSError:
             pass
+        log.info("Terminal session cleaned up")
 
 
 # --- Media serving (downloaded images) ---
