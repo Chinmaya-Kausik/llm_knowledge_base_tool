@@ -53,26 +53,9 @@ def get_filetype_category(path: Path) -> str:
 def get_page_title(path: Path, vault_root: Path) -> str:
     """Get the display title for a page (folder or file).
 
-    For folders: reads title from README.md frontmatter, falls back to folder name.
-    For files: reads title from frontmatter (if markdown), falls back to filename.
+    Uses the folder/file name directly. This is what wiki-links resolve against.
     """
-    if path.is_dir():
-        readme = path / "README.md"
-        if readme.exists():
-            try:
-                meta, _ = read_frontmatter(readme)
-                return meta.get("title", path.name)
-            except Exception:
-                pass
-        return path.name
-    else:
-        if path.suffix == ".md":
-            try:
-                meta, _ = read_frontmatter(path)
-                return meta.get("title", path.stem)
-            except Exception:
-                pass
-        return path.name
+    return path.name
 
 
 def get_page_content(path: Path) -> str:
@@ -202,13 +185,21 @@ def walk_pages(vault_root: Path, include_hidden: bool = False) -> list[dict[str,
 def resolve_wiki_link(target: str, pages: list[dict]) -> str | None:
     """Resolve a [[wiki-link]] target to a page ID.
 
-    Matches against page titles (case-insensitive) and folder/file names.
+    Matches against:
+    1. Full or partial path (e.g., [[wiki/attention]] or [[projects/data-pipeline]])
+    2. Folder/file name (e.g., [[attention]]) — first match wins
+    All case-insensitive.
     """
     target_lower = target.lower()
+    # Try path match first (most specific)
     for page in pages:
-        if page["title"].lower() == target_lower:
+        if page["id"].lower() == target_lower or page["path"].lower() == target_lower:
             return page["id"]
-        # Also match folder/file name
+        # Partial path suffix match (e.g., "wiki/attention" matches "wiki/attention")
+        if page["id"].lower().endswith("/" + target_lower) or page["id"].lower() == target_lower:
+            return page["id"]
+    # Fall back to name/stem match
+    for page in pages:
         name = Path(page["path"]).name.lower()
         stem = Path(page["path"]).stem.lower()
         if name == target_lower or stem == target_lower:

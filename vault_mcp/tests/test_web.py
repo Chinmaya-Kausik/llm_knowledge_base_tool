@@ -47,18 +47,18 @@ def vault_app(tmp_path):
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "source_hash": src_hash, "compiler_model": "claude",
         "compiler_prompt_version": "v1", "sources": [{"path": "raw/inbox/src.md", "hash": src_hash}],
-        "tags": ["machine-learning"], "related": ["[[Beta]]"],
+        "tags": ["machine-learning"], "related": ["[[beta]]"],
         "aliases": ["A"], "confidence": "high",
-    }, "# Alpha\n\nLinks to [[Beta]].\n")
+    }, "# Alpha\n\nLinks to [[beta]].\n")
 
     write_frontmatter(root / "wiki" / "concepts" / "beta.md", {
         "title": "Beta", "type": "concept", "status": "compiled",
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "source_hash": "xyz", "compiler_model": "claude",
         "compiler_prompt_version": "v1", "sources": [],
-        "tags": ["machine-learning"], "related": ["[[Alpha]]"],
+        "tags": ["machine-learning"], "related": ["[[alpha]]"],
         "aliases": [], "confidence": "medium",
-    }, "# Beta\n\nLinks to [[Alpha]].\n")
+    }, "# Beta\n\nLinks to [[alpha]].\n")
 
     import vault_mcp.web as web_module
     original_root = web_module.VAULT_ROOT
@@ -83,8 +83,8 @@ def test_graph_nodes_and_edges(vault_app):
     assert len(data["edges"]) >= 2  # Alpha↔Beta links
     # Check node structure
     node_labels = {n["data"]["label"] for n in data["nodes"]}
-    assert "Alpha" in node_labels
-    assert "Beta" in node_labels
+    assert "alpha.md" in node_labels
+    assert "beta.md" in node_labels
 
 
 def test_registry(vault_app):

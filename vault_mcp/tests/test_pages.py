@@ -32,8 +32,8 @@ def _make_vault(tmp: str) -> Path:
     attn.mkdir()
     write_frontmatter(attn / "README.md", {
         "title": "Attention Mechanisms", "type": "concept", "tags": ["ml"],
-        "related": ["[[Transformers Project]]"],
-    }, "# Attention Mechanisms\n\nCore concept. See [[Transformers Project]].\n")
+        "related": ["[[transformers-app]]"],
+    }, "# Attention Mechanisms\n\nCore concept. See [[transformers-app]].\n")
 
     # Project folder
     proj = root / "projects"
@@ -44,7 +44,7 @@ def _make_vault(tmp: str) -> Path:
     app.mkdir()
     write_frontmatter(app / "README.md", {
         "title": "Transformers Project", "type": "project", "tags": ["ml", "code"],
-    }, "# Transformers Project\n\nUses [[Attention Mechanisms]].\n")
+    }, "# Transformers Project\n\nUses [[attention]].\n")
 
     # Code file inside project
     (app / "main.py").write_text("# Main entry point\ndef train(): pass\n")
@@ -101,7 +101,7 @@ def test_page_title_folder_with_readme():
     with tempfile.TemporaryDirectory() as tmp:
         vault = _make_vault(tmp)
         title = get_page_title(vault / "wiki" / "attention", vault)
-        assert title == "Attention Mechanisms"
+        assert title == "attention"
 
 def test_page_title_folder_without_readme():
     with tempfile.TemporaryDirectory() as tmp:
@@ -123,7 +123,7 @@ def test_page_content_folder():
     with tempfile.TemporaryDirectory() as tmp:
         vault = _make_vault(tmp)
         content = get_page_content(vault / "wiki" / "attention")
-        assert "Attention Mechanisms" in content
+        assert "Attention" in content
 
 def test_page_content_file():
     with tempfile.TemporaryDirectory() as tmp:
@@ -214,11 +214,11 @@ def test_walk_page_metadata():
 
 # --- resolve_wiki_link ---
 
-def test_resolve_by_title():
+def test_resolve_by_name():
     with tempfile.TemporaryDirectory() as tmp:
         vault = _make_vault(tmp)
         pages = walk_pages(vault)
-        result = resolve_wiki_link("Attention Mechanisms", pages)
+        result = resolve_wiki_link("attention", pages)
         assert result == "wiki/attention"
 
 def test_resolve_by_folder_name():
@@ -232,7 +232,7 @@ def test_resolve_case_insensitive():
     with tempfile.TemporaryDirectory() as tmp:
         vault = _make_vault(tmp)
         pages = walk_pages(vault)
-        result = resolve_wiki_link("attention mechanisms", pages)
+        result = resolve_wiki_link("Attention", pages)
         assert result == "wiki/attention"
 
 def test_resolve_not_found():
