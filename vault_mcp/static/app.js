@@ -1483,6 +1483,85 @@ syncFromPanel(activePanel);
 // --- Panel management ---
 let panelCounter = 0;
 
+function dockPanel(panelId, action) {
+  const panel = chatPanels.get(panelId);
+  if (!panel) return;
+  const chatPanelEl = document.getElementById('chat-panel');
+  const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
+
+  if (panelId !== 'main') {
+    const mainP = chatPanels.get('main');
+    syncToPanel(activePanel);
+
+    // Pop out current main as floating (if it has content)
+    if (mainP.messages.length > 0) {
+      const mainLabel = document.querySelector('#chat-header .panel-label')?.textContent || 'Chat';
+      const poppedPanel = createFloatingPanel({ fork: false, label: mainLabel });
+      if (poppedPanel) {
+        poppedPanel.messages = [...mainP.messages];
+        poppedPanel.ws = mainP.ws;
+        poppedPanel.sessionId = mainP.sessionId;
+        poppedPanel.model = mainP.model;
+        poppedPanel.contextLevel = mainP.contextLevel;
+        poppedPanel.contextPath = mainP.contextPath;
+        const poppedMsgs = poppedPanel.container?.querySelector('.fcp-messages');
+        if (poppedMsgs) {
+          poppedMsgs.innerHTML = '';
+          for (const msg of poppedPanel.messages) {
+            if (msg.role === 'user' || msg.role === 'assistant') {
+              const el = document.createElement('div');
+              el.className = `chat-msg chat-msg-${msg.role}`;
+              el.textContent = msg.content?.slice(0, 200) || '';
+              poppedMsgs.appendChild(el);
+            }
+          }
+        }
+      }
+    }
+
+    // Transfer docking panel's state + label to main
+    mainP.ws = panel.ws;
+    mainP.sessionId = panel.sessionId;
+    mainP.messages = [...panel.messages];
+    mainP.model = panel.model;
+    mainP.contextLevel = panel.contextLevel;
+    mainP.contextPath = panel.contextPath;
+    // Update main panel's label to match the docking panel
+    const dockingLabel = panel.container?.querySelector('.panel-label')?.textContent;
+    const mainLabelEl = document.querySelector('#chat-header .panel-label');
+    if (dockingLabel && mainLabelEl) mainLabelEl.textContent = dockingLabel;
+
+    // Re-render main messages
+    const messagesEl = document.getElementById('chat-messages');
+    messagesEl.innerHTML = '';
+    for (const msg of panel.messages) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        const el = document.createElement('div');
+        el.className = `chat-msg chat-msg-${msg.role}`;
+        if (msg.role === 'assistant') el.innerHTML = marked.parse(msg.content || '');
+        else el.textContent = msg.content || '';
+        messagesEl.appendChild(el);
+      }
+    }
+
+    // Remove the floating panel
+    chatPanels.delete(panelId);
+    if (panel.container) panel.container.remove();
+
+    activePanel = mainP;
+    syncFromPanel(mainP);
+  }
+
+  // Set dock mode
+  allStates.forEach(c => chatPanelEl.classList.remove(c));
+  chatPanelEl.removeAttribute('style');
+  if (action === 'dock-right') chatPanelEl.classList.add('chat-right');
+  else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
+  else chatPanelEl.classList.add('chat-float');
+
+  if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
+}
+
 function createPanelHeader(panelId, label = 'Chat') {
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
@@ -1611,84 +1690,7 @@ function createPanelHeader(panelId, label = 'Chat') {
       renderMenu();
       closeMenu = false;
     } else if (action === 'dock-right' || action === 'dock-bottom' || action === 'float') {
-      const chatPanelEl = document.getElementById('chat-panel');
-      const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
-
-      if (panelId !== 'main') {
-        // Floating panel wants to dock — swap with main
-        const mainP = chatPanels.get('main');
-        syncToPanel(activePanel);
-
-        // Pop out current main as floating (if it has content)
-        if (mainP.messages.length > 0) {
-          const poppedPanel = createFloatingPanel({ fork: false });
-          if (poppedPanel) {
-            poppedPanel.messages = [...mainP.messages];
-            poppedPanel.ws = mainP.ws;
-            poppedPanel.sessionId = mainP.sessionId;
-            poppedPanel.model = mainP.model;
-            poppedPanel.contextLevel = mainP.contextLevel;
-            poppedPanel.contextPath = mainP.contextPath;
-            // Re-render popped panel messages
-            const poppedMsgs = poppedPanel.container?.querySelector('.fcp-messages');
-            if (poppedMsgs) {
-              poppedMsgs.innerHTML = '';
-              for (const msg of poppedPanel.messages) {
-                if (msg.role === 'user' || msg.role === 'assistant') {
-                  const el = document.createElement('div');
-                  el.className = `chat-msg chat-msg-${msg.role}`;
-                  el.textContent = msg.content?.slice(0, 200) || '';
-                  poppedMsgs.appendChild(el);
-                }
-              }
-            }
-          }
-        }
-
-        // Transfer docking panel's state to main
-        mainP.ws = panel.ws;
-        mainP.sessionId = panel.sessionId;
-        mainP.messages = [...panel.messages];
-        mainP.model = panel.model;
-        mainP.contextLevel = panel.contextLevel;
-        mainP.contextPath = panel.contextPath;
-
-        // Re-render main messages
-        const messagesEl = document.getElementById('chat-messages');
-        messagesEl.innerHTML = '';
-        for (const msg of panel.messages) {
-          if (msg.role === 'user' || msg.role === 'assistant') {
-            const el = document.createElement('div');
-            el.className = `chat-msg chat-msg-${msg.role}`;
-            if (msg.role === 'assistant') el.innerHTML = marked.parse(msg.content || '');
-            else el.textContent = msg.content || '';
-            messagesEl.appendChild(el);
-          }
-        }
-
-        // Remove the floating panel that just docked
-        chatPanels.delete(panelId);
-        if (panel.container) panel.container.remove();
-
-        // Set main as active
-        activePanel = mainP;
-        syncFromPanel(mainP);
-      }
-
-      // Set dock mode on main panel — clear inline positioning from float/drag
-      allStates.forEach(c => chatPanelEl.classList.remove(c));
-      chatPanelEl.style.left = '';
-      chatPanelEl.style.top = '';
-      chatPanelEl.style.right = '';
-      chatPanelEl.style.bottom = '';
-      chatPanelEl.style.width = '';
-      chatPanelEl.style.height = '';
-      chatPanelEl.style.inset = '';
-      if (action === 'dock-right') chatPanelEl.classList.add('chat-right');
-      else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
-      else chatPanelEl.classList.add('chat-float');
-
-      if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
+      dockPanel(panelId, action);
     } else if (action === 'clear') {
       syncToPanel(activePanel);
       activePanel = panel;
@@ -1791,7 +1793,7 @@ function createPanelHeader(panelId, label = 'Chat') {
 function createFloatingPanel(options = {}) {
   if (chatPanels.size >= 6) { alert('Max 6 chat panels'); return null; }
   const panelId = 'panel-' + (++panelCounter);
-  const label = options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`;
+  const label = options.label || (options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`);
   const panel = new ChatPanel(null, {
     sessionId: crypto.randomUUID(),
     messages: options.fork ? [...activePanel.messages] : [],
@@ -1913,14 +1915,10 @@ function createFloatingPanel(options = {}) {
       // Proximity dock: snap if dragged near edges
       const snapDist = 40;
       const vw = window.innerWidth, vh = window.innerHeight;
-      const x = e.clientX, y = e.clientY;
-      if (x > vw - snapDist) {
-        // Near right edge — dock right
-        const menuItem = { dataset: { action: 'dock-right' } };
-        menu.querySelector('[data-action="dock-right"]')?.click();
-      } else if (y > vh - snapDist) {
-        // Near bottom edge — dock bottom
-        menu.querySelector('[data-action="dock-bottom"]')?.click();
+      if (e.clientX > vw - snapDist) {
+        dockPanel(panelId, 'dock-right');
+      } else if (e.clientY > vh - snapDist) {
+        dockPanel(panelId, 'dock-bottom');
       }
     }
     dragReady = false; dragging = false;
@@ -1938,29 +1936,35 @@ function connectPanelChat(panel, messagesEl) {
     panel.ws = new WebSocket(wsUrl);
   } catch (e) { return; }
 
-  panel.ws.onopen = () => {
-    panel.ws.send(JSON.stringify({
+  const thisWs = panel.ws;
+
+  thisWs.onopen = () => {
+    thisWs.send(JSON.stringify({
       type: 'init',
       session_id: panel.sessionId,
       page_path: currentLevel().parentPath || '',
     }));
   };
 
-  panel.ws.onmessage = (e) => {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
+  // Queue events and process them without interleaving with other panels
+  const eventQueue = [];
+  let processing = false;
 
-    // Sync to this panel's state, handle event, sync back
+  function processQueue() {
+    if (processing || eventQueue.length === 0) return;
+    processing = true;
+    const msg = eventQueue.shift();
+
+    // Swap to this panel's state
     const prevActive = activePanel;
     syncToPanel(prevActive);
     activePanel = panel;
     syncFromPanel(panel);
 
-    // For floating panels, redirect DOM operations to panel's messages container
     const mainMessages = document.getElementById('chat-messages');
     handleChatEvent(msg);
 
-    // Move any new assistant elements from main to panel's container
+    // Move any DOM elements that went to main into this panel's container
     if (currentAssistantEl && currentAssistantEl.parentElement === mainMessages) {
       messagesEl.appendChild(currentAssistantEl);
     }
@@ -1968,9 +1972,19 @@ function connectPanelChat(panel, messagesEl) {
     syncToPanel(panel);
     activePanel = prevActive;
     syncFromPanel(prevActive);
+
+    processing = false;
+    if (eventQueue.length > 0) requestAnimationFrame(processQueue);
+  }
+
+  thisWs.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    eventQueue.push(msg);
+    processQueue();
   };
 
-  panel.ws.onclose = () => { panel.ws = null; };
+  thisWs.onclose = () => { if (panel.ws === thisWs) panel.ws = null; };
 }
 
 // Claude Code's actual 187 pondering words — one random word per call
@@ -2305,22 +2319,25 @@ function connectChat() {
     }));
   };
 
-  chatWs.onmessage = (e) => {
+  // Capture the WebSocket in closure so onmessage always finds the right panel
+  const thisWs = chatWs;
+  thisWs.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch (err) { console.error('Chat parse error:', err); return; }
     if (msg.type === 'init') {
       if (statusEl) statusEl.className = 'panel-status connected';
     }
-    // Sync to/from the panel that owns this WebSocket
-    const panel = [...chatPanels.values()].find(p => p.ws === chatWs) || activePanel;
-    syncFromPanel(panel);
+    // Find the panel that owns THIS WebSocket (not the global chatWs)
+    const ownerPanel = [...chatPanels.values()].find(p => p.ws === thisWs) || activePanel;
+    syncFromPanel(ownerPanel);
     handleChatEvent(msg);
-    syncToPanel(panel);
+    syncToPanel(ownerPanel);
   };
 
-  chatWs.onclose = () => {
+  thisWs.onclose = () => {
     if (statusEl) statusEl.className = 'panel-status';
-    chatWs = null;
+    // Only null out global if it's still pointing to this ws
+    if (chatWs === thisWs) chatWs = null;
   };
 
   chatWs.onerror = () => {
