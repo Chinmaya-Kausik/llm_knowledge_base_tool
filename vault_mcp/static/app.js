@@ -1957,11 +1957,10 @@ function createFloatingPanel(options = {}) {
   headerEl.addEventListener('pointerup', (e) => {
     if (dragging) {
       // Proximity dock: snap if dragged near edges
-      const snapDist = 40;
       const vw = window.innerWidth, vh = window.innerHeight;
-      if (e.clientX > vw - snapDist) {
+      if (e.clientX > vw - 40) {
         dockPanel(panelId, 'dock-right');
-      } else if (e.clientY > vh - snapDist) {
+      } else if (e.clientY > vh - 80) {
         dockPanel(panelId, 'dock-bottom');
       }
     }
