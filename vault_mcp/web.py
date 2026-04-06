@@ -623,34 +623,33 @@ async def websocket_chat(websocket: WebSocket):
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
-    import os, signal, fcntl
+    import os, fcntl, traceback
     from ptyprocess import PtyProcess
-    await websocket.accept()
 
-    shell = os.environ.get("SHELL", "/bin/zsh")
     try:
+        await websocket.accept()
+        print("[TERM] accepted", flush=True)
+
+        shell = os.environ.get("SHELL", "/bin/zsh")
         proc = PtyProcess.spawn([shell, "-l"], cwd=str(VAULT_ROOT))
-    except Exception as e:
-        await websocket.send_text(f"Failed to spawn shell: {e}\r\n")
-        await websocket.close()
-        return
+        print(f"[TERM] spawned pid={proc.pid}", flush=True)
 
-    # Set non-blocking
-    fcntl.fcntl(proc.fd, fcntl.F_SETFL, os.O_NONBLOCK)
+        fcntl.fcntl(proc.fd, fcntl.F_SETFL, os.O_NONBLOCK)
 
-    try:
         async def read_pty():
+            print("[TERM] read_pty started", flush=True)
             while proc.isalive():
                 await asyncio.sleep(0.01)
                 try:
-                    data = proc.read(4096)
+                    data = os.read(proc.fd, 4096)
                     if data:
-                        if isinstance(data, str):
-                            data = data.encode()
                         await websocket.send_bytes(data)
-                except (EOFError, OSError, BlockingIOError):
+                except BlockingIOError:
+                    pass
+                except OSError:
                     if not proc.isalive():
                         break
+            print("[TERM] read_pty ended", flush=True)
 
         read_task = asyncio.create_task(read_pty())
 
@@ -658,7 +657,7 @@ async def websocket_terminal(websocket: WebSocket):
             msg = await websocket.receive()
             if msg["type"] == "websocket.receive":
                 if "bytes" in msg:
-                    proc.write(msg["bytes"])
+                    os.write(proc.fd, msg["bytes"])
                 elif "text" in msg:
                     text = msg["text"]
                     if text.startswith("RESIZE:"):
@@ -668,18 +667,26 @@ async def websocket_terminal(websocket: WebSocket):
                         except Exception:
                             pass
                     else:
-                        proc.write(text.encode())
+                        os.write(proc.fd, text.encode())
             elif msg["type"] == "websocket.disconnect":
                 break
 
     except WebSocketDisconnect:
-        pass
-    except Exception:
-        pass
+        print("[TERM] ws disconnect", flush=True)
+    except Exception as e:
+        print(f"[TERM] ERROR: {e}", flush=True)
+        traceback.print_exc()
     finally:
-        read_task.cancel()
-        if proc.isalive():
-            proc.terminate(force=True)
+        try:
+            read_task.cancel()
+        except Exception:
+            pass
+        try:
+            if proc.isalive():
+                proc.terminate(force=True)
+        except Exception:
+            pass
+        print("[TERM] cleaned up", flush=True)
 
 
 # --- Media serving (downloaded images) ---
