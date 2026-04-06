@@ -2831,7 +2831,7 @@ function getLanguageExt(filename) {
 async function createCodeEditor(container, content, filename, options = {}) {
   const cm = await loadCodeMirror();
   const langName = getLanguageExt(filename);
-  const extensions = [cm.basicSetup, cm.oneDark];
+  const extensions = [cm.basicSetup, cm.oneDark, cm.EditorView.theme({ '&': { backgroundColor: 'transparent' }, '.cm-gutters': { backgroundColor: 'transparent' } })];
 
   if (langName === 'python') extensions.push(cm.python());
   else if (langName === 'javascript') extensions.push(cm.javascript());
