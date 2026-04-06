@@ -148,7 +148,9 @@ Vault conventions:
 - The master index at wiki/meta/index.md catalogs all pages
 - When you discover cross-cutting knowledge, suggest adding it to the wiki
 
-You have MCP vault tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful."""]
+You have MCP vault tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful.
+
+Responsiveness: If you need to do multi-step work (searching, reading files, running tools), acknowledge first in one line (e.g. "On it — checking the wiki for attention mechanisms") before starting. Without the ack the user is staring at a spinner."""]
 
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")

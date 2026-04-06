@@ -112,6 +112,36 @@ def test_tree(vault_app):
     assert "wiki" in folder_names
 
 
+def test_tree_structure_for_files_view(vault_app):
+    """Tree data has all fields needed by the Files view (tree + tile modes)."""
+    client, root = vault_app
+    tree = client.get("/api/tree").json()
+
+    # Root node
+    assert tree["type"] == "folder"
+    assert "children" in tree
+
+    def check_node(node, depth=0):
+        assert "id" in node
+        assert "name" in node
+        assert "type" in node
+        assert node["type"] in ("folder", "file")
+        if node["type"] == "folder":
+            assert "children" in node
+            assert isinstance(node["children"], list)
+            for child in node["children"]:
+                check_node(child, depth + 1)
+
+    for child in tree["children"]:
+        check_node(child)
+
+    # Verify we can navigate into wiki folder
+    wiki = next((c for c in tree["children"] if c["name"] == "wiki"), None)
+    assert wiki is not None
+    assert wiki["type"] == "folder"
+    assert len(wiki["children"]) > 0
+
+
 def test_health(vault_app):
     client, root = vault_app
     assert "total_issues" in client.get("/api/health").json()

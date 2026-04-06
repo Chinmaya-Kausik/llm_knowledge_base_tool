@@ -1017,54 +1017,168 @@ function renderTree(items, depth) {
   }).join('');
 }
 
-// --- Other views (tag cloud, health, search, tree expanded) ---
-async function initTreeView() {
-  const treeData = await api.tree();
-  const c = document.getElementById('tree-expanded'); c.innerHTML = '';
+// --- Other views (files, tag cloud, health, search) ---
+let filesTreeData = null;
+let filesMode = 'tree'; // 'tree' or 'tiles'
+let filesTilePath = []; // breadcrumb path for tile navigation
 
-  function renderTreeExpanded(items, depth) {
-    for (const item of items) {
-      if (item.type === 'folder') {
-        const hasContent = item.children && item.children.length > 0;
-        if (!hasContent) continue;
-        const section = document.createElement('div');
-        section.style.marginLeft = (depth * 16) + 'px';
-        section.innerHTML = `<h3 style="font-size:${Math.max(11,13-depth)}px;color:var(--text-muted);margin:8px 0 4px;cursor:pointer">${item.title || item.name}</h3>`;
-        section.querySelector('h3').onclick = () => {
-          switchView('graph');
-          const card = cardElements.get(item.id);
-          if (card) expandCardFullPage(card);
-        };
-        c.appendChild(section);
-        renderTreeExpanded(item.children, depth + 1);
-      } else {
-        const el = document.createElement('div');
-        el.className = 'tree-file-item';
-        el.style.marginLeft = (depth * 16) + 'px';
-        el.textContent = item.title || item.name;
-        el.onclick = () => {
-          switchView('graph');
-          const card = cardElements.get(item.id);
-          if (card) expandCardFullPage(card);
-          else {
-            const nd = nodeById(item.id);
-            if (nd) {
-              const meta = cardMeta.get(item.id);
-              if (meta) {
-                const fakeCard = document.createElement('div');
-                fakeCard.dataset.path = item.id;
-                fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
-                expandCardFullPage(fakeCard);
-              }
-            }
-          }
-        };
-        c.appendChild(el);
-      }
+async function initFilesView() {
+  filesTreeData = await api.tree();
+
+  // Wire mode toggles
+  document.getElementById('files-mode-tree').onclick = () => setFilesMode('tree');
+  document.getElementById('files-mode-tiles').onclick = () => setFilesMode('tiles');
+
+  setFilesMode(filesMode);
+}
+
+function setFilesMode(mode) {
+  filesMode = mode;
+  document.getElementById('files-mode-tree').classList.toggle('active', mode === 'tree');
+  document.getElementById('files-mode-tiles').classList.toggle('active', mode === 'tiles');
+  document.getElementById('files-tree').style.display = mode === 'tree' ? '' : 'none';
+  document.getElementById('files-tiles').style.display = mode === 'tiles' ? '' : 'none';
+
+  if (mode === 'tree') renderFilesTree();
+  else { filesTilePath = []; renderFilesTiles(); }
+}
+
+function renderFilesTree() {
+  const container = document.getElementById('files-tree');
+  container.innerHTML = '';
+  if (!filesTreeData) return;
+  renderTreeItems(container, filesTreeData.children || [], 0);
+}
+
+function renderTreeItems(container, items, depth) {
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = `ftree-item ${item.type}`;
+    row.style.paddingLeft = (12 + depth * 16) + 'px';
+
+    const icon = document.createElement('span');
+    icon.className = 'ftree-icon';
+    icon.textContent = item.type === 'folder' ? '▶' : fileIcon(item.name);
+    row.appendChild(icon);
+
+    const label = document.createElement('span');
+    label.textContent = item.title || item.name;
+    row.appendChild(label);
+
+    container.appendChild(row);
+
+    if (item.type === 'folder' && item.children?.length) {
+      const childContainer = document.createElement('div');
+      childContainer.className = 'ftree-children';
+      renderTreeItems(childContainer, item.children, depth + 1);
+      container.appendChild(childContainer);
+
+      row.onclick = (e) => {
+        e.stopPropagation();
+        childContainer.classList.toggle('open');
+        icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
+      };
+    } else {
+      row.ondblclick = () => openFileItem(item);
     }
   }
+}
 
-  renderTreeExpanded(treeData.children || [], 0);
+function renderFilesTiles() {
+  const container = document.getElementById('files-tiles');
+  container.innerHTML = '';
+  if (!filesTreeData) return;
+
+  // Navigate to current breadcrumb path
+  let currentItems = filesTreeData.children || [];
+  for (const pathSegment of filesTilePath) {
+    const folder = currentItems.find(i => i.name === pathSegment && i.type === 'folder');
+    if (folder) currentItems = folder.children || [];
+    else break;
+  }
+
+  // Update breadcrumbs
+  updateBreadcrumbs();
+
+  // Render tiles — folders first, then files
+  const folders = currentItems.filter(i => i.type === 'folder');
+  const files = currentItems.filter(i => i.type !== 'folder');
+
+  for (const item of [...folders, ...files]) {
+    const tile = document.createElement('div');
+    tile.className = 'file-tile';
+
+    const iconEl = document.createElement('div');
+    iconEl.className = 'file-tile-icon';
+    iconEl.textContent = item.type === 'folder' ? '📁' : fileIcon(item.name);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'file-tile-name' + (item.type === 'folder' ? ' folder-name' : '');
+    nameEl.textContent = item.title || item.name;
+
+    tile.appendChild(iconEl);
+    tile.appendChild(nameEl);
+
+    if (item.type === 'folder') {
+      tile.ondblclick = () => {
+        filesTilePath.push(item.name);
+        renderFilesTiles();
+      };
+    } else {
+      tile.ondblclick = () => openFileItem(item);
+    }
+
+    container.appendChild(tile);
+  }
+}
+
+function updateBreadcrumbs() {
+  const bc = document.getElementById('files-breadcrumbs');
+  bc.innerHTML = '';
+
+  // Root
+  const root = document.createElement('span');
+  root.className = 'breadcrumb-item';
+  root.textContent = 'vault';
+  root.onclick = () => { filesTilePath = []; renderFilesTiles(); };
+  bc.appendChild(root);
+
+  // Path segments
+  for (let i = 0; i < filesTilePath.length; i++) {
+    const sep = document.createElement('span');
+    sep.className = 'breadcrumb-sep';
+    sep.textContent = ' / ';
+    bc.appendChild(sep);
+
+    const crumb = document.createElement('span');
+    crumb.className = 'breadcrumb-item';
+    crumb.textContent = filesTilePath[i];
+    const depth = i;
+    crumb.onclick = () => { filesTilePath = filesTilePath.slice(0, depth + 1); renderFilesTiles(); };
+    bc.appendChild(crumb);
+  }
+}
+
+function fileIcon(name) {
+  if (!name) return '📄';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const icons = { md: '📝', py: '🐍', js: '📜', ts: '📜', json: '📋', yaml: '📋', yml: '📋', pdf: '📕', png: '🖼', jpg: '🖼', jpeg: '🖼', gif: '🖼', svg: '🖼' };
+  return icons[ext] || '📄';
+}
+
+function openFileItem(item) {
+  switchView('graph');
+  const card = cardElements.get(item.id);
+  if (card) expandCardFullPage(card);
+  else {
+    // Create a temporary card reference to open fullpage
+    const fakeCard = document.createElement('div');
+    fakeCard.dataset.path = item.id;
+    const nd = nodeById(item.id);
+    fakeCard.innerHTML = `<span class="doc-title">${nd?.label || item.title || item.name}</span>`;
+    expandCardFullPage(fakeCard);
+  }
+}
   if (!c.children.length) c.innerHTML = '<div class="empty-state">No pages yet</div>';
 }
 async function initTagCloud() {
@@ -1126,7 +1240,7 @@ function switchView(name) {
   document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(`view-${name}`)?.classList.add('active');
   document.querySelector(`.view-tab[data-view="${name}"]`)?.classList.add('active');
-  if (name==='tree') initTreeView();
+  if (name==='files') initFilesView();
   if (name==='tags') initTagCloud();
   if (name==='health') initHealth();
 }
@@ -1158,6 +1272,7 @@ let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool cal
 let wasUserInterrupt = false; // Set when user presses Escape
 let activePlanPath = null; // Path to the active plan file
 let activePlanContent = ''; // Raw markdown of the plan
+let sessionEditedFiles = new Set(); // Files modified by the agent this session
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
@@ -2203,11 +2318,11 @@ function handleChatEvent(msg) {
         pendingAgentPrompt = msg.input.prompt || msg.input.description || null;
       }
 
-      // Detect plan file writes
+      // Track file edits + detect plan file writes
       if ((toolName === 'Write' || toolName === 'Edit') && msg.input) {
         const fp = msg.input.file_path || msg.input.path || '';
+        if (fp) sessionEditedFiles.add(fp);
         if (fp.includes('.claude/plans/') && fp.endsWith('.md')) {
-          // Fetch plan after a short delay (let the write complete)
           setTimeout(() => checkForPlanFile(fp), 500);
         }
       }
@@ -2385,6 +2500,22 @@ function handleChatEvent(msg) {
         }
         document.getElementById('chat-input').focus();
       }
+      // Show file edit notification if agent modified files
+      if (sessionEditedFiles.size > 0 && !wasStopped) {
+        const files = [...sessionEditedFiles];
+        const short = files.map(f => f.split('/').slice(-2).join('/'));
+        const summary = short.length <= 3
+          ? short.join(', ')
+          : `${short.slice(0, 2).join(', ')} +${short.length - 2} more`;
+        const notif = document.createElement('div');
+        notif.className = 'chat-file-notification';
+        notif.textContent = `Modified ${files.length} file${files.length > 1 ? 's' : ''}: ${summary}`;
+        notif.title = files.join('\n');
+        if (currentAssistantEl) currentAssistantEl.appendChild(notif);
+        else document.getElementById('chat-messages').appendChild(notif);
+        sessionEditedFiles.clear();
+      }
+
       // Finalize status bar
       const activeStatus = document.getElementById('chat-active-status');
       if (activeStatus && chatStartTime) {
@@ -2726,6 +2857,30 @@ async function init() {
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }
     if (mod && e.key === 'f') { e.preventDefault(); searchInput.focus(); return; }
+
+    // Ctrl+O: toggle all tool details open/closed
+    if (mod && e.key === 'o' && !inInput) {
+      e.preventDefault();
+      const bodies = document.querySelectorAll('.chat-activity-body, .chat-thinking-body');
+      const anyOpen = [...bodies].some(b => b.classList.contains('open'));
+      bodies.forEach(b => { anyOpen ? b.classList.remove('open') : b.classList.add('open'); });
+      document.querySelectorAll('.chat-thinking-toggle').forEach(t => { anyOpen ? t.classList.remove('open') : t.classList.add('open'); });
+      return;
+    }
+
+    // Alt+P: cycle model
+    if (e.altKey && e.key === 'p') {
+      e.preventDefault();
+      const models = ['sonnet', 'opus', 'haiku'];
+      const btn = document.getElementById('chat-model-btn');
+      const current = btn.textContent.trim().toLowerCase();
+      const idx = models.indexOf(current);
+      const next = models[(idx + 1) % models.length];
+      // Simulate clicking the model option
+      const opt = document.querySelector(`#chat-model-menu .chat-context-opt[data-value="${next}"]`);
+      if (opt) opt.click();
+      return;
+    }
 
     // Canvas shortcuts (only when not typing)
     if (!inInput) {
