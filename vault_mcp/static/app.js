@@ -1762,14 +1762,17 @@ function createPanelHeader(panelId, label = 'Chat') {
 
   header.querySelector('.panel-minimize').onclick = (e) => { e.stopPropagation(); toggleMinimize(); };
 
-  // Header click (not on buttons/menu/label) toggles minimize — but not after a drag
+  // Header click toggles minimize, with delay to allow dblclick to cancel
   let _headerDragged = false;
+  let _clickTimer = null;
   header._setDragged = () => { _headerDragged = true; };
+  header._cancelClick = () => { if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; } };
   header.addEventListener('click', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     if (_headerDragged) { _headerDragged = false; return; }
+    if (_clickTimer) return; // Already waiting
     e.stopPropagation();
-    toggleMinimize();
+    _clickTimer = setTimeout(() => { _clickTimer = null; toggleMinimize(); }, 250);
   });
 
   // Close button
@@ -1986,8 +1989,8 @@ function connectPanelChat(panel, messagesEl) {
 
     handleChatEvent(msg);
 
-    // Save this panel's state back
-    panel.ws = chatWs; panel.sessionId = chatSessionId;
+    // Save this panel's state back (but NOT ws — it's managed separately)
+    panel.sessionId = chatSessionId;
     panel.generating = chatGenerating; panel.assistantEl = currentAssistantEl;
     panel.thinkingEl = currentThinkingEl; panel.thinkingWrapper = currentThinkingWrapper;
     panel.activityGroup = currentActivityGroup; panel.subagents = activeSubagents;
@@ -2089,6 +2092,9 @@ function initChat() {
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     e.stopPropagation();
+    // Cancel the pending single-click minimize
+    const panelHeader = document.querySelector('#chat-header .panel-header');
+    if (panelHeader?._cancelClick) panelHeader._cancelClick();
 
     if (chatMaximized) {
       // Restore previous state
@@ -2453,8 +2459,8 @@ function sendChatMessage() {
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
   const statusBar = document.createElement('div');
   statusBar.className = 'chat-status-bar';
-  statusBar.id = 'chat-active-status';
-  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
+  statusBar.className = 'chat-status-bar chat-active-status';
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
   currentAssistantEl.appendChild(statusBar);
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
@@ -2463,11 +2469,11 @@ function sendChatMessage() {
   // Timer updates once started
   clearInterval(chatTimerInterval);
   chatTimerInterval = setInterval(() => {
-    const el = document.getElementById('chat-elapsed');
+    const el = currentAssistantEl?.querySelector('.chat-elapsed');
     if (el && chatStartTime) {
       el.textContent = ((Date.now() - chatStartTime) / 1000).toFixed(1) + 's';
     }
-    const tokEl = document.getElementById('chat-tokens');
+    const tokEl = currentAssistantEl?.querySelector('.chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
   syncToPanel(chatPanels.get('main'));
@@ -2503,8 +2509,8 @@ function sendQueuedMessage(text) {
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
   const statusBar = document.createElement('div');
   statusBar.className = 'chat-status-bar';
-  statusBar.id = 'chat-active-status';
-  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span id="chat-elapsed">0.0s</span> <span id="chat-tokens">0 tokens</span>`;
+  statusBar.className = 'chat-status-bar chat-active-status';
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
   currentAssistantEl.appendChild(statusBar);
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
@@ -2512,9 +2518,9 @@ function sendQueuedMessage(text) {
 
   clearInterval(chatTimerInterval);
   chatTimerInterval = setInterval(() => {
-    const el = document.getElementById('chat-elapsed');
+    const el = currentAssistantEl?.querySelector('.chat-elapsed');
     if (el && chatStartTime) el.textContent = ((Date.now() - chatStartTime) / 1000).toFixed(1) + 's';
-    const tokEl = document.getElementById('chat-tokens');
+    const tokEl = currentAssistantEl?.querySelector('.chat-tokens');
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
   syncToPanel(chatPanels.get('main'));
@@ -3204,7 +3210,7 @@ function handleChatEvent(msg) {
       }
 
       // Finalize status bar with real usage if available
-      const activeStatus = document.getElementById('chat-active-status');
+      const activeStatus = currentAssistantEl?.querySelector('.chat-active-status');
       if (activeStatus && chatStartTime) {
         const elapsed = ((Date.now() - chatStartTime) / 1000).toFixed(1);
         let statusParts = [`${elapsed}s`];
@@ -3217,7 +3223,7 @@ function handleChatEvent(msg) {
         }
         // Cost available but not shown — user prefers token count only
         activeStatus.innerHTML = statusParts.map(s => `<span>${s}</span>`).join(' ');
-        activeStatus.id = '';
+        activeStatus.classList.remove('chat-active-status');
       }
       lastResultUsage = null;
       lastResultCost = null;
