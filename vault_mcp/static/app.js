@@ -1179,8 +1179,7 @@ function openFileItem(item) {
     expandCardFullPage(fakeCard);
   }
 }
-  if (!c.children.length) c.innerHTML = '<div class="empty-state">No pages yet</div>';
-}
+
 async function initTagCloud() {
   const c = document.getElementById('tag-cloud'); c.innerHTML='';
   const counts = {};
