@@ -6,7 +6,7 @@ const api = {
   graph:       () => fetch('/api/graph').then(r => r.json()),
   page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
   tree:        () => fetch('/api/tree').then(r => r.json()),
-  search:      (q, s='wiki') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}`).then(r => r.json()),
+  search:      (q, s='all') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}`).then(r => r.json()),
   health:      () => fetch('/api/health').then(r => r.json()),
   brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
   orphans:     () => fetch('/api/orphans').then(r => r.json()),

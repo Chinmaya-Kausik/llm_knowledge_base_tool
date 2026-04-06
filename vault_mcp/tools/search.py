@@ -33,8 +33,22 @@ def ripgrep_search(
     }
     search_path = scope_map.get(scope, vault_root)
 
+    # Find ripgrep — check common locations including Claude Code's vendored copy
+    import shutil
+    rg_path = shutil.which("rg")
+    if not rg_path:
+        # Check Claude Code's vendored ripgrep
+        import platform
+        arch = "arm64" if platform.machine() == "arm64" else "x64"
+        system = "darwin" if platform.system() == "Darwin" else "linux"
+        vendored = Path.home() / ".npm-global/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep" / f"{arch}-{system}" / "rg"
+        if vendored.exists():
+            rg_path = str(vendored)
+        else:
+            raise RuntimeError("ripgrep (rg) is not installed. Install it with: brew install ripgrep")
+
     cmd = [
-        "rg",
+        rg_path,
         "--json",
         "-C", str(context_lines),
         "--glob", file_glob,

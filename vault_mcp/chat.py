@@ -50,6 +50,7 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                     "page_path": msg.get("page_path"),
                     "history": [],
                     "model": msg.get("model"),
+                    "permission_mode": msg.get("permission_mode", "auto"),
                 }
                 await websocket.send_json({"type": "init", "session_id": session_id})
 
@@ -150,7 +151,17 @@ Vault conventions:
 
 You have MCP vault tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful.
 
-Responsiveness: If you need to do multi-step work (searching, reading files, running tools), acknowledge first in one line (e.g. "On it — checking the wiki for attention mechanisms") before starting. Without the ack the user is staring at a spinner."""]
+Responsiveness: If you need to do multi-step work (searching, reading files, running tools), acknowledge first in one line (e.g. "On it — checking the wiki for attention mechanisms") before starting. Without the ack the user is staring at a spinner.
+
+Permissions:
+- You may read and write any file inside this vault directory.
+- You may run MCP tools freely (search, compile, ingest, index, commit).
+- You may run read-only shell commands (ls, find, grep, git status, git log).
+- NEVER write or modify files outside the vault directory.
+- NEVER modify .claude/ configuration files (mcp.json, settings).
+- NEVER run destructive git commands (push, reset --hard, clean -f, branch -D) without explicit user approval.
+- NEVER delete files without asking the user first.
+- Prefer MCP tools over raw shell commands when both can accomplish the task."""]
 
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
@@ -224,12 +235,14 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
         has_run = sessions.get(session_id, {}).get("has_run", False)
         model = sessions.get(session_id, {}).get("model")
 
+        perm_mode = sessions.get(session_id, {}).get("permission_mode", "auto")
+
         options = ClaudeAgentOptions(
             cwd=str(vault_root),
             system_prompt=system_prompt,
             include_partial_messages=True,
             thinking={"type": "enabled", "budget_tokens": 10000},
-            permission_mode="auto",
+            permission_mode=perm_mode,
             resume=sdk_sid if has_run and sdk_sid else None,
             model=model,
         )
