@@ -899,6 +899,7 @@ function expandCardFullPage(card, highlightQuery) {
   } else {
     // Render markdown with marked
     contentEl.innerHTML = marked.parse(rawContent);
+    renderLatex(contentEl);
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
     // Highlight search matches
@@ -2846,6 +2847,8 @@ function initChat() {
       : 'Choose breakpoints above, then type here...';
   }
 
+  // Connect WebSocket eagerly so first message works immediately
+  connectChat();
 }
 
 function exitCheckpointMode() {
@@ -3419,6 +3422,7 @@ function handleChatEvent(msg) {
         }
         textEl._rawText = (textEl._rawText || '') + msg.content;
         textEl.innerHTML = marked.parse(textEl._rawText);
+        renderLatex(textEl);
         textEl.querySelectorAll('.wiki-link').forEach(el => {
           el.onclick = () => focusCardByTitle(el.dataset.target);
         });
@@ -3789,6 +3793,7 @@ function handleChatEvent(msg) {
           textEl.className = 'chat-text';
           currentAssistantEl.appendChild(textEl);
           textEl.innerHTML = marked.parse(msg.content);
+          renderLatex(textEl);
           textEl.querySelectorAll('.wiki-link').forEach(el => {
             el.onclick = () => focusCardByTitle(el.dataset.target);
           });
@@ -3838,6 +3843,22 @@ function saveChatBeacon() {
     session_id: chatSessionId, messages: chatMessages,
   })], { type: 'application/json' });
   navigator.sendBeacon('/api/chat/save', blob);
+}
+
+function renderLatex(el) {
+  if (typeof renderMathInElement === 'function' && el) {
+    try {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true },
+        ],
+        throwOnError: false,
+      });
+    } catch {}
+  }
 }
 
 function appendChatMessage(role, text, tag) {
