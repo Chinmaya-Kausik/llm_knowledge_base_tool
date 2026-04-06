@@ -1151,7 +1151,8 @@ let selectedCards = new Set(); // Multi-select with Cmd+click
 let activeSubagents = new Map(); // task_id → {el, body, header, activityGroup, thinkingWrapper}
 let currentResponseText = ''; // Accumulate assistant text for saving
 let pendingAgentPrompt = null;
-let checkpointMode = false; // When true, tool entries show checkpoint markers
+let checkpointMode = false;
+let redirectSnapshot = new Map(); // Snapshot of activeSubagents at time of redirect
 let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool call to redirect from)
 
 // Claude Code's actual 187 pondering words — one random word per call
@@ -1471,6 +1472,10 @@ function initChat() {
     // Stop everything
     if (chatWs && chatGenerating) chatWs.send(JSON.stringify({ type: 'stop' }));
 
+    // Snapshot subagents before stop clears them
+    redirectSnapshot = new Map(activeSubagents);
+    pendingSelection = null; // Clear any leftover selection context
+
     // Enter checkpoint mode
     checkpointMode = true;
     redirectCheckpoints.clear();
@@ -1507,7 +1512,7 @@ function initChat() {
 
     // Build compact one-line summary
     const parts = [];
-    for (const [tid, sub] of activeSubagents) {
+    for (const [tid, sub] of redirectSnapshot) {
       const desc = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'Agent';
       const shortDesc = desc.length > 20 ? desc.slice(0, 20) + '...' : desc;
       if (redirectCheckpoints.has(tid)) {
@@ -1531,6 +1536,7 @@ function initChat() {
   function exitCheckpointMode() {
     checkpointMode = false;
     redirectCheckpoints.clear();
+    redirectSnapshot.clear();
     document.getElementById('chat-messages').classList.remove('checkpoint-mode');
     document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
     document.getElementById('chat-context-preview').style.display = 'none';
@@ -1723,7 +1729,7 @@ function buildRedirectMessage(generalText) {
   // Build redirect context with truncated progress per checkpoint
   let msg = 'All subagents were interrupted. Please restart them with the following instructions.\n\n';
 
-  for (const [tid, sub] of activeSubagents) {
+  for (const [tid, sub] of (checkpointMode ? redirectSnapshot : activeSubagents)) {
     const desc = sub.header?.querySelector('.chat-subagent-desc')?.textContent || tid;
     const prompt = sub.el?.dataset?.prompt || '';
     const checkpointIdx = redirectCheckpoints.get(tid);
@@ -2027,7 +2033,7 @@ function handleChatEvent(msg) {
       const agentPrompt = pendingAgentPrompt || '';
       pendingAgentPrompt = null;
 
-      subHeader.innerHTML = `<span class="chat-thinking-toggle open">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span>`;
+      subHeader.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">Agent</span> <span class="chat-subagent-desc">${subDesc}</span> <span class="chat-subagent-status">running</span>`;
 
       subEl.dataset.prompt = agentPrompt;
 
@@ -2050,7 +2056,7 @@ function handleChatEvent(msg) {
       subHeader.addEventListener('click', (e) => {
         if (e.target.closest('.subagent-redirect')) return;
         e.stopPropagation();
-        subBody.classList.toggle('collapsed');
+        subBody.classList.toggle('open');
         subHeader.querySelector('.chat-thinking-toggle').classList.toggle('open');
       });
 
@@ -2083,7 +2089,7 @@ function handleChatEvent(msg) {
         const status2 = sub2.header.querySelector('.chat-subagent-status');
         if (status2) {
           status2.textContent = msg.status || 'done';
-          status2.style.color = msg.status === 'completed' ? 'var(--green)' : msg.status === 'failed' ? 'var(--red)' : 'var(--text-muted)';
+          status2.className = 'chat-subagent-status ' + (msg.status === 'completed' ? 'status-ok' : msg.status === 'failed' ? 'status-err' : '');
         }
         const pond = sub2.header.querySelector('.pondering');
         if (pond) pond.classList.remove('pondering');
@@ -2097,9 +2103,7 @@ function handleChatEvent(msg) {
         }
 
         // Collapse the body by default after completion
-        sub2.body.classList.add('collapsed');
-        const toggle = sub2.header.querySelector('.chat-thinking-toggle');
-        if (toggle) toggle.classList.remove('open');
+        // Already collapsed by default — no action needed
 
         activeSubagents.delete(msg.task_id);
       }
