@@ -773,7 +773,7 @@ function expandCardFullPage(card) {
   const path = card.dataset.path;
   const meta = cardMeta.get(path);
   const title = card.querySelector('.doc-title')?.textContent || path;
-  const content = meta ? marked.parse(meta.content) : '';
+  const rawContent = meta?.content || '';
   const overlay = document.createElement('div');
   overlay.id = 'fullpage-overlay';
   overlay.dataset.path = path;
@@ -786,13 +786,26 @@ function expandCardFullPage(card) {
       <span style="flex:1"></span>
       <button class="fullpage-toggle">Edit</button>
     </div>
-    <div class="fullpage-content">${content}</div>
+    <div class="fullpage-content"></div>
   `;
   document.getElementById('canvas-container').appendChild(overlay);
   expandedCard = overlay;
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
-  overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
-  wireFullPageLinks(overlay);
+
+  const contentEl = overlay.querySelector('.fullpage-content');
+
+  if (isCodeFile(path)) {
+    // Render code files with CodeMirror
+    overlay.querySelector('.fullpage-toggle').style.display = 'none'; // CodeMirror handles editing
+    createCodeEditor(contentEl, rawContent, path).then(view => {
+      overlay._cmView = view;
+    });
+  } else {
+    // Render markdown with marked
+    contentEl.innerHTML = marked.parse(rawContent);
+    overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
+    wireFullPageLinks(overlay);
+  }
 }
 
 function wireFullPageLinks(overlay) {
@@ -1112,7 +1125,7 @@ function renderTreeItems(container, items, depth) {
         icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
       };
     } else {
-      row.ondblclick = () => openFileItem(item);
+      row.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
     }
   }
 }
@@ -1158,7 +1171,7 @@ function renderFilesTiles() {
         renderFilesTiles();
       };
     } else {
-      tile.ondblclick = () => openFileItem(item);
+      tile.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
     }
 
     container.appendChild(tile);
@@ -1199,7 +1212,15 @@ function fileIcon(name) {
   return icons[ext] || '📄';
 }
 
-function openFileItem(item) {
+function openExternal(path) {
+  fetch('/api/open-external', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  }).catch(e => console.error('External open failed:', e));
+}
+
+function openFileItem(item, external = false) {
+  if (external) { openExternal(item.id); return; }
   fullpageReturnView = 'files';
   const card = cardElements.get(item.id);
   if (card) expandCardFullPage(card);
@@ -2788,6 +2809,49 @@ async function renderPdfInElement(container, pdfUrl) {
   } catch (e) {
     container.innerHTML = `<em>Failed to load PDF: ${e.message}</em>`;
   }
+}
+
+// ========================================
+// CodeMirror 6 (lazy-loaded for code editing)
+// ========================================
+let cm6Module = null;
+
+async function loadCodeMirror() {
+  if (cm6Module) return cm6Module;
+  cm6Module = await import('/static/vendor/codemirror6.min.js');
+  return cm6Module;
+}
+
+function getLanguageExt(filename) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const map = { py: 'python', js: 'javascript', ts: 'javascript', jsx: 'javascript', tsx: 'javascript', html: 'html', htm: 'html', css: 'css', json: 'json', md: 'markdown', tex: 'markdown', bib: 'markdown', sh: 'javascript', bash: 'javascript', yaml: 'markdown', yml: 'markdown' };
+  return map[ext] || null;
+}
+
+async function createCodeEditor(container, content, filename, options = {}) {
+  const cm = await loadCodeMirror();
+  const langName = getLanguageExt(filename);
+  const extensions = [cm.basicSetup, cm.oneDark];
+
+  if (langName === 'python') extensions.push(cm.python());
+  else if (langName === 'javascript') extensions.push(cm.javascript());
+  else if (langName === 'html') extensions.push(cm.html());
+  else if (langName === 'css') extensions.push(cm.css());
+  else if (langName === 'json') extensions.push(cm.json());
+  else if (langName === 'markdown') extensions.push(cm.markdown());
+
+  if (options.readOnly) {
+    extensions.push(cm.EditorState.readOnly.of(true));
+  }
+
+  const state = cm.EditorState.create({ doc: content, extensions });
+  const view = new cm.EditorView({ state, parent: container });
+  return view;
+}
+
+function isCodeFile(path) {
+  const ext = path.split('.').pop()?.toLowerCase();
+  return ['py', 'js', 'ts', 'jsx', 'tsx', 'html', 'htm', 'css', 'json', 'yaml', 'yml', 'sh', 'bash', 'tex', 'bib', 'toml', 'cfg', 'ini', 'sql', 'r', 'rs', 'go', 'java', 'c', 'cpp', 'h'].includes(ext);
 }
 
 // ========================================

@@ -586,6 +586,25 @@ async def api_delete_plan(request: Request):
     return {"ok": True}
 
 
+# --- System open ---
+
+@app.post("/api/open-external")
+async def api_open_external(request: Request):
+    """Open a file in the system's default application."""
+    import subprocess
+    body = await request.json()
+    path = body.get("path", "")
+    if not path:
+        return {"ok": False, "error": "No path"}
+    full_path = (VAULT_ROOT / path).resolve()
+    if not str(full_path).startswith(str(VAULT_ROOT.resolve())):
+        return {"ok": False, "error": "Invalid path"}
+    if not full_path.exists():
+        return {"ok": False, "error": "File not found"}
+    subprocess.Popen(["open", str(full_path)])
+    return {"ok": True}
+
+
 # --- Chat WebSocket ---
 
 @app.websocket("/ws/chat")
