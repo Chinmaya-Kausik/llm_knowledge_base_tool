@@ -413,6 +413,55 @@ body {
 .file-tile-name { font-size: 11px; color: var(--text); word-break: break-word; line-height: 1.3; }
 .file-tile-name.folder-name { font-weight: 600; }
 
+/* Universal panel header */
+.panel-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; background: var(--bg-surface2);
+  border-bottom: 1px solid var(--border);
+  cursor: grab; user-select: none; font-size: 12px;
+  flex-shrink: 0; position: relative;
+}
+.panel-label {
+  font-weight: 600; outline: none; min-width: 40px;
+  border-radius: 3px; padding: 1px 4px; color: var(--text-bright);
+}
+.panel-label:focus { background: var(--bg); cursor: text; }
+.panel-status {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-muted); flex-shrink: 0;
+}
+.panel-status.connected { background: var(--green); }
+.panel-status.generating { background: var(--green); animation: status-pulse 1s infinite; }
+@keyframes status-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.panel-header button {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 12px; padding: 2px 4px;
+}
+.panel-header button:hover { color: var(--text); }
+.panel-menu {
+  position: absolute; top: 100%; right: 8px;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  min-width: 190px; z-index: 300; font-size: 12px;
+  display: none;
+}
+.panel-menu.open { display: block; }
+.panel-menu-item {
+  padding: 6px 12px; cursor: pointer; display: flex;
+  align-items: center; justify-content: space-between;
+  color: var(--text);
+}
+.panel-menu-item:hover { background: var(--bg-hover); }
+.panel-menu-item.active { color: var(--accent); }
+.panel-menu-sep { border-top: 1px solid var(--border); margin: 2px 0; }
+.panel-menu-sub {
+  position: absolute; left: 100%; top: -1px;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  min-width: 140px; display: none;
+}
+.panel-menu-item:hover > .panel-menu-sub { display: block; }
+
 /* Floating chat panels */
 .floating-chat-panel {
   position: absolute; width: 380px; height: 450px;

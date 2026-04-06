@@ -1485,6 +1485,133 @@ syncFromPanel(activePanel);
 // --- Panel management ---
 let panelCounter = 0;
 
+function createPanelHeader(panelId, label = 'Chat') {
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+
+  const header = document.createElement('div');
+  header.className = 'panel-header';
+  header.innerHTML = `
+    <span class="panel-label" contenteditable="true">${label}</span>
+    <span class="panel-status"></span>
+    <span style="flex:1"></span>
+    <button class="panel-menu-btn" title="Options">⋯</button>
+    <button class="panel-minimize" title="Minimize">─</button>
+    <button class="panel-close" title="Close">✕</button>
+  `;
+
+  const menu = document.createElement('div');
+  menu.className = 'panel-menu';
+
+  function renderMenu() {
+    const panel = chatPanels.get(panelId) || activePanel;
+    const model = panel.model || 'sonnet';
+    const ctx = panel.contextLevel || 'page';
+    const isTemp = panel.isTemporary;
+
+    menu.innerHTML = `
+      <div class="panel-menu-item" style="position:relative">Model: ${model} ▸
+        <div class="panel-menu-sub">
+          <div class="panel-menu-item${model==='sonnet'?' active':''}" data-action="model" data-value="sonnet">Sonnet</div>
+          <div class="panel-menu-item${model==='opus'?' active':''}" data-action="model" data-value="opus">Opus</div>
+          <div class="panel-menu-item${model==='haiku'?' active':''}" data-action="model" data-value="haiku">Haiku</div>
+        </div>
+      </div>
+      <div class="panel-menu-item" style="position:relative">Context: ${ctx} ▸
+        <div class="panel-menu-sub">
+          <div class="panel-menu-item${ctx==='page'?' active':''}" data-action="context" data-value="page">Page</div>
+          <div class="panel-menu-item${ctx==='folder'?' active':''}" data-action="context" data-value="folder">Folder</div>
+          <div class="panel-menu-item${ctx==='global'?' active':''}" data-action="context" data-value="global">Global</div>
+        </div>
+      </div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="new">+ New Chat</div>
+      <div class="panel-menu-item" data-action="fork">⑂ Fork Conversation</div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="temp">${isTemp ? '☑' : '☐'} Temporary</div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="dock-right">Dock Right →</div>
+      <div class="panel-menu-item" data-action="dock-bottom">Dock Bottom ↓</div>
+      <div class="panel-menu-item" data-action="float">Float ◻</div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="clear">Clear Conversation</div>
+    `;
+  }
+
+  // Toggle menu
+  header.querySelector('.panel-menu-btn').onclick = (e) => {
+    e.stopPropagation();
+    renderMenu();
+    menu.classList.toggle('open');
+  };
+
+  // Close menu on click outside
+  document.addEventListener('click', () => menu.classList.remove('open'));
+
+  // Handle menu actions
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-action]');
+    if (!item) return;
+    e.stopPropagation();
+    const action = item.dataset.action;
+    const value = item.dataset.value;
+    const panel = chatPanels.get(panelId) || activePanel;
+
+    if (action === 'model') {
+      panel.model = value;
+      if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
+        panel.ws.send(JSON.stringify({ type: 'set_model', model: value }));
+      }
+    } else if (action === 'context') {
+      panel.contextLevel = value;
+      syncFromPanel(panel);
+    } else if (action === 'new') {
+      createFloatingPanel();
+    } else if (action === 'fork') {
+      syncToPanel(activePanel);
+      const prev = activePanel;
+      activePanel = panel;
+      syncFromPanel(panel);
+      createFloatingPanel({ fork: true });
+      activePanel = prev;
+      syncFromPanel(prev);
+    } else if (action === 'temp') {
+      panel.isTemporary = !panel.isTemporary;
+    } else if (action === 'dock-right' || action === 'dock-bottom' || action === 'float') {
+      // For main panel, use existing dock logic
+      const chatPanel = document.getElementById('chat-panel');
+      const allStates = ['chat-bottom','chat-right','chat-float','chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
+      allStates.forEach(c => chatPanel.classList.remove(c));
+      if (action === 'dock-right') chatPanel.classList.add('chat-right');
+      else if (action === 'dock-bottom') chatPanel.classList.add('chat-bottom');
+      else chatPanel.classList.add('chat-float');
+      connectChat();
+    } else if (action === 'clear') {
+      syncToPanel(activePanel);
+      activePanel = panel;
+      syncFromPanel(panel);
+      saveChatTranscript();
+      const msgContainer = panel.container?.querySelector('.fcp-messages') || document.getElementById('chat-messages');
+      if (msgContainer) msgContainer.innerHTML = '';
+      chatMessages = [];
+      chatSessionId = crypto.randomUUID();
+      panel.sessionId = chatSessionId;
+      syncToPanel(panel);
+    }
+
+    menu.classList.remove('open');
+  });
+
+  // Label editing
+  const labelEl = header.querySelector('.panel-label');
+  labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); } });
+  labelEl.addEventListener('focus', () => { labelEl.style.cursor = 'text'; });
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(menu);
+  return { wrapper, header, menu, statusEl: header.querySelector('.panel-status'), labelEl };
+}
+
 function createFloatingPanel(options = {}) {
   if (chatPanels.size >= 6) { alert('Max 6 chat panels'); return null; }
   const panelId = 'panel-' + (++panelCounter);
@@ -1677,10 +1804,16 @@ function randomPonderingWord() {
 
 function initChat() {
   const panel = document.getElementById('chat-panel');
-  const toggle = document.getElementById('chat-toggle');
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
   const stopBtn = document.getElementById('chat-stop');
+
+  // Inject universal header into main chat panel
+  const mainHeaderContainer = document.getElementById('chat-header');
+  const { wrapper: headerWrapper, statusEl: mainStatusEl } = createPanelHeader('main', 'Chat');
+  mainHeaderContainer.appendChild(headerWrapper);
+  // Store status element reference for connectChat
+  mainHeaderContainer._statusEl = mainStatusEl;
 
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
     'chat-bottom', 'chat-right', 'chat-float'];
@@ -1716,14 +1849,12 @@ function initChat() {
     }
   }
 
-  toggle.onclick = (e) => { e.stopPropagation(); toggleChat(); };
-
   // Header click/dblclick handling with timer to distinguish
   let chatDragOccurred = false;
   let chatClickTimer = null;
 
   document.getElementById('chat-header').addEventListener('click', (e) => {
-    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     if (chatDragOccurred) { chatDragOccurred = false; return; }
     // Delay click to allow double-click detection
     if (chatClickTimer) return; // Already waiting
@@ -1737,7 +1868,7 @@ function initChat() {
   let chatPreMaxState = null; // {dockMode, left, top, width, height}
 
   document.getElementById('chat-header').addEventListener('dblclick', (e) => {
-    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     if (chatClickTimer) { clearTimeout(chatClickTimer); chatClickTimer = null; }
     e.stopPropagation();
 
@@ -1770,15 +1901,10 @@ function initChat() {
     connectChat();
   });
 
-  // Dock buttons
-  document.getElementById('chat-dock-bottom').onclick = (e) => { e.stopPropagation(); setChatMode('bottom', false); };
-  document.getElementById('chat-dock-right').onclick = (e) => { e.stopPropagation(); setChatMode('right', false); };
-  document.getElementById('chat-dock-float').onclick = (e) => { e.stopPropagation(); setChatMode('float', false); };
-
   // Drag header: in float mode → move; from bottom/right → detach to float
   const chatHeader = document.getElementById('chat-header');
   chatHeader.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button') || e.target.closest('.chat-context-dropdown')) return;
+    if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     const startX = e.clientX, startY = e.clientY;
     let dragging = false;
     const rect = panel.getBoundingClientRect();
@@ -1832,63 +1958,7 @@ function initChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
   };
 
-  // Context level dropdown
-  const ctxBtn = document.getElementById('chat-context-btn');
-  const ctxMenu = document.getElementById('chat-context-menu');
-  function positionMenu(btn, menu) {
-    const rect = btn.getBoundingClientRect();
-    const menuH = 120; // Approximate
-    // If there's room below, open downward; otherwise upward
-    if (rect.bottom + menuH < window.innerHeight) {
-      menu.style.top = rect.bottom + 4 + 'px';
-      menu.style.bottom = '';
-    } else {
-      menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
-      menu.style.top = '';
-    }
-    menu.style.left = rect.left + 'px';
-  }
-
-  ctxBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    modelMenu.classList.remove('open');
-    ctxMenu.classList.toggle('open');
-    if (ctxMenu.classList.contains('open')) positionMenu(ctxBtn, ctxMenu);
-  });
-  ctxMenu.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const opt = e.target.closest('.chat-context-opt');
-    if (opt) {
-      chatContextLevel = opt.dataset.value;
-      ctxBtn.textContent = opt.dataset.value.charAt(0).toUpperCase() + opt.dataset.value.slice(1);
-      ctxMenu.classList.remove('open');
-    }
-  });
-
-  // Model selector dropdown
-  const modelBtn = document.getElementById('chat-model-btn');
-  const modelMenu = document.getElementById('chat-model-menu');
-  modelBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ctxMenu.classList.remove('open');
-    modelMenu.classList.toggle('open');
-    if (modelMenu.classList.contains('open')) positionMenu(modelBtn, modelMenu);
-  });
-  modelMenu.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const opt = e.target.closest('.chat-context-opt');
-    if (opt) {
-      const model = opt.dataset.value;
-      modelBtn.textContent = opt.textContent.split(' ')[0]; // Just the name
-      modelMenu.classList.remove('open');
-      // Tell server to switch model
-      if (chatWs && chatWs.readyState === WebSocket.OPEN) {
-        chatWs.send(JSON.stringify({ type: 'set_model', model }));
-      }
-    }
-  });
-
-  document.addEventListener('click', () => { ctxMenu.classList.remove('open'); modelMenu.classList.remove('open'); });
+  // Context and model are now in the universal panel menu (⋯)
 
   // Chat panel resize handles
   panel.querySelectorAll('.chat-resize').forEach(handle => {
@@ -1939,36 +2009,7 @@ function initChat() {
     });
   });
 
-  // Stop generation
-  // Temporary toggle
-  const tempBtn = document.getElementById('chat-temp');
-  tempBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    chatIsTemporary = !chatIsTemporary;
-    tempBtn.style.opacity = chatIsTemporary ? '1' : '0.6';
-    tempBtn.style.color = chatIsTemporary ? 'var(--red)' : '';
-    tempBtn.title = chatIsTemporary ? 'Temporary — will not be saved' : 'Toggle temporary (won\'t save)';
-  });
-
-  // Clear chat / new conversation — save existing chat first
-  document.getElementById('chat-new-panel').onclick = () => createFloatingPanel();
-  document.getElementById('chat-fork').onclick = () => createFloatingPanel({ fork: true });
-
-  document.getElementById('chat-clear').addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await saveChatTranscript(); // Save before clearing
-    document.getElementById('chat-messages').innerHTML = '';
-    chatMessages = [];
-    chatIsTemporary = false;
-    chatSessionId = crypto.randomUUID();
-    sessionStorage.setItem('vault-chat-session', chatSessionId);
-    currentAssistantEl = null; currentThinkingEl = null; currentThinkingWrapper = null; currentActivityGroup = null;
-    activeSubagents.clear(); currentResponseText = ''; pendingAgentPrompt = null; pendingSelection = null;
-    if (checkpointMode) exitCheckpointMode();
-    if (chatWs && chatWs.readyState === WebSocket.OPEN) {
-      chatWs.send(JSON.stringify({ type: 'init', session_id: chatSessionId, page_path: currentLevel().parentPath || '' }));
-    }
-  });
+  // Temp, new, fork, clear are now in the universal panel menu (⋯)
 
   // Auto-grow input
   input.addEventListener('input', () => {
@@ -2069,9 +2110,8 @@ function exitCheckpointMode() {
 function connectChat() {
   if (chatWs && chatWs.readyState === WebSocket.OPEN) return;
 
-  const status = document.getElementById('chat-status');
-  status.textContent = 'Connecting...';
-  status.className = '';
+  const statusEl = document.querySelector('#chat-header .panel-status');
+  if (statusEl) statusEl.className = 'panel-status';
 
   const wsUrl = `ws://${location.host}/ws/chat`;
   try {
@@ -2084,7 +2124,7 @@ function connectChat() {
   chatWs.onopen = () => {
     chatSessionId = sessionStorage.getItem('vault-chat-session') || crypto.randomUUID();
     sessionStorage.setItem('vault-chat-session', chatSessionId);
-    syncToPanel(activePanel); // Save ws + sessionId to panel
+    syncToPanel(activePanel);
 
     const level = currentLevel();
     chatWs.send(JSON.stringify({
@@ -2098,8 +2138,7 @@ function connectChat() {
     let msg;
     try { msg = JSON.parse(e.data); } catch (err) { console.error('Chat parse error:', err); return; }
     if (msg.type === 'init') {
-      status.textContent = 'Connected';
-      status.className = 'connected';
+      if (statusEl) statusEl.className = 'panel-status connected';
     }
     // Sync to/from the panel that owns this WebSocket
     const panel = [...chatPanels.values()].find(p => p.ws === chatWs) || activePanel;
@@ -2109,14 +2148,12 @@ function connectChat() {
   };
 
   chatWs.onclose = () => {
-    status.textContent = 'Disconnected';
-    status.className = '';
+    if (statusEl) statusEl.className = 'panel-status';
     chatWs = null;
   };
 
   chatWs.onerror = () => {
-    status.textContent = 'Connection failed';
-    status.className = '';
+    if (statusEl) statusEl.className = 'panel-status';
     chatWs = null;
   };
 }
@@ -3347,13 +3384,12 @@ async function init() {
     if (e.altKey && e.key === 'p') {
       e.preventDefault();
       const models = ['sonnet', 'opus', 'haiku'];
-      const btn = document.getElementById('chat-model-btn');
-      const current = btn.textContent.trim().toLowerCase();
-      const idx = models.indexOf(current);
-      const next = models[(idx + 1) % models.length];
-      // Simulate clicking the model option
-      const opt = document.querySelector(`#chat-model-menu .chat-context-opt[data-value="${next}"]`);
-      if (opt) opt.click();
+      const current = activePanel.model || 'sonnet';
+      const next = models[(models.indexOf(current) + 1) % models.length];
+      activePanel.model = next;
+      if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+        chatWs.send(JSON.stringify({ type: 'set_model', model: next }));
+      }
       return;
     }
 

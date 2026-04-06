@@ -136,32 +136,7 @@
     <div class="chat-resize chat-resize-bottom" data-dir="bottom"></div>
     <div class="chat-resize chat-resize-corner" data-dir="corner"></div>
     <div id="chat-header">
-      <button id="chat-toggle" title="Toggle chat">Chat</button>
-      <div class="chat-context-dropdown" id="chat-context-dropdown">
-        <button class="chat-context-btn" id="chat-context-btn">Page</button>
-        <div class="chat-context-menu" id="chat-context-menu">
-          <div class="chat-context-opt" data-value="page">Page <span class="ctx-desc">current file + parent</span></div>
-          <div class="chat-context-opt" data-value="folder">Folder <span class="ctx-desc">folder README</span></div>
-          <div class="chat-context-opt" data-value="global">Global <span class="ctx-desc">master index</span></div>
-        </div>
-      </div>
-      <div class="chat-context-dropdown" id="chat-model-dropdown">
-        <button class="chat-context-btn" id="chat-model-btn">Sonnet</button>
-        <div class="chat-context-menu" id="chat-model-menu">
-          <div class="chat-context-opt" data-value="sonnet">Sonnet <span class="ctx-desc">fast</span></div>
-          <div class="chat-context-opt" data-value="opus">Opus <span class="ctx-desc">smartest</span></div>
-          <div class="chat-context-opt" data-value="haiku">Haiku <span class="ctx-desc">fastest</span></div>
-        </div>
-      </div>
-      <span id="chat-status">Disconnected</span>
-      <span style="flex:1"></span>
-      <button id="chat-temp" title="Toggle temporary (won't save)" style="font-size:10px;padding:2px 6px;opacity:0.6">Temp</button>
-      <button id="chat-new-panel" title="New chat panel" style="font-size:11px;padding:2px 8px">+</button>
-      <button id="chat-fork" title="Fork conversation" style="font-size:11px;padding:2px 8px">Fork</button>
-      <button id="chat-clear" title="New conversation" style="font-size:11px;padding:2px 8px">New</button>
-      <button id="chat-dock-right" title="Dock right">→</button>
-      <button id="chat-dock-bottom" title="Dock bottom">↓</button>
-      <button id="chat-dock-float" title="Float">◻</button>
+      <!-- Universal panel header injected by initChat() -->
     </div>
     <div id="chat-body">
       <div id="plan-pane" style="display:none">
