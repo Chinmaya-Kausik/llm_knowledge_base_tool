@@ -206,10 +206,11 @@ function wireCardButtons(card, hasChildren) {
     scheduleEdgeUpdate();
   });
 
-  // Double-click title: folders → drill into canvas, files → full page
+  // Double-click title: folders → drill into canvas (unless already inside), files → full page
   card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
     e.stopPropagation(); e.preventDefault();
-    if (card.dataset.isFolder === 'true' && hasChildren) {
+    const currentParent = currentLevel().parentPath;
+    if (card.dataset.isFolder === 'true' && hasChildren && currentParent !== path) {
       drillInto(path);
     } else {
       expandCardFullPage(card);
@@ -217,6 +218,12 @@ function wireCardButtons(card, hasChildren) {
   });
 
   const body = card.querySelector('.doc-body');
+
+  // Double-click body → full page view (for folders: view/edit README)
+  body.addEventListener('dblclick', (e) => {
+    e.stopPropagation(); e.preventDefault();
+    if (card.dataset.editing !== 'true') expandCardFullPage(card);
+  });
 
   // Single click body → expand content (for non-markdown files in summary mode)
   if (!isMarkdown) {
@@ -2996,6 +3003,12 @@ async function init() {
       if (mod && e.key === '[') {
         e.preventDefault(); e.stopPropagation();
         if (expandedCard) { collapseFullPage(); return; }
+        // Files tile view: navigate breadcrumbs back
+        if (filesMode === 'tiles' && filesTilePath.length > 0) {
+          filesTilePath.pop();
+          renderFilesTiles();
+          return;
+        }
         if (canvasStack.length > 1) navigateToLevel(canvasStack.length - 2);
         return;
       }
