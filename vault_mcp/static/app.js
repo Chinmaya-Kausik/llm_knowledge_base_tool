@@ -2445,10 +2445,16 @@ function handleChatEvent(msg) {
         else currentActivityGroup = ag;
       }
 
-      // Update header with live summary
+      // Update inner header with last tool call detail
       ag._tools.push(toolName);
       const latestEl = ag.querySelector('.activity-latest');
-      if (latestEl) latestEl.textContent = summarizeTools(ag._tools);
+      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${escapeHtml(toolName)}</b> ${escapeHtml(toolDesc)}`;
+
+      // Update outer subagent header with aggregated summary (if inside a subagent)
+      if (sub) {
+        const outerDesc = sub.header?.querySelector('.chat-subagent-desc');
+        if (outerDesc) outerDesc.textContent = `${sub._description || ''} — ${summarizeTools(ag._tools)}`;
+      }
 
       // Same-tool grouping: if same tool as last, increment counter
       const agBody = ag.querySelector('.chat-activity-body');
@@ -2593,6 +2599,7 @@ function handleChatEvent(msg) {
       activeSubagents.set(taskId, {
         el: subEl, body: subBody, header: subHeader,
         activityGroup: null, thinkingWrapper: null, thinkingEl: null,
+        _description: msg.description || msg.task_type || 'Subagent',
       });
       chatMessages.push({ role: 'subagent', content: `Started: ${msg.description || msg.task_type || 'Subagent'}` });
       break;
@@ -2601,11 +2608,9 @@ function handleChatEvent(msg) {
     case 'subagent_progress': {
       const sub = activeSubagents.get(msg.task_id);
       if (sub) {
-        // Update the header with latest tool
-        const desc = sub.header.querySelector('.chat-subagent-desc');
-        if (desc && msg.last_tool) desc.textContent = `${msg.description || ''} — ${formatToolDesc(msg.last_tool, {})}`;
+        // Only update status text, don't overwrite desc (activity summary handles that)
         const status = sub.header.querySelector('.chat-subagent-status');
-        if (status) status.textContent = msg.description || 'working';
+        if (status) status.textContent = 'working';
       }
       break;
     }
@@ -2613,10 +2618,17 @@ function handleChatEvent(msg) {
     case 'subagent_done': {
       const sub2 = activeSubagents.get(msg.task_id);
       if (sub2) {
-        // Finalize subagent's own activity group
+        // Finalize subagent's own activity group and set outer header summary
+        const agTools = sub2.activityGroup?._tools || [];
+        const agElapsed = sub2.activityGroup ? ((Date.now() - sub2.activityGroup._startTime) / 1000).toFixed(1) : '0';
         if (sub2.activityGroup) {
           finalizeActivityGroup(sub2.activityGroup);
           sub2.activityGroup = null;
+        }
+        // Set outer header with final activity summary
+        const outerDesc = sub2.header.querySelector('.chat-subagent-desc');
+        if (outerDesc && agTools.length) {
+          outerDesc.textContent = `${sub2._description || ''} — ${summarizeTools(agTools)} (${agElapsed}s)`;
         }
         const status2 = sub2.header.querySelector('.chat-subagent-status');
         if (status2) {
