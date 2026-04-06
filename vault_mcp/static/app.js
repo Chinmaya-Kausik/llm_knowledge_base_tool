@@ -1780,10 +1780,10 @@ function createPanelHeader(panelId, label = 'Chat') {
   let _floatPreMaxState = null;
   header.addEventListener('dblclick', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
-    e.stopPropagation();
     if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; }
 
-    if (panelId === 'main') return; // Main panel dblclick handled in initChat
+    if (panelId === 'main') return; // Let it propagate to initChat's dblclick handler
+    e.stopPropagation();
 
     const card = chatPanels.get(panelId)?.container;
     if (!card) return;
@@ -1960,7 +1960,7 @@ function createFloatingPanel(options = {}) {
       const vw = window.innerWidth, vh = window.innerHeight;
       if (e.clientX > vw - 40) {
         dockPanel(panelId, 'dock-right');
-      } else if (e.clientY > vh - 80) {
+      } else if (e.clientY > vh - 120) {
         dockPanel(panelId, 'dock-bottom');
       }
     }
