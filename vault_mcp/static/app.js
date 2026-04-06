@@ -23,6 +23,7 @@ const DEFAULT_KEYBINDINGS = {
   'nav-back':       { key: '[', mod: true, label: 'Navigate back' },
   'nav-forward':    { key: ']', mod: true, label: 'Drill into folder' },
   'show-shortcuts': { key: 'k', mod: true, label: 'Show shortcuts' },
+  'focus-chat':     { key: 'j', mod: true, label: 'Focus chat input' },
 };
 
 let keyBindings = { ...DEFAULT_KEYBINDINGS };
@@ -4008,6 +4009,17 @@ async function init() {
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
+    if (matchesBinding(e, 'focus-chat')) {
+      e.preventDefault();
+      // Focus main chat input, expand if collapsed
+      const cp = document.getElementById('chat-panel');
+      if (cp.classList.contains('chat-collapsed') || cp.classList.contains('chat-collapsed-right') || cp.classList.contains('chat-collapsed-float')) {
+        const ph = document.querySelector('#chat-header .panel-header');
+        if (ph) ph.click();
+      }
+      setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+      return;
+    }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
     if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
     if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
