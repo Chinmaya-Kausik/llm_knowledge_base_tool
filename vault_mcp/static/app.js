@@ -1910,27 +1910,43 @@ function handleChatEvent(msg) {
       function doRedirect() {
         if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
 
-        // Build context with other agents' full history for seamless restart
-        const otherAgents = [];
+        // Collect ALL agents' info for restart
+        const allAgents = [];
         for (const [tid, sub] of activeSubagents) {
-          if (tid !== taskId) {
-            const desc2 = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'unknown';
-            const prompt2 = sub.el?.dataset?.prompt || '';
-            otherAgents.push({ desc: desc2, prompt: prompt2 });
+          const d = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'unknown';
+          const p = sub.el?.dataset?.prompt || '';
+          allAgents.push({ taskId: tid, desc: d, prompt: p, isRedirected: tid === taskId });
+        }
+
+        // Show context block
+        const preview = document.getElementById('chat-context-preview');
+        preview.innerHTML = `<span class="ctx-file">Redirecting: ${subDesc}</span><span class="ctx-text">${agentPrompt ? agentPrompt.slice(0, 60) + '...' : ''}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
+        preview.style.display = 'flex';
+        preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
+
+        // Build the hidden context that gets sent with the user's message.
+        // The user only types the redirect instructions — everything else is automatic.
+        let autoContext = 'All subagents were interrupted and need to be restarted. The conversation history contains each subagent\'s full progress (thinking traces, tool calls, results). Please restart all subagents to continue exactly where they left off.\n\n';
+
+        for (const ag of allAgents) {
+          if (ag.isRedirected) {
+            autoContext += `For subagent "${ag.desc}": restart it with its original task, but apply these additional instructions from the user: `;
+          } else {
+            autoContext += `For subagent "${ag.desc}": restart it to continue exactly where it left off with no changes.\n`;
           }
         }
+
+        pendingSelection = {
+          text: autoContext,
+          file: '',
+        };
 
         const input = document.getElementById('chat-input');
-        let prefill = `The subagent "${subDesc}" was going in the wrong direction. Instead, `;
-
-        if (otherAgents.length > 0) {
-          prefill += '\n\nThe following other agents were running and should be restarted to continue exactly where they left off. They had the following original prompts — the conversation history already contains their full progress (thinking traces, tool calls, and results), so they should pick up seamlessly:\n';
-          for (const oa of otherAgents) {
-            prefill += `- "${oa.desc}"${oa.prompt ? ': ' + oa.prompt.slice(0, 200) : ''}\n`;
-          }
-        }
-        input.value = prefill;
+        input.value = '';
+        input.placeholder = 'Type your redirect instructions for this agent...';
         input.focus();
+        // Trigger resize
+        input.style.height = 'auto';
       }
 
       subHeader.querySelector('.subagent-redirect').addEventListener('click', (e) => {
