@@ -448,6 +448,22 @@ body {
 .toolbar-menu-row button { font-size: 11px; padding: 2px 8px; }
 #filter-active-dot { color: var(--accent); font-size: 8px; margin-left: 2px; vertical-align: super; }
 
+/* Keybinding editor */
+.keybind-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11px; }
+.keybind-label { flex: 1; color: var(--text); }
+.keybind-key {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
+  padding: 2px 8px; border-radius: 3px; font-family: var(--font); font-size: 11px;
+  cursor: pointer; min-width: 50px; text-align: center;
+}
+.keybind-key:hover { border-color: var(--accent); color: var(--text); }
+.keybind-key.listening { border-color: var(--accent); color: var(--accent); animation: status-pulse 1s infinite; }
+.keybind-reset {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 13px; padding: 0 2px;
+}
+.keybind-reset:hover { color: var(--text); }
+
 /* Universal panel header */
 .panel-header {
   display: flex; align-items: center; gap: 6px;

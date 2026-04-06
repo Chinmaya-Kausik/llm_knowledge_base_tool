@@ -1,6 +1,70 @@
 // === Vault Knowledge Base UI v3 ===
 // Canvas stack with drill-in sub-canvases, edge aggregation, border resizing
 
+// --- Keybindings ---
+const DEFAULT_KEYBINDINGS = {
+  'view-canvas':    { key: '1', mod: true, label: 'Canvas view' },
+  'view-files':     { key: '2', mod: true, label: 'Files view' },
+  'view-tags':      { key: '3', mod: true, label: 'Tags view' },
+  'view-health':    { key: '4', mod: true, label: 'Health view' },
+  'toggle-tree-tile': { key: 't', mod: true, label: 'Toggle tree/tile' },
+  'toggle-sidebar': { key: 'b', mod: true, label: 'Toggle sidebar' },
+  'toggle-chat':    { key: '\\', mod: true, label: 'Toggle chat' },
+  'new-chat':       { key: 'n', mod: true, label: 'New chat panel' },
+  'fork-chat':      { key: 'N', mod: true, shift: true, label: 'Fork chat' },
+  'settings':       { key: ',', mod: true, label: 'Open settings' },
+  'fit-view':       { key: '0', mod: true, label: 'Fit view' },
+  'auto-layout':    { key: 'l', mod: true, label: 'Auto layout' },
+  'toggle-edit':    { key: 'e', mod: true, label: 'Toggle edit mode' },
+  'save-edit':      { key: 's', mod: true, label: 'Save edits' },
+  'search':         { key: 'f', mod: true, label: 'Search' },
+  'toggle-tools':   { key: 'o', mod: true, label: 'Toggle tool details' },
+  'cycle-model':    { key: 'p', alt: true, label: 'Cycle model' },
+  'nav-back':       { key: '[', mod: true, label: 'Navigate back' },
+  'nav-forward':    { key: ']', mod: true, label: 'Drill into folder' },
+};
+
+let keyBindings = { ...DEFAULT_KEYBINDINGS };
+
+// Load saved overrides
+try {
+  const saved = JSON.parse(localStorage.getItem('vault-keybindings') || '{}');
+  for (const [action, binding] of Object.entries(saved)) {
+    if (keyBindings[action]) keyBindings[action] = { ...keyBindings[action], ...binding };
+  }
+} catch {}
+
+function matchesBinding(e, action) {
+  const b = keyBindings[action];
+  if (!b) return false;
+  if (b.mod && !(e.ctrlKey || e.metaKey)) return false;
+  if (b.alt && !e.altKey) return false;
+  if (b.shift && !e.shiftKey) return false;
+  if (!b.shift && e.shiftKey && !b.mod) return false;
+  return e.key === b.key || e.key.toLowerCase() === b.key.toLowerCase();
+}
+
+function bindingToString(b) {
+  const parts = [];
+  if (b.mod) parts.push('⌘');
+  if (b.alt) parts.push('⌥');
+  if (b.shift) parts.push('⇧');
+  parts.push(b.key === '\\' ? '\\' : b.key === ' ' ? 'Space' : b.key.toUpperCase());
+  return parts.join('');
+}
+
+function saveKeyBindings() {
+  // Only save non-default bindings
+  const overrides = {};
+  for (const [action, binding] of Object.entries(keyBindings)) {
+    const def = DEFAULT_KEYBINDINGS[action];
+    if (def && (binding.key !== def.key || binding.mod !== def.mod || binding.alt !== def.alt || binding.shift !== def.shift)) {
+      overrides[action] = { key: binding.key, mod: binding.mod, alt: binding.alt, shift: binding.shift };
+    }
+  }
+  localStorage.setItem('vault-keybindings', JSON.stringify(overrides));
+}
+
 // --- API ---
 const api = {
   graph:       () => fetch('/api/graph').then(r => r.json()),
@@ -3749,6 +3813,56 @@ function initSettings() {
     valDisplay.textContent = size;
     document.documentElement.style.setProperty('--code-font-size', size);
   });
+
+  // Keybinding editor
+  renderKeybindingEditor();
+}
+
+function renderKeybindingEditor() {
+  const editor = document.getElementById('keybinding-editor');
+  if (!editor) return;
+  editor.innerHTML = '';
+  for (const [action, binding] of Object.entries(keyBindings)) {
+    const row = document.createElement('div');
+    row.className = 'keybind-row';
+    const label = document.createElement('span');
+    label.className = 'keybind-label';
+    label.textContent = binding.label || action;
+    const key = document.createElement('button');
+    key.className = 'keybind-key';
+    key.textContent = bindingToString(binding);
+    key.title = 'Click to rebind';
+    key.onclick = (e) => {
+      e.stopPropagation();
+      key.textContent = 'Press keys...';
+      key.classList.add('listening');
+      function onKey(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        if (ev.key === 'Escape') { key.textContent = bindingToString(binding); key.classList.remove('listening'); document.removeEventListener('keydown', onKey, true); return; }
+        if (['Shift','Control','Alt','Meta'].includes(ev.key)) return;
+        keyBindings[action] = { ...binding, key: ev.key, mod: ev.ctrlKey || ev.metaKey, alt: ev.altKey, shift: ev.shiftKey };
+        saveKeyBindings();
+        key.textContent = bindingToString(keyBindings[action]);
+        key.classList.remove('listening');
+        document.removeEventListener('keydown', onKey, true);
+      }
+      document.addEventListener('keydown', onKey, true);
+    };
+    const reset = document.createElement('button');
+    reset.className = 'keybind-reset';
+    reset.textContent = '↺';
+    reset.title = 'Reset to default';
+    reset.onclick = (e) => {
+      e.stopPropagation();
+      keyBindings[action] = { ...DEFAULT_KEYBINDINGS[action] };
+      saveKeyBindings();
+      key.textContent = bindingToString(keyBindings[action]);
+    };
+    row.appendChild(label);
+    row.appendChild(key);
+    row.appendChild(reset);
+    editor.appendChild(row);
+  }
 }
 
 // --- Main init ---
@@ -3787,10 +3901,9 @@ async function init() {
       if (expandedCard) { collapseFullPage(); return; }
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }
-    if (mod && e.key === 'f') { e.preventDefault(); searchInput.focus(); return; }
-
-    // Ctrl+O: toggle all tool details open/closed
-    if (mod && e.key === 'o' && !inInput) {
+    // Rebindable shortcuts
+    if (matchesBinding(e, 'search')) { e.preventDefault(); searchInput.focus(); return; }
+    if (matchesBinding(e, 'toggle-tools') && !inInput) {
       e.preventDefault();
       const bodies = document.querySelectorAll('.chat-activity-body, .chat-thinking-body');
       const anyOpen = [...bodies].some(b => b.classList.contains('open'));
@@ -3798,98 +3911,29 @@ async function init() {
       document.querySelectorAll('.chat-thinking-toggle').forEach(t => { anyOpen ? t.classList.remove('open') : t.classList.add('open'); });
       return;
     }
-
-    // Alt+P: cycle model
-    if (e.altKey && e.key === 'p') {
+    if (matchesBinding(e, 'cycle-model')) {
       e.preventDefault();
       const models = ['sonnet', 'opus', 'haiku'];
       const current = activePanel.model || 'sonnet';
       const next = models[(models.indexOf(current) + 1) % models.length];
       activePanel.model = next;
-      if (chatWs && chatWs.readyState === WebSocket.OPEN) {
-        chatWs.send(JSON.stringify({ type: 'set_model', model: next }));
-      }
+      if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'set_model', model: next }));
       return;
     }
-
-    // View switching: Cmd+1/2/3/4
-    if (mod && e.key === '1') { e.preventDefault(); switchView('graph'); return; }
-    if (mod && e.key === '2') { e.preventDefault(); switchView('files'); return; }
-    if (mod && e.key === '3') { e.preventDefault(); switchView('tags'); return; }
-    if (mod && e.key === '4') { e.preventDefault(); switchView('health'); return; }
-
-    // Cmd+T: toggle tree/tile in Files view
-    if (mod && e.key === 't' && !inInput) {
-      e.preventDefault();
-      if (filesInitialized) setFilesMode(filesMode === 'tree' ? 'tiles' : 'tree');
-      return;
-    }
-
-    // Cmd+B: toggle sidebar
-    if (mod && e.key === 'b' && !inInput) {
-      e.preventDefault();
-      document.getElementById('sidebar').classList.toggle('collapsed');
-      return;
-    }
-
-    // Cmd+\: toggle chat panel
-    if (mod && e.key === '\\') {
-      e.preventDefault();
-      const panelHeader = document.querySelector('#chat-header .panel-header');
-      if (panelHeader) panelHeader.click();
-      return;
-    }
-
-    // Cmd+N: new floating chat
-    if (mod && !e.shiftKey && e.key === 'n' && !inInput) {
-      e.preventDefault();
-      createFloatingPanel();
-      return;
-    }
-
-    // Cmd+Shift+N: fork current chat
-    if (mod && e.shiftKey && e.key === 'N') {
-      e.preventDefault();
-      createFloatingPanel({ fork: true });
-      return;
-    }
-
-    // Cmd+,: open settings menu
-    if (mod && e.key === ',') {
-      e.preventDefault();
-      document.getElementById('btn-toolbar-menu')?.click();
-      return;
-    }
-
-    // Cmd+0: fit view
-    if (mod && e.key === '0' && !inInput) {
-      e.preventDefault();
-      fitView();
-      return;
-    }
-
-    // Cmd+L: auto layout
-    if (mod && e.key === 'l' && !inInput) {
-      e.preventDefault();
-      autoLayout();
-      return;
-    }
-
-    // Cmd+E: toggle edit mode in fullpage
-    if (mod && e.key === 'e' && expandedCard) {
-      e.preventDefault();
-      const path = expandedCard.dataset.path;
-      toggleFullPageEdit(expandedCard, path);
-      return;
-    }
-
-    // Cmd+S: save edits in fullpage
-    if (mod && e.key === 's' && expandedCard && expandedCard.dataset.mode === 'edit') {
-      e.preventDefault();
-      const path = expandedCard.dataset.path;
-      toggleFullPageEdit(expandedCard, path); // Toggle back to preview = save
-      return;
-    }
+    if (matchesBinding(e, 'view-canvas')) { e.preventDefault(); switchView('graph'); return; }
+    if (matchesBinding(e, 'view-files')) { e.preventDefault(); switchView('files'); return; }
+    if (matchesBinding(e, 'view-tags')) { e.preventDefault(); switchView('tags'); return; }
+    if (matchesBinding(e, 'view-health')) { e.preventDefault(); switchView('health'); return; }
+    if (matchesBinding(e, 'toggle-tree-tile') && !inInput) { e.preventDefault(); if (filesInitialized) setFilesMode(filesMode === 'tree' ? 'tiles' : 'tree'); return; }
+    if (matchesBinding(e, 'toggle-sidebar') && !inInput) { e.preventDefault(); document.getElementById('sidebar').classList.toggle('collapsed'); return; }
+    if (matchesBinding(e, 'toggle-chat')) { e.preventDefault(); const ph = document.querySelector('#chat-header .panel-header'); if (ph) ph.click(); return; }
+    if (matchesBinding(e, 'new-chat') && !inInput) { e.preventDefault(); createFloatingPanel(); return; }
+    if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
+    if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
+    if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
+    if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
+    if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
+    if (matchesBinding(e, 'save-edit') && expandedCard?.dataset.mode === 'edit') { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
 
     // Canvas shortcuts (only when not typing)
     if (!inInput) {
