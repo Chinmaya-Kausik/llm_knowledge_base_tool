@@ -1215,8 +1215,20 @@ async function refreshFileTree() {
     if (filesMode === 'tree') renderFilesTree();
     else renderFilesTiles();
   }
-  // Refresh graph data
+  // Refresh graph data and fetch content for new pages
   graphData = await api.graph();
+  const newIds = graphData.nodes.map(n => n.data.id).filter(id => !cardMeta.has(id));
+  if (newIds.length > 0) {
+    try {
+      const bulk = await fetch('/api/pages/bulk', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(newIds),
+      }).then(r => r.json());
+      for (const [id, data] of Object.entries(bulk)) {
+        if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
+      }
+    } catch {}
+  }
 }
 
 async function initFilesView() {
