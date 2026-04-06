@@ -1862,10 +1862,8 @@ function createFloatingPanel(options = {}) {
   sendBtn.onclick = () => {
     const text = input.value.trim();
     if (!text) return;
-    console.log('[SEND-FLOAT] text:', JSON.stringify(text?.slice(0,30)), 'panelId:', panelId, 'ws:', !!panel.ws, 'readyState:', panel.ws?.readyState, 'generating:', panel.generating);
 
     if (!panel.ws || panel.ws.readyState !== WebSocket.OPEN) {
-      console.log('[SEND-FLOAT] BLOCKED: ws not open, reconnecting...');
       connectPanelChat(panel, messagesEl);
       setTimeout(() => sendBtn.click(), 500);
       return;
@@ -1985,7 +1983,6 @@ function connectPanelChat(panel, messagesEl) {
       pendingAgentPrompt: pendingAgentPrompt, editedFiles: sessionEditedFiles,
       lastResultUsage: lastResultUsage, lastResultCost: lastResultCost,
     };
-    console.log('[QUEUE] processing event:', msg.type, 'for panel, saved mainP.ws:', !!saved.ws, 'panel.ws:', !!panel.ws);
 
     // Load this panel's state into globals
     chatWs = panel.ws; chatSessionId = panel.sessionId;
@@ -2021,7 +2018,6 @@ function connectPanelChat(panel, messagesEl) {
     pendingAgentPrompt = saved.pendingAgentPrompt; sessionEditedFiles = saved.editedFiles;
     lastResultUsage = saved.lastResultUsage; lastResultCost = saved.lastResultCost;
 
-    console.log('[QUEUE] restored — chatWs:', !!chatWs, 'readyState:', chatWs?.readyState, 'mainP.ws:', !!chatPanels.get('main')?.ws, 'panel.ws:', !!panel.ws);
     processing = false;
     if (eventQueue.length > 0) requestAnimationFrame(processQueue);
   }
@@ -2347,8 +2343,6 @@ function exitCheckpointMode() {
 
 function connectChat() {
   const mainP = chatPanels.get('main');
-  console.log('[CONNECT] mainP.ws:', !!mainP.ws, 'readyState:', mainP.ws?.readyState);
-  if (mainP.ws && mainP.ws.readyState === WebSocket.OPEN) { console.log('[CONNECT] already open'); return; }
 
   const statusEl = document.querySelector('#chat-header .panel-status');
   if (statusEl) statusEl.className = 'panel-status';
@@ -2409,9 +2403,7 @@ function sendChatMessage() {
   syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  console.log('[SEND-MAIN] text:', JSON.stringify(text?.slice(0,30)), 'ws:', !!mainP.ws, 'readyState:', mainP.ws?.readyState, 'generating:', chatGenerating);
   if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) {
-    console.log('[SEND-MAIN] BLOCKED: ws not open, connecting...');
     connectChat();
     syncToPanel(mainP);
     return;
