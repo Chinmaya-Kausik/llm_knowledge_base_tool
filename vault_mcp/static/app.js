@@ -2414,13 +2414,15 @@ function createTerminalPanel() {
   if (fitAddon) fitAddon.fit();
 
   // WebSocket to backend PTY
+  console.log('[TERM] connecting to ws/terminal');
   const ws = new WebSocket(`ws://${location.host}/ws/terminal`);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
-    // Send initial size
+    console.log('[TERM] ws connected');
     ws.send(`RESIZE:${term.cols}:${term.rows}`);
   };
+  ws.onerror = (e) => { console.error('[TERM] ws error:', e); };
 
   ws.onmessage = (e) => {
     if (e.data instanceof ArrayBuffer) {
@@ -2430,7 +2432,7 @@ function createTerminalPanel() {
     }
   };
 
-  ws.onclose = () => term.write('\r\n[Session ended]\r\n');
+  ws.onclose = (e) => { console.log('[TERM] ws closed, code:', e.code, 'reason:', e.reason); term.write('\r\n[Session ended]\r\n'); };
 
   term.onData((data) => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
   term.onResize(({ cols, rows }) => { if (ws.readyState === WebSocket.OPEN) ws.send(`RESIZE:${cols}:${rows}`); });
