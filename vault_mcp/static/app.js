@@ -1695,6 +1695,20 @@ let panelCounter = 0;
 let chatFocusHistory = ['main']; // Ordered by recency of focus
 let chatCycleIndex = -1;
 
+function openNewChat() {
+  // If main panel is hidden, reopen it
+  const cp = document.getElementById('chat-panel');
+  if (cp.style.display === 'none') {
+    cp.style.display = '';
+    cp.classList.add('chat-bottom');
+    connectChat();
+    setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+    return;
+  }
+  // Otherwise create a floating panel
+  createFloatingPanel();
+}
+
 function focusChatPanel(panelId) {
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
