@@ -1384,33 +1384,76 @@ function switchView(name) {
 // ========================================
 // Chat Panel
 // ========================================
+// ========================================
+// ChatPanel — encapsulates all per-chat state
+// ========================================
+class ChatPanel {
+  constructor(container, options = {}) {
+    this.container = container;
+    this.ws = null;
+    this.sessionId = options.sessionId || crypto.randomUUID();
+    this.generating = false;
+    this.messageQueue = [];
+    this.assistantEl = null;
+    this.thinkingEl = null;
+    this.thinkingWrapper = null;
+    this.contextLevel = options.contextLevel || 'page';
+    this.messages = options.messages ? [...options.messages] : [];
+    this.isTemporary = false;
+    this.startTime = null;
+    this.tokenCount = 0;
+    this.timerInterval = null;
+    this.activityGroup = null;
+    this.subagents = new Map();
+    this.responseText = '';
+    this.pendingAgentPrompt = null;
+    this.checkpointMode = false;
+    this.redirectSnapshot = new Map();
+    this.redirectCheckpoints = new Map();
+    this.wasUserInterrupt = false;
+    this.lastResultUsage = null;
+    this.lastResultCost = null;
+    this.activePlanPath = null;
+    this.activePlanContent = '';
+    this.editedFiles = new Set();
+    this.model = null;
+  }
+}
+
+// Main panel instance — all existing code references these shims
+const mainPanel = new ChatPanel(null); // container set in initChat()
+
+// Global shims — these proxy to mainPanel so existing code works unchanged
 let chatWs = null;
 let chatSessionId = null;
 let chatGenerating = false;
-let messageQueue = []; // Queue messages sent while generating
+let messageQueue = [];
 let currentAssistantEl = null;
 let currentThinkingEl = null;
 let currentThinkingWrapper = null;
 let chatContextLevel = 'page';
-let chatMessages = []; // Track messages for auto-save
-let chatIsTemporary = false; // Temporary chats don't get saved
+let chatMessages = [];
+let chatIsTemporary = false;
 let chatStartTime = null;
 let chatTokenCount = 0;
 let chatTimerInterval = null;
-let currentActivityGroup = null; // Groups consecutive tool uses
-let selectedCards = new Set(); // Multi-select with Cmd+click
-let activeSubagents = new Map(); // task_id → {el, body, header, activityGroup, thinkingWrapper}
-let currentResponseText = ''; // Accumulate assistant text for saving
+let currentActivityGroup = null;
+let selectedCards = new Set();
+let activeSubagents = new Map();
+let currentResponseText = '';
 let pendingAgentPrompt = null;
 let checkpointMode = false;
-let redirectSnapshot = new Map(); // Snapshot of activeSubagents at time of redirect
-let redirectCheckpoints = new Map(); // agentTaskId → msgIndex (which tool call to redirect from)
-let wasUserInterrupt = false; // Set when user presses Escape
-let lastResultUsage = null; // Token usage from ResultMessage
-let lastResultCost = null; // Cost in USD from ResultMessage
-let activePlanPath = null; // Path to the active plan file
-let activePlanContent = ''; // Raw markdown of the plan
-let sessionEditedFiles = new Set(); // Files modified by the agent this session
+let redirectSnapshot = new Map();
+let redirectCheckpoints = new Map();
+let wasUserInterrupt = false;
+let lastResultUsage = null;
+let lastResultCost = null;
+let activePlanPath = null;
+let activePlanContent = '';
+let sessionEditedFiles = new Set();
+
+// Panel registry
+const chatPanels = new Map(); // panelId → ChatPanel
 
 // Claude Code's actual 187 pondering words — one random word per call
 const ponderingWords = ["Accomplishing","Actioning","Actualizing","Architecting","Baking","Beaming","Beboppin'","Befuddling","Billowing","Blanching","Bloviating","Boogieing","Boondoggling","Booping","Bootstrapping","Brewing","Bunning","Burrowing","Calculating","Canoodling","Caramelizing","Cascading","Catapulting","Cerebrating","Channeling","Channelling","Choreographing","Churning","Clauding","Coalescing","Cogitating","Combobulating","Composing","Computing","Concocting","Considering","Contemplating","Cooking","Crafting","Creating","Crunching","Crystallizing","Cultivating","Deciphering","Deliberating","Determining","Dilly-dallying","Discombobulating","Doing","Doodling","Drizzling","Ebbing","Effecting","Elucidating","Embellishing","Enchanting","Envisioning","Evaporating","Fermenting","Fiddle-faddling","Finagling","Flambéing","Flibbertigibbeting","Flowing","Flummoxing","Fluttering","Forging","Forming","Frolicking","Frosting","Gallivanting","Galloping","Garnishing","Generating","Gesticulating","Germinating","Gitifying","Grooving","Gusting","Harmonizing","Hashing","Hatching","Herding","Honking","Hullaballooing","Hyperspacing","Ideating","Imagining","Improvising","Incubating","Inferring","Infusing","Ionizing","Jitterbugging","Julienning","Kneading","Leavening","Levitating","Lollygagging","Manifesting","Marinating","Meandering","Metamorphosing","Misting","Moonwalking","Moseying","Mulling","Mustering","Musing","Nebulizing","Nesting","Newspapering","Noodling","Nucleating","Orbiting","Orchestrating","Osmosing","Perambulating","Percolating","Perusing","Philosophising","Photosynthesizing","Pollinating","Pondering","Pontificating","Pouncing","Precipitating","Prestidigitating","Processing","Proofing","Propagating","Puttering","Puzzling","Quantumizing","Razzle-dazzling","Razzmatazzing","Recombobulating","Reticulating","Roosting","Ruminating","Sautéing","Scampering","Schlepping","Scurrying","Seasoning","Shenaniganing","Shimmying","Simmering","Skedaddling","Sketching","Slithering","Smooshing","Sock-hopping","Spelunking","Spinning","Sprouting","Stewing","Sublimating","Swirling","Swooping","Symbioting","Synthesizing","Tempering","Thinking","Thundering","Tinkering","Tomfoolering","Topsy-turvying","Transfiguring","Transmuting","Twisting","Undulating","Unfurling","Unravelling","Vibing","Waddling","Wandering","Warping","Whatchamacalliting","Whirlpooling","Whirring","Whisking","Wibbling","Working","Wrangling","Zesting","Zigzagging"];
