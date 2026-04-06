@@ -1277,40 +1277,51 @@ async function initHealth() {
     }
   } catch(e) { c.innerHTML=`<div class="empty-state">Error: ${e.message}</div>`; }
 }
-let searchScope = 'auto'; // 'auto' = current folder if in sub-canvas, else 'all'
-let searchMode = 'both'; // 'both', 'content', 'name'
+let searchScopeGlobal = false; // false = auto (current folder), true = all
+let searchContent = true;
+let searchName = true;
 
 async function doSearch(query) {
   if (!query.trim()) return;
   switchView('search');
   const c = document.getElementById('search-results');
 
-  // Determine scope: if in a sub-canvas, scope to that folder
+  // Determine scope
   let scope = 'all';
-  if (searchScope === 'auto') {
+  if (!searchScopeGlobal) {
     const level = currentLevel();
     if (level.parentPath) scope = level.parentPath;
-  } else {
-    scope = searchScope;
   }
 
-  const scopeLabel = scope === 'all' ? 'vault' : scope;
+  // Determine mode
+  let mode = 'both';
+  if (searchContent && !searchName) mode = 'content';
+  else if (!searchContent && searchName) mode = 'name';
+  else if (!searchContent && !searchName) { c.innerHTML='<div class="empty-state">Select at least one search mode</div>'; return; }
+
+  const scopeLabel = scope === 'all' ? 'vault' : scope.split('/').pop();
   c.innerHTML=`<div class="empty-state">Searching ${scopeLabel}...</div>`;
   try {
-    const results = await api.search(query, scope, searchMode);
+    const results = await api.search(query, scope, mode);
     c.innerHTML='';
 
-    // Search options bar
+    // Search options bar — always shown
     const opts = document.createElement('div');
     opts.className = 'search-options';
-    const scopeToggle = scope !== 'all'
-      ? `<button class="search-opt${searchScope==='auto'?' active':''}" onclick="searchScope='auto';doSearch('${query.replace(/'/g,"\\'")}')">📁 ${scope.split('/').pop()}</button><button class="search-opt${searchScope==='all'?' active':''}" onclick="searchScope='all';doSearch('${query.replace(/'/g,"\\'")}')">🌐 All</button>`
-      : `<button class="search-opt active">🌐 All</button>`;
-    const modeToggles = `<button class="search-opt${searchMode==='both'?' active':''}" onclick="searchMode='both';doSearch('${query.replace(/'/g,"\\'")}')">Both</button><button class="search-opt${searchMode==='content'?' active':''}" onclick="searchMode='content';doSearch('${query.replace(/'/g,"\\'")}')">Content</button><button class="search-opt${searchMode==='name'?' active':''}" onclick="searchMode='name';doSearch('${query.replace(/'/g,"\\'")}')">Name</button>`;
-    opts.innerHTML = scopeToggle + '<span class="search-opt-sep">|</span>' + modeToggles;
+    const inFolder = currentLevel().parentPath;
+    const scopeHtml = inFolder
+      ? `<label class="search-check"><input type="checkbox" ${searchScopeGlobal?'':'checked'}  onchange="searchScopeGlobal=!this.checked;doSearch(document.getElementById('search-input').value)"> 📁 ${inFolder.split('/').pop()}</label>`
+      : '';
+    opts.innerHTML = `${scopeHtml}<label class="search-check"><input type="checkbox" ${searchContent?'checked':''}  onchange="searchContent=this.checked;doSearch(document.getElementById('search-input').value)"> Content</label><label class="search-check"><input type="checkbox" ${searchName?'checked':''}  onchange="searchName=this.checked;doSearch(document.getElementById('search-input').value)"> Name</label>`;
     c.appendChild(opts);
 
-    if (!results.length) { c.innerHTML += '<div class="empty-state">No results</div>'; return; }
+    if (!results.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No results';
+      c.appendChild(empty);
+      return;
+    }
     for (const r of results) {
       const div=document.createElement('div'); div.className='search-result';
       const esc=query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');

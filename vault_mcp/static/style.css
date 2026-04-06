@@ -469,6 +469,8 @@ body {
 .search-opt:hover { color: var(--text); }
 .search-opt.active { color: var(--accent); border-color: var(--accent); }
 .search-opt-sep { color: var(--border); font-size: 11px; margin: 0 2px; }
+.search-check { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); cursor: pointer; }
+.search-check input { cursor: pointer; }
 .search-result {
   padding: 8px 10px; border-bottom: 1px solid var(--border);
   cursor: pointer; border-radius: var(--radius);
