@@ -1631,7 +1631,7 @@ function sendChatMessage() {
   chatStartTime = Date.now();
   chatTokenCount = 0;
   document.getElementById('chat-send').style.display = 'none';
-  document.getElementById('chat-stop').style.display = '';
+  document.getElementById('chat-stop').style.display = 'none'; // Hidden — Redirect handles stopping
   document.getElementById('chat-redirect').style.display = '';
 
   // Prepare assistant message area

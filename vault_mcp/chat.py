@@ -82,7 +82,7 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                 )
 
             elif msg_type == "stop":
-                # Cancel active generation and wait for it to finish
+                # Cancel active generation and wait for cleanup
                 if query_task and not query_task.done():
                     query_task.cancel()
                     try:
@@ -90,7 +90,7 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                     except (asyncio.CancelledError, Exception):
                         pass
                     query_task = None
-                    await websocket.send_json({"type": "stopped"})
+                    # Note: stream_query's CancelledError handler already sends "stopped"
 
     except WebSocketDisconnect:
         pass
