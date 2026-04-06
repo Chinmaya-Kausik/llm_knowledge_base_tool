@@ -1679,7 +1679,7 @@ function handleChatEvent(msg) {
         chatTokenCount += Math.ceil(msg.content.length / 4);
         const elapsed = ((Date.now() - tw._startTime) / 1000).toFixed(1);
         tw.querySelector('.thinking-time').textContent = `${elapsed}s, ~${tw._tokens} tokens`;
-        chatMessages.push({ role: 'thinking', content: msg.content });
+        chatMessages.push({ role: 'thinking', content: msg.content, subagent_id: msg.subagent_id || null });
       }
       break;
     }
@@ -1831,7 +1831,7 @@ function handleChatEvent(msg) {
       }
 
       ag._tools.push(toolName);
-      chatMessages.push({ role: 'tool', content: `${toolName}: ${toolDesc}` });
+      chatMessages.push({ role: 'tool', content: `${toolName}: ${toolDesc}`, subagent_id: msg.subagent_id || null });
 
       // Capture Agent tool prompt for the upcoming subagent
       if (toolName === 'Agent' && msg.input) {
@@ -1868,7 +1868,7 @@ function handleChatEvent(msg) {
           if (pond) pond.classList.remove('pondering');
         }
       }
-      chatMessages.push({ role: 'tool_result', content: (msg.output || '').slice(0, 500) });
+      chatMessages.push({ role: 'tool_result', content: (msg.output || '').slice(0, 500), subagent_id: msg.subagent_id || null });
       break;
     }
 
@@ -1910,42 +1910,54 @@ function handleChatEvent(msg) {
       function doRedirect() {
         if (chatWs && chatWs.readyState === WebSocket.OPEN) chatWs.send(JSON.stringify({ type: 'stop' }));
 
-        // Collect ALL agents' info for restart
-        const allAgents = [];
+        // Build each subagent's progress from chatMessages
+        function getAgentProgress(agentTaskId) {
+          const progress = [];
+          for (const m of chatMessages) {
+            if (m.subagent_id === agentTaskId) {
+              if (m.role === 'thinking') progress.push(`[Thinking]: ${m.content}`);
+              else if (m.role === 'tool') progress.push(`[Tool]: ${m.content}`);
+              else if (m.role === 'tool_result') progress.push(`[Result]: ${m.content}`);
+            }
+          }
+          return progress.join('\n');
+        }
+
+        // Build hidden context with full progress for all agents
+        let autoContext = 'All subagents were interrupted and need to be restarted. Here is each subagent\'s progress so they can continue exactly where they left off.\n\n';
+
         for (const [tid, sub] of activeSubagents) {
           const d = sub.header?.querySelector('.chat-subagent-desc')?.textContent || 'unknown';
           const p = sub.el?.dataset?.prompt || '';
-          allAgents.push({ taskId: tid, desc: d, prompt: p, isRedirected: tid === taskId });
-        }
+          const progress = getAgentProgress(tid);
 
-        // Show context block
-        const preview = document.getElementById('chat-context-preview');
-        preview.innerHTML = `<span class="ctx-file">Redirecting: ${subDesc}</span><span class="ctx-text">${agentPrompt ? agentPrompt.slice(0, 60) + '...' : ''}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
-        preview.style.display = 'flex';
-        preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
-
-        // Build the hidden context that gets sent with the user's message.
-        // The user only types the redirect instructions — everything else is automatic.
-        let autoContext = 'All subagents were interrupted and need to be restarted. The conversation history contains each subagent\'s full progress (thinking traces, tool calls, results). Please restart all subagents to continue exactly where they left off.\n\n';
-
-        for (const ag of allAgents) {
-          if (ag.isRedirected) {
-            autoContext += `For subagent "${ag.desc}": restart it with its original task, but apply these additional instructions from the user: `;
+          if (tid === taskId) {
+            autoContext += `--- REDIRECTED AGENT: "${d}" ---\n`;
+            autoContext += `Original prompt: ${p}\n`;
+            if (progress) autoContext += `Progress before redirect:\n${progress}\n`;
+            autoContext += `User's redirect instructions: `;
           } else {
-            autoContext += `For subagent "${ag.desc}": restart it to continue exactly where it left off with no changes.\n`;
+            autoContext += `--- AGENT TO CONTINUE: "${d}" ---\n`;
+            autoContext += `Original prompt: ${p}\n`;
+            if (progress) autoContext += `Progress (continue from here):\n${progress}\n`;
+            autoContext += `Action: Restart this agent to continue exactly where it left off.\n\n`;
           }
         }
 
-        pendingSelection = {
-          text: autoContext,
-          file: '',
-        };
+        // Show context block (user sees a clean summary, not the full progress)
+        const preview = document.getElementById('chat-context-preview');
+        const otherCount = activeSubagents.size - 1;
+        const otherNote = otherCount > 0 ? ` + ${otherCount} other agent${otherCount > 1 ? 's' : ''} will restart` : '';
+        preview.innerHTML = `<span class="ctx-file">Redirecting: ${subDesc}${otherNote}</span><span class="ctx-remove" title="Cancel redirect">✕</span>`;
+        preview.style.display = 'flex';
+        preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
+
+        pendingSelection = { text: autoContext, file: '' };
 
         const input = document.getElementById('chat-input');
         input.value = '';
         input.placeholder = 'Type your redirect instructions for this agent...';
         input.focus();
-        // Trigger resize
         input.style.height = 'auto';
       }
 
