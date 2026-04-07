@@ -1,0 +1,1 @@
+- prefer-concise-answers — senior engineer, terse responses, skip preamble

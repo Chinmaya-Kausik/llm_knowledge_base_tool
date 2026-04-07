@@ -1,0 +1,2 @@
+- data-pipeline-csv-format — CSV with headers, lowercase underscore columns, numeric normalization
+- prefer-concise-answers — senior engineer, terse responses

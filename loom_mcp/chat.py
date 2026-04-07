@@ -226,13 +226,17 @@ Permissions:
 
 def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str | None:
     """Read project MEMORY.md or root MEMORY.md, inject capped."""
+    import logging
+    log = logging.getLogger("loom.chat")
     if not config.get("memory", {}).get("enabled", True):
+        log.info("[memory] disabled by config")
         return None
     max_chars = config.get("memory", {}).get("max_chars", 2000)
 
     memory_content = None
 
     # If in a project, try project-level MEMORY.md
+    source = None
     if page_path:
         parts = page_path.split("/")
         if len(parts) >= 2 and parts[0] == "projects":
@@ -240,6 +244,7 @@ def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str |
             if project_memory.exists():
                 try:
                     memory_content = project_memory.read_text(encoding="utf-8").strip()
+                    source = f"projects/{parts[1]}/MEMORY.md"
                 except Exception:
                     pass
 
@@ -249,15 +254,18 @@ def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str |
         if root_memory.exists():
             try:
                 memory_content = root_memory.read_text(encoding="utf-8").strip()
+                source = "MEMORY.md (root)"
             except Exception:
                 pass
 
     if not memory_content:
+        log.info("[memory] no MEMORY.md found for page_path=%s", page_path)
         return None
 
     if len(memory_content) > max_chars:
         memory_content = memory_content[:max_chars] + "\n\n[... more memories available ...]"
 
+    log.info("[memory] injecting from %s (%d chars) for page_path=%s", source, len(memory_content), page_path)
     return f"## Memories\n{memory_content}"
 
 

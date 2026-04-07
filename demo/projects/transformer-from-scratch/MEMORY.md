@@ -1,0 +1,3 @@
+- transformer-uses-pytorch — PyTorch with custom attention, AdamW + warmup cosine
+- attention-paper-deadline — paper submission mid-May, experiments feed into results
+- prefer-concise-answers — senior engineer, terse responses
