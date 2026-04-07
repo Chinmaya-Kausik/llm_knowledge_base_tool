@@ -1,14 +1,16 @@
 # Vault
 
-A local-first personal knowledge base that puts your files on an infinite canvas and gives Claude Code a visual interface to operate on all of it. Markdown on disk, git-versioned, no cloud sync.
+A local-first workspace for managing files, knowledge, and agents on an infinite canvas. Claude Code runs inside the UI with visual tool traces, programmatic permissions, and persistent context across everything in your vault. Markdown on disk, git-versioned, no cloud sync.
 
 <!-- ![Vault screenshot](screenshot.png) -->
 
 ## Why
 
-I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things.
+I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things. And file managers, editors, and AI chat are all separate applications with no shared state.
 
-Vault puts everything on a canvas where documents are cards you can arrange, connect, and drill into. Claude Code runs inside the UI with multiple chat panels, inline diffs, and a programmatic permission system. The knowledge base compounds over time: ingest sources, compile them into structured wiki pages, and every future conversation benefits from the accumulated context.
+Vault is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the vault. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
+
+It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
 ## Quick Start
 
