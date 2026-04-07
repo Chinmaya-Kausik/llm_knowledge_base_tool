@@ -8,7 +8,7 @@ An interactive workspace and knowledge base on an infinite canvas. Navigate, edi
 
 I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things. And file managers, editors, and AI chat are all separate applications with no shared state.
 
-Vault is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the vault. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
+Vault is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the loom. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
 
 It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
@@ -20,13 +20,13 @@ cd llm_knowledge_base_tool
 
 uv sync --extra web --extra dev
 
-export VAULT_ROOT=~/my-vault   # or omit to use current dir
+export LOOM_ROOT=~/my-vault   # or omit to use current dir
 
-uv run --extra web python -m vault_mcp.web
+uv run --extra web python -m loom_mcp.web
 # Open http://localhost:8420
 ```
 
-Or double-click `vault-ui.command` to launch with auto browser open.
+Or double-click `loom-ui.command` to launch with auto browser open.
 
 ### Native App (macOS)
 
@@ -43,7 +43,7 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 Vault builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
 
 - **Selective tool call expansion.** Expand any individual tool call to see its details while the rest stay collapsed — and they stay open while the agent keeps working. Edit calls show inline diffs with colored removed/added text. Same-tool runs are grouped by unique file count ("Edited 1 file" not "Edited 3 files"). Tool call details are preserved in saved chat transcripts.
-- **Browsable chat transcripts.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to pick up where you left off — your conversation history is just files in the vault.
+- **Browsable chat transcripts.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to pick up where you left off — your conversation history is just files in the loom.
 - **Fork any conversation.** Branch a chat with full context injected into the new panel. Explore an alternative direction without losing the original thread.
 - **Redirect with checkpoints.** Set breakpoints on specific tool calls and intervene at that point with corrective feedback. More granular than Escape — you choose *where* to redirect, and the agent resumes with your instructions as context.
 - **Multiple concurrent agents.** Open several chat panels at once — floating, docked, or minimized. Each has its own session. Work on different parts of a project in parallel.
@@ -140,12 +140,12 @@ All shortcuts are rebindable via Cmd+K.
 ## Architecture
 
 ```
-vault/
+loom/
   wiki/                  <- LLM-maintained structured knowledge
   raw/                   <- Ingested sources + saved chat transcripts
   outputs/               <- Generated artifacts
 
-vault_mcp/
+loom_mcp/
   server.py              <- 28 MCP tools (stdio transport)
   web.py                 <- FastAPI server + WebSocket endpoints
   chat.py                <- Claude Agent SDK bridge with permission system
@@ -177,8 +177,8 @@ src-tauri/               <- Tauri v2 native app (optional)
 
 ## Configuration
 
-- `VAULT_ROOT` env var, `~/.vault-app-config.json`, or the Settings dropdown in the UI
-- `.claude/mcp.json` registers the vault MCP server for Claude Code (auto-created on startup)
+- `LOOM_ROOT` env var, `~/.loom-app-config.json`, or the Settings dropdown in the UI
+- `.claude/mcp.json` registers the loom MCP server for Claude Code (auto-created on startup)
 - `config.yaml` for frontmatter schema and compilation settings
 
 ## Development

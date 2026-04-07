@@ -3,11 +3,11 @@
 ## Project Structure
 
 ```
-vault_mcp/
+loom_mcp/
   server.py          MCP server entrypoint (stdio transport, 28 tools)
   web.py             FastAPI web server (REST + WebSocket)
   chat.py            Chat backend — WebSocket bridge to Claude Agent SDK
-  __main__.py        `python -m vault_mcp` -> MCP server
+  __main__.py        `python -m loom_mcp` -> MCP server
 
   lib/
     pages.py         Folder-as-page abstraction (filesystem walk, link resolution)
@@ -39,12 +39,12 @@ src-tauri/           Tauri native app wrapper
 
 ## Data Model: Folder as Page
 
-The core abstraction is in `vault_mcp/lib/pages.py`:
+The core abstraction is in `loom_mcp/lib/pages.py`:
 
 - **A folder IS a page.** Its `README.md` holds the content (LLM-maintained summary).
 - **A file IS a subpage** of its parent folder.
-- **`walk_pages(vault_root)`** walks the filesystem and returns all pages as a flat list with parent/child relationships.
-- **`build_page_graph(vault_root)`** adds edges from `[[wiki-links]]` and returns the full graph with top-level aggregation.
+- **`walk_pages(loom_root)`** walks the filesystem and returns all pages as a flat list with parent/child relationships.
+- **`build_page_graph(loom_root)`** adds edges from `[[wiki-links]]` and returns the full graph with top-level aggregation.
 - **README.md files are hidden** from the page list (they're represented by their parent folder).
 - **Hidden patterns** (`.git`, `__pycache__`, `node_modules`) are excluded by default.
 
@@ -61,7 +61,7 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 
 ## Web Server (FastAPI)
 
-`vault_mcp/web.py` serves:
+`loom_mcp/web.py` serves:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -92,18 +92,18 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 | `/api/open-external` | POST | Open file in system default app |
 | `/ws/chat` | WebSocket | Claude Code chat (streaming) |
 | `/ws/terminal` | WebSocket | PTY terminal session |
-| `/media/{path}` | GET | Serve files (PDFs, images) from vault |
+| `/media/{path}` | GET | Serve files (PDFs, images) from loom |
 
 ### Bootstrap
 
-On startup (`lifespan`), `bootstrap_vault()` creates:
+On startup (`lifespan`), `bootstrap_loom()` creates:
 - Directory structure: `raw/{inbox,articles,papers,repos,media}`, `wiki/{concepts,summaries,indexes,answers,meta}`, `outputs/{slides,reports,visualizations}`
 - `page-registry.json` and `glossary.md` if missing
-- `.claude/mcp.json` in the vault directory so the Claude agent subprocess can find MCP tools
+- `.claude/mcp.json` in the loom directory so the Claude agent subprocess can find MCP tools
 
 ## Chat Backend
 
-`vault_mcp/chat.py` bridges browser <-> Claude Code via the Agent SDK:
+`loom_mcp/chat.py` bridges browser <-> Claude Code via the Agent SDK:
 
 ### Protocol
 
@@ -119,7 +119,7 @@ On startup (`lifespan`), `bootstrap_vault()` creates:
 
 ### System Prompt
 
-`build_system_prompt()` constructs a system prompt that enhances (does not replace) Claude Code's defaults. It injects vault structure, conventions, MCP tool references, and context depending on the level. Uses `__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__` to separate cached static content from per-request dynamic context. Page content is truncated to 8K characters.
+`build_system_prompt()` constructs a system prompt that enhances (does not replace) Claude Code's defaults. It injects loom structure, conventions, MCP tool references, and context depending on the level. Uses `__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__` to separate cached static content from per-request dynamic context. Page content is truncated to 8K characters.
 
 ### Context Levels
 
@@ -154,7 +154,7 @@ Sessions track `page_path`, `history`, `model`, `sdk_client`, `sdk_session_id`, 
 
 ## Frontend (Vanilla JS)
 
-`vault_mcp/static/app.js` (~5100 lines) -- no framework, no build step. Key modules:
+`loom_mcp/static/app.js` (~5100 lines) -- no framework, no build step. Key modules:
 
 - **Keybindings**: Rebindable shortcuts stored in localStorage, all actions mapped via `matchesBinding()`
 - **Canvas Controller**: d3-zoom on `#infinite-canvas`, CSS transform on `#world`
@@ -173,7 +173,7 @@ Sessions track `page_path`, `history`, `model`, `sdk_client`, `sdk_session_id`, 
 - **Selection Tooltip**: `mouseup` listener, shows "Ask Claude" on text selection with context injection
 - **PDF Rendering**: Lazy-loaded pdf.js (`pdf.min.mjs` + worker) with text layer for selection
 - **Search**: Content/name/global toggles with match highlighting in file cards
-- **Settings Dropdown**: vault root path, Claude auth status/login trigger, code font size slider
+- **Settings Dropdown**: loom root path, Claude auth status/login trigger, code font size slider
 - **Auto-save**: chat transcripts saved via `sendBeacon` on `beforeunload` to `/api/chat/save`
 
 ### Card Interaction Model
@@ -189,7 +189,7 @@ Sessions track `page_path`, `history`, `model`, `sdk_client`, `sdk_session_id`, 
 
 ### Keyboard Shortcuts
 
-All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBINDINGS` at the top of app.js and persisted to `localStorage['vault-keybindings']`.
+All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBINDINGS` at the top of app.js and persisted to `localStorage['loom-keybindings']`.
 
 | Shortcut | Action |
 |----------|--------|
@@ -221,7 +221,7 @@ All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBIND
 
 ## MCP Server
 
-`vault_mcp/server.py` registers 28 tools for Claude Code. The server uses stdio transport and is registered in `.claude/mcp.json`. All tools are deterministic -- no LLM calls from Python.
+`loom_mcp/server.py` registers 28 tools for Claude Code. The server uses stdio transport and is registered in `.claude/mcp.json`. All tools are deterministic -- no LLM calls from Python.
 
 ### Tool Categories
 
@@ -229,7 +229,7 @@ All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBIND
 
 **Classification** (1 tool): `classify_inbox_item` -- move a source from inbox to its proper location.
 
-**Reading** (4 tools): `read_source`, `read_wiki_page`, `get_page_registry`, `get_glossary` -- read vault content.
+**Reading** (4 tools): `read_source`, `read_wiki_page`, `get_page_registry`, `get_glossary` -- read loom content.
 
 **Compilation** (5 tools): `write_wiki_page`, `mark_source_compiled`, `update_glossary`, `update_master_index`, `append_log` -- write and maintain wiki pages.
 
@@ -245,14 +245,14 @@ All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBIND
 
 To inspect registered tools:
 ```bash
-uv run python -c "from vault_mcp.server import mcp; print(len(mcp._tool_manager._tools), 'tools')"
+uv run python -c "from loom_mcp.server import mcp; print(len(mcp._tool_manager._tools), 'tools')"
 ```
 
 ## Testing
 
 ```bash
 uv run pytest                    # All 293 tests
-uv run pytest vault_mcp/tests/test_pages.py -v  # Just page model
+uv run pytest loom_mcp/tests/test_pages.py -v  # Just page model
 uv run pytest -k "test_chat"     # Just chat tests
 ```
 
@@ -312,30 +312,30 @@ cargo tauri build
 ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Vault.app
 ```
 
-The Tauri app starts the Python server as a sidecar process and opens a native window pointing at `localhost:8420`. Settings (vault root) are persisted to `~/.vault-app-config.json`.
+The Tauri app starts the Python server as a sidecar process and opens a native window pointing at `localhost:8420`. Settings (loom root) are persisted to `~/.loom-app-config.json`.
 
 ## Adding New Features
 
 ### New MCP Tool
 
-1. Write the function in the appropriate `vault_mcp/tools/*.py` file
-2. Register it in `vault_mcp/server.py` with `@mcp.tool()` decorator
-3. Write tests in `vault_mcp/tests/`
-4. If it needs a web API endpoint, add it to `vault_mcp/web.py`
+1. Write the function in the appropriate `loom_mcp/tools/*.py` file
+2. Register it in `loom_mcp/server.py` with `@mcp.tool()` decorator
+3. Write tests in `loom_mcp/tests/`
+4. If it needs a web API endpoint, add it to `loom_mcp/web.py`
 5. Run `uv run pytest` to verify
 
 ### New API Endpoint
 
-1. Add the route in `vault_mcp/web.py` with the appropriate decorator (`@app.get`, `@app.post`, etc.)
+1. Add the route in `loom_mcp/web.py` with the appropriate decorator (`@app.get`, `@app.post`, etc.)
 2. Follow the existing pattern: resolve paths relative to `VAULT_ROOT`, validate path traversal
-3. Add tests in `vault_mcp/tests/test_web.py` or `test_web_comprehensive.py`
+3. Add tests in `loom_mcp/tests/test_web.py` or `test_web_comprehensive.py`
 
 ### New Frontend Feature
 
-1. Add code to `vault_mcp/static/app.js` -- no build step needed
+1. Add code to `loom_mcp/static/app.js` -- no build step needed
 2. For new keyboard shortcuts, add to `DEFAULT_KEYBINDINGS` at the top of app.js
-3. For new styles, add to `vault_mcp/static/style.css`
-4. For new vendored libraries, add to `vault_mcp/static/vendor/`
+3. For new styles, add to `loom_mcp/static/style.css`
+4. For new vendored libraries, add to `loom_mcp/static/vendor/`
 
 ### Key Conventions
 
