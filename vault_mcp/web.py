@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -563,15 +564,20 @@ async def api_update_settings(request: Request):
 
 @app.post("/api/restart")
 async def api_restart():
-    """Re-resolve vault root and re-bootstrap. Browser should hard-refresh after."""
-    global VAULT_ROOT, LAYOUT_FILE
-    VAULT_ROOT = _resolve_vault_root()
-    LAYOUT_FILE = VAULT_ROOT / "wiki" / "meta" / "canvas-layout.json"
-    bootstrap_vault(VAULT_ROOT)
-    # Clear all chat sessions (they reference old paths)
-    from vault_mcp.chat import sessions
-    sessions.clear()
-    return {"ok": True, "vault_root": str(VAULT_ROOT)}
+    """Full process restart — re-exec the server so code changes take effect.
+
+    Responds with OK, then a background thread replaces the process after a delay.
+    """
+    import threading
+
+    def _restart():
+        import time
+        time.sleep(0.5)  # Let the HTTP response flush
+        print(f"[restart] os.execv: {sys.executable} {sys.argv}", flush=True)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    threading.Thread(target=_restart, daemon=True).start()
+    return {"ok": True, "restarting": True}
 
 
 # --- Chat transcript saving ---

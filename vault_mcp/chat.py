@@ -275,13 +275,17 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         rules = session.get("permission_rules", {})
         category = _map_tool_to_category(tool_name)
 
-        # Check for destructive git commands in Bash
+        # Check for destructive commands in Bash
         if tool_name == "Bash":
             cmd = tool_input.get("command", "")
-            for pattern in ["git push", "git reset --hard", "git clean", "git branch -D", "rm -rf"]:
-                if pattern in cmd:
-                    category = "destructive_git"
-                    break
+            import re
+            if re.search(r'\brm\b', cmd) or any(
+                p in cmd for p in [
+                    "git push", "git reset --hard", "git clean", "git branch -D",
+                    "git push --force",
+                ]
+            ):
+                category = "destructive_git"
 
         rule = rules.get(category, "allow")
 
@@ -296,7 +300,7 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
             await websocket.send_json({
                 "type": "permission_request",
                 "tool": tool_name,
-                "input": {k: str(v)[:200] for k, v in tool_input.items()},
+                "input": {k: str(v) for k, v in tool_input.items()},
                 "category": category,
             })
             # Wait for browser response (with timeout)
@@ -360,7 +364,6 @@ async def _get_or_create_client(session_id: str, vault_root: Path, context_level
     # "auto" when no rules are set (backwards compatible)
     has_rules = any(v != "allow" for v in rules.values())
     perm_mode = "default" if has_rules else "auto"
-
     can_use_tool_cb = _make_permission_handler(session_id, websocket) if has_rules else None
 
     options = ClaudeAgentOptions(

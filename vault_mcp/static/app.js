@@ -2538,10 +2538,7 @@ function connectPanelChat(panel, messagesEl) {
       session_id: panel.sessionId,
       page_path: panel.contextPath || currentLevel().parentPath || '',
     }));
-    const rules = getPermissionRules();
-    if (Object.keys(rules).length > 0) {
-      thisWs.send(JSON.stringify({ type: 'set_permissions', rules }));
-    }
+    thisWs.send(JSON.stringify({ type: 'set_permissions', rules: getPermissionRules() }));
   };
 
   // Queue events and process without corrupting main panel's globals
@@ -3301,7 +3298,7 @@ function formatToolDesc(tool, input) {
     case 'Edit':            return `${i.file_path || i.path || 'file'}`;
     case 'Grep':            return `"${i.pattern || ''}"${i.path ? ' in ' + i.path : ''}`;
     case 'Glob':            return i.pattern || '*';
-    case 'Bash':            return (i.command || '').slice(0, 80);
+    case 'Bash':            return i.command || '';
     case 'WebSearch':       return i.query || '';
     case 'WebFetch':        return i.url || '';
     case 'ripgrep_search':  return `"${i.query || ''}"${i.scope ? ' in ' + i.scope : ''}`;
@@ -3516,10 +3513,7 @@ function finalizeActivityGroup(ag) {
       latest.textContent = `${summarizeTools(ag._tools || [])} (${elapsed}s)`;
     }
   }
-  const body = ag.querySelector('.chat-activity-body');
-  if (body) body.classList.remove('open');
-  const toggle = ag.querySelector('.chat-thinking-toggle');
-  if (toggle) toggle.classList.remove('open');
+  // Don't collapse — let the user keep reading expanded details
 }
 
 // Get the target container for an event — subagent body or parent assistant
@@ -4119,19 +4113,32 @@ function handleChatEvent(msg) {
       container.appendChild(promptEl);
       container.scrollTop = container.scrollHeight;
 
+      // Focus Allow button so Enter confirms
+      const allowBtn = promptEl.querySelector('.perm-allow');
+      allowBtn?.focus();
+
+      function resolvePermission(decision) {
+        const ws = activePanel?.ws || chatWs;
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'permission_response', decision }));
+        }
+        // Replace with compact notification (like "Modified 1 file")
+        promptEl.className = 'chat-file-notification';
+        const label = decision === 'allow' ? 'Allowed' : 'Denied';
+        promptEl.innerHTML = `${label}: ${escapeHtml(toolName)} — ${escapeHtml(inputSummary)}`;
+        promptEl.removeEventListener('keydown', onKey);
+      }
+
       promptEl.querySelectorAll('.perm-actions button').forEach(btn => {
-        btn.onclick = () => {
-          const decision = btn.dataset.decision;
-          // Send response back to backend
-          const ws = activePanel?.ws || chatWs;
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'permission_response', decision }));
-          }
-          // Update UI
-          promptEl.innerHTML = `<div class="perm-label">${decision === 'allow' ? 'Allowed' : 'Denied'}: ${escapeHtml(toolName)}</div>`;
-          promptEl.style.opacity = '0.6';
-        };
+        btn.onclick = () => resolvePermission(btn.dataset.decision);
       });
+
+      // Enter = allow, Escape = deny while prompt is active
+      function onKey(e) {
+        if (e.key === 'Enter') { e.preventDefault(); resolvePermission('allow'); }
+        if (e.key === 'Escape') { e.preventDefault(); resolvePermission('deny'); }
+      }
+      promptEl.addEventListener('keydown', onKey);
       break;
     }
   }
@@ -4738,16 +4745,33 @@ async function restartServer() {
       } catch {}
     }
   }
-  // Restart
+  // Restart — server will os.execv itself, so wait for it to come back
   document.title = 'Restarting...';
   try {
     await fetch('/api/restart', { method: 'POST' });
   } catch {}
+  // Poll until server is back up
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const resp = await fetch('/api/tree', { signal: AbortSignal.timeout(2000) });
+      if (resp.ok) break;
+    } catch {}
+  }
   window.location.href = window.location.pathname + '?_=' + Date.now();
 }
 
+const DEFAULT_PERMISSION_RULES = {
+  file_read: 'allow',
+  file_write: 'allow',
+  shell: 'allow',
+  destructive_git: 'ask',
+  mcp_tools: 'allow',
+};
+
 function getPermissionRules() {
-  return JSON.parse(localStorage.getItem('vault-permissions') || '{}');
+  const saved = JSON.parse(localStorage.getItem('vault-permissions') || '{}');
+  return { ...DEFAULT_PERMISSION_RULES, ...saved };
 }
 
 function sendPermissionsToBackend(rules) {
