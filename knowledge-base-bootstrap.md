@@ -23,7 +23,7 @@ I want to build a local-first personal knowledge management system. No Obsidian,
 ### Directory Structure
 
 ```
-~/vault/
+~/loom/
 ├── CLAUDE.md                  # Project instructions for Claude Code
 ├── raw/                       # Unprocessed source material
 │   ├── articles/              # Web articles (markdown via trafilatura)
@@ -44,7 +44,7 @@ I want to build a local-first personal knowledge management system. No Obsidian,
 │   ├── slides/                # Marp-format slide decks
 │   ├── reports/               # Long-form synthesized documents
 │   └── visualizations/        # matplotlib/mermaid/svg outputs
-├── vault_mcp/                 # Local MCP server (deterministic tools, no LLM calls)
+├── loom_mcp/                 # Local MCP server (deterministic tools, no LLM calls)
 │   ├── __init__.py
 │   ├── server.py              # MCP server entrypoint (stdio transport)
 │   ├── tools/
@@ -122,28 +122,28 @@ compiled: true                   # Has this been processed by compile.py?
 
 The MCP server exposes deterministic tools. Claude Code does all the reasoning and writing.
 
-1. **MCP server setup** (`vault_mcp/server.py`):
+1. **MCP server setup** (`loom_mcp/server.py`):
    - Use the **MCP Python SDK** (`mcp`) with **stdio transport** (Claude Code connects to it as a local MCP server).
    - Register in `.claude/mcp.json` so Claude Code auto-connects:
      ```json
      {
        "mcpServers": {
-         "vault": {
+         "loom": {
            "command": "uv",
-           "args": ["run", "--directory", "/path/to/vault/vault_mcp", "python", "-m", "vault_mcp.server"]
+           "args": ["run", "--directory", "/path/to/loom/loom_mcp", "python", "-m", "loom_mcp.server"]
          }
        }
      }
      ```
    - Each tool is a function that takes structured input and returns structured output. No LLM calls inside any tool.
 
-2. **Ingestion tools** (`vault_mcp/tools/ingest.py`):
+2. **Ingestion tools** (`loom_mcp/tools/ingest.py`):
    - `ingest_url(url: str) → {path, title, content_hash}`: Fetch URL via **trafilatura** with `output_format="markdown"`, write to `raw/inbox/` with auto-generated frontmatter, compute content hash. Returns the file path so Claude Code can review/classify.
    - `ingest_pdf(filepath: str) → {path, title, content_hash}`: Extract PDF to markdown via **PyMuPDF4LLM**, write to `raw/inbox/` with frontmatter. Fall back to **marker-pdf** for complex papers (expose as `ingest_pdf_complex`).
    - `ingest_text(text: str, title: str) → {path, content_hash}`: Write raw text to `raw/inbox/` with frontmatter.
    - `classify_inbox_item(source: str, destination: str)`: Move a file from `raw/inbox/` to the appropriate `raw/` subdirectory.
 
-3. **Compilation support tools** (`vault_mcp/tools/compile.py`):
+3. **Compilation support tools** (`loom_mcp/tools/compile.py`):
    These tools assist Claude Code during compilation. Claude Code does the actual synthesis/writing.
    - `get_changed_sources() → [{path, content_hash, old_hash, status}]`: Scan `raw/` for files where `compiled: false` or where content hash has changed. Returns the list of sources needing compilation.
    - `get_page_registry() → {pages: [{title, path, aliases}]}`: Read `wiki/meta/page-registry.json`.
@@ -154,7 +154,7 @@ The MCP server exposes deterministic tools. Claude Code does all the reasoning a
    - `mark_source_compiled(path: str, hash: str)`: Update `compiled: true` and `content_hash` in a raw source's frontmatter.
    - `update_glossary(term: str, definition: str)`: Append a term to `wiki/meta/glossary.md`.
 
-4. **Linting tools** (`vault_mcp/tools/lint.py`) — **Phase 1, not Phase 2**:
+4. **Linting tools** (`loom_mcp/tools/lint.py`) — **Phase 1, not Phase 2**:
    - `validate_links() → [{page, link, status}]`: Parse all `[[wiki-links]]` across `wiki/`, check each against `page-registry.json` and filesystem. Return broken links.
    - `find_stale_pages() → [{page, source, expected_hash, actual_hash}]`: Compare `source_hash` in wiki frontmatter against current raw source hashes.
    - `find_orphan_pages() → [path]`: Wiki pages with zero inbound backlinks.
@@ -162,14 +162,14 @@ The MCP server exposes deterministic tools. Claude Code does all the reasoning a
    - `check_terminology(page: str) → [unknown_term]`: Terms used in a wiki page not found in `glossary.md`.
    - `generate_health_report()`: Run all checks, write `wiki/meta/health.md`.
 
-5. **Search tools** (`vault_mcp/tools/search.py`):
+5. **Search tools** (`loom_mcp/tools/search.py`):
    - `ripgrep_search(query: str, scope: str) → [{path, line, context}]`: Wrapper around `rg` for full-text search. Scope can be `raw`, `wiki`, or `all`.
    - `read_index(topic: str) → str`: Read a topic index file from `wiki/indexes/`.
    - **No vector search.** At personal scale, ripgrep + LLM-maintained indexes + context windows are sufficient. If you outgrow this, add **sqlite-vec** later.
 
-6. **Git tools** (`vault_mcp/tools/git.py`):
+6. **Git tools** (`loom_mcp/tools/git.py`):
    - `auto_commit(message: str)`: Stage all changes in `wiki/` and commit.
-   - `get_recent_changes(n: int) → [{hash, message, date}]`: Recent git log for the vault.
+   - `get_recent_changes(n: int) → [{hash, message, date}]`: Recent git log for the loom.
 
 **Phase 2: Intelligence — Make it useful**
 
@@ -199,19 +199,19 @@ These are Claude Code workflows that use the MCP tools above.
    ---
    name: wiki-compiler
    description: Compiles raw sources into wiki pages with summaries, concepts, and backlinks
-   tools: Read, Write, Edit, Glob, Grep, Bash, vault:*
+   tools: Read, Write, Edit, Glob, Grep, Bash, loom:*
    model: sonnet
    ---
    You are a wiki compilation agent for a personal knowledge base.
    
    Workflow:
-   1. Call vault:get_changed_sources to find uncompiled/modified sources.
-   2. Call vault:get_page_registry and vault:get_glossary for context.
-   3. For each changed source, call vault:read_source to get content.
-   4. Write summaries and concept articles using vault:write_wiki_page.
-   5. Mark processed sources with vault:mark_source_compiled.
-   6. Propose new glossary terms with vault:update_glossary.
-   7. Commit changes with vault:auto_commit.
+   1. Call loom:get_changed_sources to find uncompiled/modified sources.
+   2. Call loom:get_page_registry and loom:get_glossary for context.
+   3. For each changed source, call loom:read_source to get content.
+   4. Write summaries and concept articles using loom:write_wiki_page.
+   5. Mark processed sources with loom:mark_source_compiled.
+   6. Propose new glossary terms with loom:update_glossary.
+   7. Commit changes with loom:auto_commit.
    
    Rules:
    - Never generate [[links]] to pages not in the registry.
@@ -224,7 +224,7 @@ These are Claude Code workflows that use the MCP tools above.
    ---
    name: wiki-linter
    description: Validates wiki integrity — checks links, staleness, terminology, orphans
-   tools: Read, Glob, Grep, vault:validate_links, vault:find_stale_pages, vault:find_orphan_pages, vault:find_missing_concepts, vault:generate_health_report
+   tools: Read, Glob, Grep, loom:validate_links, loom:find_stale_pages, loom:find_orphan_pages, loom:find_missing_concepts, loom:generate_health_report
    model: haiku
    ---
    You are a wiki health check agent. Run all validation tools and synthesize
@@ -237,25 +237,25 @@ These are Claude Code workflows that use the MCP tools above.
    ---
    name: researcher
    description: Searches the web for information on a topic, ingests relevant sources
-   tools: Read, Write, Bash, WebSearch, WebFetch, vault:ingest_url, vault:ingest_text
+   tools: Read, Write, Bash, WebSearch, WebFetch, loom:ingest_url, loom:ingest_text
    model: sonnet
    ---
    You are a research agent. Given a topic:
    1. Search the web for high-quality sources (prefer primary sources, papers, docs)
-   2. For each relevant source, ingest it using vault:ingest_url
+   2. For each relevant source, ingest it using loom:ingest_url
    3. Write a brief research log to outputs/research-log.md
    ```
 
 9. **Slash commands** (`.claude/commands/`):
-   - `/compile $ARGUMENTS` — "Use the vault MCP tools to run incremental compilation. Call get_changed_sources, then compile each changed source into wiki pages. If arguments provided, compile only matching files."
-   - `/ingest $ARGUMENTS` — "Ingest the URL or file path using vault:ingest_url or vault:ingest_pdf: $ARGUMENTS"
-   - `/query $ARGUMENTS` — "Search the knowledge base using vault:ripgrep_search and vault:read_index, then synthesize an answer for: $ARGUMENTS"
-   - `/lint` — "Run wiki health checks using the vault linting tools and report findings."
-   - `/file-answer` — "Write the last synthesized answer back to wiki/answers/ using vault:write_wiki_page with full provenance."
+   - `/compile $ARGUMENTS` — "Use the loom MCP tools to run incremental compilation. Call get_changed_sources, then compile each changed source into wiki pages. If arguments provided, compile only matching files."
+   - `/ingest $ARGUMENTS` — "Ingest the URL or file path using loom:ingest_url or loom:ingest_pdf: $ARGUMENTS"
+   - `/query $ARGUMENTS` — "Search the knowledge base using loom:ripgrep_search and loom:read_index, then synthesize an answer for: $ARGUMENTS"
+   - `/lint` — "Run wiki health checks using the loom linting tools and report findings."
+   - `/file-answer` — "Write the last synthesized answer back to wiki/answers/ using loom:write_wiki_page with full provenance."
 
 10. **Hooks** (`.claude/settings.json`):
-    - `PostToolUse` on `vault:write_wiki_page`: auto-run `mdformat` for consistent formatting.
-    - `Stop` hook: if the session involved compilation, auto-run lint via `vault:generate_health_report`.
+    - `PostToolUse` on `loom:write_wiki_page`: auto-run `mdformat` for consistent formatting.
+    - `Stop` hook: if the session involved compilation, auto-run lint via `loom:generate_health_report`.
 
 ### Technical Constraints
 
@@ -267,15 +267,15 @@ These are Claude Code workflows that use the MCP tools above.
 - **PDF extraction**: **PyMuPDF4LLM** (fast default), **marker-pdf** (complex papers).
 - **Web extraction**: **trafilatura** with `output_format="markdown"`.
 - **CLI**: MCP tools are the primary interface (Claude Code calls them). For any standalone CLI needs, use **Typer**. **Rich** for terminal output.
-- **Version control**: `git init` the vault. Every compilation auto-commits via the `auto_commit` MCP tool. `.gitignore` for large binary files in `raw/media/`.
-- **Config**: `config.yaml` for vault paths, prompt template versions. No API keys needed anywhere.
+- **Version control**: `git init` the loom. Every compilation auto-commits via the `auto_commit` MCP tool. `.gitignore` for large binary files in `raw/media/`.
+- **Config**: `config.yaml` for loom paths, prompt template versions. No API keys needed anywhere.
 
 ### What to Build First
 
 Start with this exact sequence:
 
-1. `git init ~/vault` and create the directory structure.
-2. Scaffold the MCP server: `vault_mcp/server.py` with stdio transport, register one dummy tool, verify Claude Code can connect to it via `.claude/mcp.json`.
+1. `git init ~/loom` and create the directory structure.
+2. Scaffold the MCP server: `loom_mcp/server.py` with stdio transport, register one dummy tool, verify Claude Code can connect to it via `.claude/mcp.json`.
 3. Write the ingestion tools: `ingest_url` (trafilatura) and `ingest_pdf` (PyMuPDF4LLM). Test: ingest a URL, verify markdown + frontmatter + content hash land in `raw/inbox/`.
 4. Write `wiki/meta/glossary.md` (start empty) and `wiki/meta/page-registry.json` (start as `{"pages": []}`).
 5. Write the compilation support tools: `get_changed_sources`, `get_page_registry`, `get_glossary`, `write_wiki_page`, `mark_source_compiled`. Claude Code will use these to compile — you're giving it the plumbing, it does the thinking.

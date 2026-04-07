@@ -2,25 +2,25 @@
 
 An interactive workspace and knowledge base on an infinite canvas. Navigate, edit, compile, and run agents across all your files — with Claude Code as the built-in agent. Local-first, markdown on disk, git-versioned.
 
-<!-- ![Vault screenshot](screenshot.png) -->
+<!-- ![Loom screenshot](screenshot.png) -->
 
 ## Why
 
 I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things. And file managers, editors, and AI chat are all separate applications with no shared state.
 
-Vault is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the loom. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
+Loom is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the loom. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
 
 It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/Chinmaya-Kausik/llm_knowledge_base_tool.git
-cd llm_knowledge_base_tool
+git clone https://github.com/Chinmaya-Kausik/loom.git
+cd loom
 
 uv sync --extra web --extra dev
 
-export LOOM_ROOT=~/my-vault   # or omit to use current dir
+export LOOM_ROOT=~/my-loom   # or omit to use current dir
 
 uv run --extra web python -m loom_mcp.web
 # Open http://localhost:8420
@@ -33,14 +33,14 @@ Or double-click `loom-ui.command` to launch with auto browser open.
 ```bash
 cargo install tauri-cli
 cargo tauri build
-ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Vault.app
+ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Loom.app" /Applications/Loom.app
 ```
 
 Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
-## How Vault extends Claude Code
+## How Loom extends Claude Code
 
-Vault builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
+Loom builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
 
 - **Selective tool call expansion.** Expand any individual tool call to see its details while the rest stay collapsed — and they stay open while the agent keeps working. Edit calls show inline diffs with colored removed/added text. Same-tool runs are grouped by unique file count ("Edited 1 file" not "Edited 3 files"). Tool call details are preserved in saved chat transcripts.
 - **Browsable chat transcripts.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to pick up where you left off — your conversation history is just files in the loom.
