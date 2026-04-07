@@ -1076,6 +1076,15 @@ def serve_media(filepath: str):
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    """Disable browser caching for static files during development."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static") or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.get("/")
 def index():
     return FileResponse(str(STATIC_DIR / "index.html"))

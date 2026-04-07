@@ -523,6 +523,14 @@ body {
 }
 .keybind-reset:hover { color: var(--text); }
 
+/* View panel */
+.view-panel-section { margin-bottom: 12px; }
+.view-panel-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.view-panel-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; cursor: pointer; }
+.view-panel-row:hover { color: var(--accent); }
+.view-panel-row input[type="checkbox"] { accent-color: var(--accent); }
+.view-panel-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
 /* Universal panel header */
 .panel-header {
   display: flex; align-items: center; gap: 6px;
@@ -1126,7 +1134,7 @@ body {
 .item-focused { background: rgba(122,162,247,0.1) !important; outline: 1px solid var(--accent); outline-offset: -1px; border-radius: var(--radius); }
 .tree-item.item-focused, .ftree-item.item-focused { background: rgba(122,162,247,0.15) !important; }
 .file-tile.item-focused { outline: 2px solid var(--accent); }
-.doc-card.item-focused { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(122,162,247,0.3); }
+.doc-card.item-focused { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(122,162,247,0.3); background: var(--bg-surface) !important; }
 #chat-input-controls { display: flex; flex-direction: column; gap: 4px; }
 #chat-send, #chat-stop {
   background: var(--bg-surface2); border: 1px solid var(--border);

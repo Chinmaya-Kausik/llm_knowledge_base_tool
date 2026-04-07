@@ -75,9 +75,9 @@ function saveKeyBindings() {
 
 // --- API ---
 const api = {
-  graph:       () => fetch(`/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`).then(r => r.json()),
+  graph:       () => { const url = `/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`; console.log('[API] graph:', url); return fetch(url).then(r => r.json()); },
   page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
-  tree:        () => fetch(`/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}`).then(r => r.json()),
+  tree:        () => { const url = `/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}`; console.log('[API] tree:', url); return fetch(url).then(r => r.json()); },
   search:      (q, s='all', mode='both') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
   health:      () => fetch('/api/health').then(r => r.json()),
   brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
@@ -116,6 +116,13 @@ function setFocusedItem(path, element) {
   if (element) element.classList.add('item-focused');
 }
 let edgeRAF = null;         // rAF handle for edge debouncing
+let topZIndex = 200;        // Counter for bring-to-front
+
+function bringToFront(el) {
+  if (!el || !el.parentNode) return;
+  topZIndex++;
+  el.style.setProperty('z-index', String(topZIndex), 'important');
+}
 
 // Canvas stack for drill-in navigation
 let canvasStack = [];  // [{parentPath: null|string, label: string}]
@@ -277,6 +284,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
     <div class="doc-body">${bodyHTML}</div>
   `;
 
+  card.addEventListener('pointerdown', () => bringToFront(card), true);
   wireCardDrag(card, options.pinned);
   wireCardBorderResize(card);
   wireCardButtons(card, childCount > 0);
@@ -1173,6 +1181,30 @@ function initFilterDropdowns() {
   ftMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.onchange = applyFilters);
   document.getElementById('filetype-select-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=true); applyFilters(); };
   document.getElementById('filetype-clear-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=false); applyFilters(); };
+
+  // Visibility toggles
+  const internalsCheckbox = document.getElementById('filter-show-internals');
+  const hiddenCheckbox = document.getElementById('filter-show-hidden');
+  if (internalsCheckbox) {
+    internalsCheckbox.checked = localStorage.getItem('loom-show-internals') === 'true';
+    internalsCheckbox.onchange = () => {
+      console.log('[View] Show internals:', internalsCheckbox.checked);
+      localStorage.setItem('loom-show-internals', internalsCheckbox.checked);
+      refreshFileTree();
+    };
+  } else {
+    console.warn('[View] filter-show-internals checkbox not found');
+  }
+  if (hiddenCheckbox) {
+    hiddenCheckbox.checked = localStorage.getItem('loom-show-hidden') === 'true';
+    hiddenCheckbox.onchange = () => {
+      console.log('[View] Show hidden:', hiddenCheckbox.checked);
+      localStorage.setItem('loom-show-hidden', hiddenCheckbox.checked);
+      refreshFileTree();
+    };
+  } else {
+    console.warn('[View] filter-show-hidden checkbox not found');
+  }
 }
 
 function populateTagFilter() {
@@ -1285,6 +1317,7 @@ function sortItems(items) {
 }
 
 async function refreshFileTree() {
+  console.log('[View] refreshFileTree called');
   // Refresh sidebar tree
   const treeData = await api.tree();
   const sidebarContainer = document.getElementById('sidebar-tree');
@@ -1297,7 +1330,7 @@ async function refreshFileTree() {
     if (filesMode === 'tree') renderFilesTree();
     else renderFilesTiles();
   }
-  // Refresh graph data and fetch content for new pages
+  // Refresh graph data and re-render canvas
   graphData = await api.graph();
   const newIds = graphData.nodes.map(n => n.data.id).filter(id => !cardMeta.has(id));
   if (newIds.length > 0) {
@@ -1310,9 +1343,9 @@ async function refreshFileTree() {
         if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
       }
     } catch {}
-    // Re-render canvas to include new nodes
-    renderCurrentLevel();
   }
+  // Always re-render to reflect visibility changes
+  renderCurrentLevel();
 }
 
 async function initFilesView() {
@@ -1915,11 +1948,13 @@ function focusChatPanel(panelId) {
       const ph = document.querySelector('#chat-header .panel-header');
       if (ph) ph.click();
     }
+    if (cp.classList.contains('chat-float')) bringToFront(cp);
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
+      bringToFront(p.container);
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
     }
   }
@@ -2375,6 +2410,7 @@ function createFloatingPanel(options = {}) {
   card.style.top = (100 + panelCounter * 30) + 'px';
 
   document.getElementById('canvas-container').appendChild(card);
+  bringToFront(card);
   panel.container = card;
   panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
@@ -2486,6 +2522,7 @@ function createFloatingPanel(options = {}) {
 
   // Draggable header with dead zone to distinguish from click
   let dragReady = false, dragging = false, startX, startY, dx, dy;
+  card.addEventListener('pointerdown', () => bringToFront(card), true);
   headerEl.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button') || e.target.closest('.panel-menu') || e.target.closest('[contenteditable]')) return;
     dragReady = true; dragging = false;
@@ -2692,6 +2729,8 @@ function createTerminalPanel() {
   }
 
   document.getElementById('canvas-container').appendChild(card);
+  card.addEventListener('pointerdown', () => bringToFront(card), true);
+  bringToFront(card);
 
   // Draggable
   let dragging = false, dragReady = false, startX, startY, dx, dy;
@@ -2777,6 +2816,11 @@ function initChat() {
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
   const stopBtn = document.getElementById('chat-stop');
+
+  // Bring main chat to front on any interaction when floating
+  panel.addEventListener('pointerdown', () => {
+    if (panel.classList.contains('chat-float')) bringToFront(panel);
+  }, true);
 
   // Inject universal header into main chat panel
   const mainHeaderContainer = document.getElementById('chat-header');
@@ -4748,23 +4792,6 @@ function initSettings() {
     const size = slider.value + 'px';
     valDisplay.textContent = size;
     document.documentElement.style.setProperty('--code-font-size', size);
-  });
-
-  // Show loom internals toggle
-  const internalsCheckbox = document.getElementById('settings-show-internals');
-  internalsCheckbox.checked = localStorage.getItem('loom-show-internals') === 'true';
-  internalsCheckbox.addEventListener('change', () => {
-    localStorage.setItem('loom-show-internals', internalsCheckbox.checked);
-    loadGraph();
-    loadTree();
-  });
-
-  // Show hidden files toggle (files view only)
-  const hiddenCheckbox = document.getElementById('settings-show-hidden');
-  hiddenCheckbox.checked = localStorage.getItem('loom-show-hidden') === 'true';
-  hiddenCheckbox.addEventListener('change', () => {
-    localStorage.setItem('loom-show-hidden', hiddenCheckbox.checked);
-    loadTree();
   });
 
   // Keybinding editor

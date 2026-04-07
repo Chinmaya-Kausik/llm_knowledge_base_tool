@@ -99,6 +99,14 @@
           </div>
           <hr>
           <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Hidden Files</div>
+            <div class="toolbar-menu-body collapsed" id="filter-visibility-menu">
+              <label><input type="checkbox" id="filter-show-internals"> Loom internals</label>
+              <label><input type="checkbox" id="filter-show-hidden"> Hidden files (tree only)</label>
+            </div>
+          </div>
+          <hr>
+          <div class="toolbar-menu-section">
             <div id="settings-menu">
           <div class="settings-section">
             <label class="settings-label">Loom Root</label>
@@ -118,20 +126,6 @@
             <span id="settings-code-font-val">13px</span>
           </div>
           <hr>
-          <div class="settings-section">
-            <label class="settings-label">Show Loom Internals</label>
-            <label class="settings-toggle">
-              <input type="checkbox" id="settings-show-internals">
-              <span class="settings-toggle-label">CLAUDE.md, MEMORY.md, config.yaml</span>
-            </label>
-          </div>
-          <div class="settings-section">
-            <label class="settings-label">Show Hidden Files</label>
-            <label class="settings-toggle">
-              <input type="checkbox" id="settings-show-hidden">
-              <span class="settings-toggle-label">In files view only (.git, __pycache__, etc.)</span>
-            </label>
-          </div>
           <hr>
           <div class="toolbar-menu-section">
             <div class="toolbar-menu-label" onclick="openPermissionsPanel(); document.getElementById('toolbar-menu').classList.remove('open');">Agent Permissions</div>
