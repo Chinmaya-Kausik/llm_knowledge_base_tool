@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage{amsmath, graphicx}
+\title{Efficient Attention: Combining Sparse and Multi-Head Mechanisms}
+\author{Demo Author}
+\begin{document}
+\maketitle
+\begin{abstract}
+We propose a hybrid attention mechanism that combines sparse attention patterns
+with multi-head projections, achieving O(n \sqrt{n}) complexity while maintaining
+the expressiveness of full attention.
+\end{abstract}
+
+\section{Introduction}
+Self-attention has O(n^2) complexity, limiting its application to long sequences.
+We address this by introducing \textit{SparseMultiHead}, which...
+
+\section{Related Work}
+\subsection{Sparse Attention}
+BigBird, Longformer, and similar approaches restrict attention to local windows
+plus global tokens.
+
+\subsection{Linear Attention}
+Performers and Random Feature Attention approximate softmax attention in O(n) time
+but lose expressiveness.
+
+\section{Method}
+\textit{Coming soon...}
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

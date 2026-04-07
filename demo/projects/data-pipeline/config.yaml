@@ -1,0 +1,21 @@
+pipeline:
+  name: research-data-pipeline
+  version: 0.1.0
+
+sources:
+  - type: arxiv
+    query: "transformer attention mechanism"
+    max_results: 50
+  - type: huggingface
+    dataset: "wikitext"
+    split: "train[:1000]"
+
+transform:
+  clean_html: true
+  lowercase: true
+  tokenize: true
+  extract_entities: false
+
+export:
+  format: jsonl
+  output_dir: "data/processed/"

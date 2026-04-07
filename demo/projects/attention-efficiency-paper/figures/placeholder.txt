@@ -1,0 +1,1 @@
+Figure files will go here (matplotlib outputs, diagrams)

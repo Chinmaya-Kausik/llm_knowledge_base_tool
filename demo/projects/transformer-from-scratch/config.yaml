@@ -1,0 +1,41 @@
+# --- Transformer hyperparameters ---
+model:
+  d_model: 128            # embedding dimension
+  n_heads: 4
+  n_layers: 4            # encoder-only (backward compat)
+  enc_layers: 3
+  dec_layers: 3
+  d_ff: 256
+  vocab_size: 1000
+  dropout: 0.1            # residual + attention dropout rate
+  max_len: 128
+
+training:
+  batch_size: 64
+  min_seq_len: 5
+  max_seq_len: 20
+  learning_rate: 0.0005
+  warmup_steps: 1000
+  steps: 10000
+  log_every: 100
+  eval_every: 500
+  eval_samples: 512
+  num_train_samples: 100000
+  num_val_samples: 2000
+
+# EN→DE translation (Tatoeba sentence pairs)
+translation:
+  batch_size: 64
+  learning_rate: 0.0003
+  warmup_steps: 2000
+  steps: 15000
+  log_every: 100
+  eval_every: 2000
+  max_pairs: 50000           # cap dataset size (null = use all)
+  max_len_words: 25          # filter: max words per sentence
+  max_len_tokens: 40         # filter: max tokens after tokenization
+  src_vocab_size: 8000
+  tgt_vocab_size: 8000
+  val_split: 0.05            # fraction held out for validation
+
+# end of config

@@ -1,0 +1,9 @@
+id,title,category,score
+1,Attention Is All You Need,transformers,10
+2,BERT Pre-training,language-models,9
+3,GPT-3 Few-Shot Learning,language-models,9
+4,FlashAttention,efficiency,8
+5,LoRA Fine-tuning,fine-tuning,8
+6,Scaling Laws,theory,7
+7,BigBird Sparse Attention,attention,7
+8,Gradient Checkpointing,efficiency,6

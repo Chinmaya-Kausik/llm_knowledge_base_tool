@@ -12,14 +12,12 @@ build/
 .venv/
 venv/
 
-# Large binary files in raw/media
-raw/media/*.png
-raw/media/*.jpg
-raw/media/*.jpeg
-raw/media/*.gif
-raw/media/*.mp4
-raw/media/*.pdf
-!raw/papers/*.pdf
+# Large binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
 
 # OS
 .DS_Store
@@ -41,9 +39,5 @@ Thumbs.db
 htmlcov/
 .coverage
 
-# Knowledge base data directories (user content, not code)
-raw/
-wiki/
-outputs/
 src-tauri/target/
 src-tauri/icons/android/

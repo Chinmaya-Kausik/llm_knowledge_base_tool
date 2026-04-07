@@ -1,0 +1,466 @@
+{
+  "outputs": {
+    "x": 914,
+    "y": 487
+  },
+  "projects": {
+    "x": 663,
+    "y": 904
+  },
+  "raw": {
+    "x": 259,
+    "y": 730
+  },
+  "wiki": {
+    "x": 1090,
+    "y": 640
+  },
+  "projects/attention-efficiency-paper": {
+    "x": -21,
+    "y": 259
+  },
+  "projects/transformer-from-scratch": {
+    "x": 1127,
+    "y": -83
+  },
+  "projects/attention-efficiency-paper/figures": {
+    "x": 0,
+    "y": 450
+  },
+  "projects/attention-efficiency-paper/paper.tex": {
+    "x": 434,
+    "y": 314
+  },
+  "projects/attention-efficiency-paper/references.bib": {
+    "x": 48,
+    "y": 575
+  },
+  "projects/transformer-from-scratch/src": {
+    "x": 0,
+    "y": 450
+  },
+  "projects/transformer-from-scratch/config.yaml": {
+    "x": 440,
+    "y": 450
+  },
+  "raw/articles": {
+    "x": -128,
+    "y": 358
+  },
+  "raw/chats": {
+    "x": 403,
+    "y": 249
+  },
+  "raw/inbox": {
+    "x": 861,
+    "y": 321
+  },
+  "raw/media": {
+    "x": -70,
+    "y": 636
+  },
+  "raw/papers": {
+    "x": 375,
+    "y": 583
+  },
+  "raw/repos": {
+    "x": 781,
+    "y": 540
+  },
+  "wiki/answers": {
+    "x": 0,
+    "y": 493
+  },
+  "wiki/concepts": {
+    "x": 423,
+    "y": 365
+  },
+  "wiki/indexes": {
+    "x": 880,
+    "y": 357
+  },
+  "wiki/meta": {
+    "x": 0,
+    "y": 870
+  },
+  "wiki/summaries": {
+    "x": 440,
+    "y": 870
+  },
+  "projects/transformer-from-scratch/src/attention.py": {
+    "x": 4,
+    "y": -353
+  },
+  "projects/transformer-from-scratch/src/model.py": {
+    "x": 483,
+    "y": 151
+  },
+  "projects/transformer-from-scratch/src/train.py": {
+    "x": -105,
+    "y": 294
+  },
+  "raw/articles/attention-is-all-you-need.md": {
+    "x": -56,
+    "y": 436
+  },
+  "raw/articles/bert-paper.md": {
+    "x": 440,
+    "y": 450
+  },
+  "raw/articles/scaling-laws.md": {
+    "x": 0,
+    "y": 870
+  },
+  "projects/data-pipeline": {
+    "x": 1435,
+    "y": 420
+  },
+  "projects/future-project": {
+    "x": 729,
+    "y": 195
+  },
+  "projects/research-journal": {
+    "x": 404,
+    "y": 414
+  },
+  "projects/research-journal/2026-04-01.md": {
+    "x": 0,
+    "y": 450
+  },
+  "projects/research-journal/2026-04-03.md": {
+    "x": 440,
+    "y": 450
+  },
+  "projects/data-pipeline/data": {
+    "x": 0,
+    "y": 450
+  },
+  "projects/data-pipeline/config.yaml": {
+    "x": 440,
+    "y": 450
+  },
+  "projects/data-pipeline/export.py": {
+    "x": 880,
+    "y": 450
+  },
+  "projects/data-pipeline/ingest.py": {
+    "x": 0,
+    "y": 830
+  },
+  "projects/data-pipeline/transform.py": {
+    "x": 440,
+    "y": 830
+  },
+  "projects/future-project/src": {
+    "x": 0,
+    "y": 450
+  },
+  "projects/attention-efficiency-paper/figures/placeholder.txt": {
+    "x": 0,
+    "y": 450
+  },
+  "raw/chats/2026-04-03_research.md": {
+    "x": 0,
+    "y": 450
+  },
+  "raw/chats/2026-04-04_coding.md": {
+    "x": 440,
+    "y": 450
+  },
+  "raw/chats/2026-04-05_05a40884.md": {
+    "x": 880,
+    "y": 450
+  },
+  "raw/chats/2026-04-05_0e406497.md": {
+    "x": 1320,
+    "y": 450
+  },
+  "raw/chats/2026-04-05_3ce498bf.md": {
+    "x": 1760,
+    "y": 450
+  },
+  "raw/chats/2026-04-05_beacon-t.md": {
+    "x": 0,
+    "y": 829
+  },
+  "raw/chats/2026-04-05_demo.md": {
+    "x": 440,
+    "y": 829
+  },
+  "raw/chats/2026-04-05_test-sav.md": {
+    "x": 880,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_1078fd09.md": {
+    "x": 1320,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_13ee16bb.md": {
+    "x": 1760,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_2c0ddc10.md": {
+    "x": 0,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_4a2e0524.md": {
+    "x": 440,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_689912c5.md": {
+    "x": 880,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_7939d388.md": {
+    "x": 1320,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_7d0a5c6a.md": {
+    "x": 1760,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_7e0d170c.md": {
+    "x": 0,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_e2e-test.md": {
+    "x": 440,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_e61fe553.md": {
+    "x": 880,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_10a473ab.md": {
+    "x": 1320,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_2282bf32.md": {
+    "x": 2200,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_29d14d7a.md": {
+    "x": 0,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_46cd55d3.md": {
+    "x": 880,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_5b457207.md": {
+    "x": 1760,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_83289cdc.md": {
+    "x": 1320,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_8d3381ca.md": {
+    "x": 1760,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_9950d6dc.md": {
+    "x": 2200,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_9e2ad18b.md": {
+    "x": 0,
+    "y": 1970
+  },
+  "raw/chats/2026-04-06_ba446ea8.md": {
+    "x": 440,
+    "y": 1970
+  },
+  "raw/chats/2026-04-06_ff0d57a7.md": {
+    "x": 1760,
+    "y": 1970
+  },
+  "wiki/answers/attention-scaling.md": {
+    "x": 0,
+    "y": 450
+  },
+  "wiki/answers/bert-vs-gpt.md": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/answers/lora-vs-full-finetuning.md": {
+    "x": 0,
+    "y": 830
+  },
+  "wiki/answers/why-transformers-won.md": {
+    "x": 440,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_0be9abe9.md": {
+    "x": 440,
+    "y": 830
+  },
+  "raw/chats/2026-04-06_498bc34c.md": {
+    "x": 880,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_649ec89c.md": {
+    "x": 2200,
+    "y": 1210
+  },
+  "raw/chats/2026-04-06_7a41dd56.md": {
+    "x": 440,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_8617f9e5.md": {
+    "x": 2200,
+    "y": 1590
+  },
+  "raw/chats/2026-04-06_bcefd74b.md": {
+    "x": 1320,
+    "y": 1970
+  },
+  "raw/chats/2026-04-06_db16eb46.md": {
+    "x": 1760,
+    "y": 1970
+  },
+  "raw/chats/2026-04-06_f9009dea.md": {
+    "x": 0,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-06_2239.md": {
+    "x": 880,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-06_2244.md": {
+    "x": 1320,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-06_2258.md": {
+    "x": 1758,
+    "y": 2479
+  },
+  "raw/chats/talk-about-self-attention_2026-04-06_2303.md": {
+    "x": 2265,
+    "y": 2077
+  },
+  "raw/chats/talk-about-training-transformers-from-sc_2026-04-06_2303.md": {
+    "x": 2313,
+    "y": 2752
+  },
+  "raw/chats/talk-about-self-attention_2026-04-06_2315.md": {
+    "x": 2640,
+    "y": 2350
+  },
+  "raw/chats/talk-about-transformers_2026-04-06_2315.md": {
+    "x": 988,
+    "y": 2856
+  },
+  "raw/chats/hey_2026-04-06_2317.md": {
+    "x": 2200,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-06_2318.md": {
+    "x": 2640,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-07_0125.md": {
+    "x": 0,
+    "y": 2730
+  },
+  "raw/chats/talk-about-transformers1415_2026-04-07_0127.md": {
+    "x": 1760,
+    "y": 2730
+  },
+  "raw/chats/hey_2026-04-07_0131.md": {
+    "x": 1320,
+    "y": 2350
+  },
+  "raw/chats/hey_2026-04-07_0137.md": {
+    "x": 1760,
+    "y": 2350
+  },
+  "wiki/indexes/machine-learning": {
+    "x": 0,
+    "y": 450
+  },
+  "wiki/concepts/attention": {
+    "x": 0,
+    "y": 450
+  },
+  "wiki/concepts/backpropagation": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/concepts/bert": {
+    "x": 880,
+    "y": 450
+  },
+  "wiki/concepts/design-patterns": {
+    "x": 1320,
+    "y": 450
+  },
+  "wiki/concepts/embeddings": {
+    "x": -59,
+    "y": 804
+  },
+  "wiki/concepts/fine-tuning": {
+    "x": 440,
+    "y": 830
+  },
+  "wiki/concepts/gpt": {
+    "x": 880,
+    "y": 830
+  },
+  "wiki/concepts/gradient-descent": {
+    "x": 1320,
+    "y": 830
+  },
+  "wiki/concepts/loss-functions": {
+    "x": 0,
+    "y": 1210
+  },
+  "wiki/concepts/regularization": {
+    "x": 440,
+    "y": 1210
+  },
+  "wiki/concepts/reinforcement-learning": {
+    "x": 880,
+    "y": 1210
+  },
+  "wiki/concepts/tokenization": {
+    "x": 1320,
+    "y": 1210
+  },
+  "wiki/concepts/transformers": {
+    "x": 0,
+    "y": 1590
+  },
+  "raw/chats/4c8b7c0b_2026-04-07_0335.md": {
+    "x": 0,
+    "y": 450
+  },
+  "raw/chats/talk-about-transformers_2026-04-07_0251.md": {
+    "x": 440,
+    "y": 450
+  },
+  "raw/chats/tell-me-about-my-transformer-from-scratc_2026-04-07_0341.md": {
+    "x": 0,
+    "y": 830
+  },
+  "projects/transformer-from-scratch/src/data.py": {
+    "x": 440,
+    "y": 450
+  },
+  "projects/transformer-from-scratch/src/tokenizer.py": {
+    "x": 0,
+    "y": 674
+  },
+  "projects/transformer-from-scratch/src/train_translation.py": {
+    "x": 880,
+    "y": 830
+  },
+  "projects/transformer-from-scratch/src/translation_data.py": {
+    "x": 0,
+    "y": 1210
+  },
+  "projects/transformer-from-scratch/src/lr_schedule.py": {
+    "x": 880,
+    "y": 450
+  }
+}

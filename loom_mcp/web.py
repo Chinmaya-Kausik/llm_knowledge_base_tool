@@ -42,6 +42,7 @@ def bootstrap_loom(loom_root: Path) -> None:
     dirs = [
         "raw/inbox", "raw/articles", "raw/papers", "raw/repos", "raw/media",
         "wiki/concepts", "wiki/summaries", "wiki/indexes", "wiki/answers", "wiki/meta",
+        "wiki/meta/memory",
         "outputs/slides", "outputs/reports", "outputs/visualizations",
     ]
     for d in dirs:
@@ -53,11 +54,10 @@ def bootstrap_loom(loom_root: Path) -> None:
         reg.write_text('{"pages": []}', encoding="utf-8")
 
     # Create .claude/mcp.json in loom so the agent can find MCP tools
+    repo_dir = str(Path(__file__).parent.parent)
     claude_dir = loom_root / ".claude"
     claude_dir.mkdir(exist_ok=True)
     mcp_json = claude_dir / "mcp.json"
-    repo_dir = str(Path(__file__).parent.parent)
-    import json
     mcp_config = {
         "mcpServers": {
             "loom": {
@@ -68,6 +68,12 @@ def bootstrap_loom(loom_root: Path) -> None:
     }
     mcp_json.write_text(json.dumps(mcp_config, indent=2), encoding="utf-8")
 
+    # Copy .claude/settings.json (hooks) if missing
+    settings_src = Path(repo_dir) / ".claude" / "settings.json"
+    settings_dst = claude_dir / "settings.json"
+    if not settings_dst.exists() and settings_src.exists():
+        settings_dst.write_text(settings_src.read_text(encoding="utf-8"), encoding="utf-8")
+
     # Create glossary if missing
     glossary = loom_root / "wiki" / "meta" / "glossary.md"
     if not glossary.exists():
@@ -76,6 +82,122 @@ def bootstrap_loom(loom_root: Path) -> None:
             "title": "Glossary", "type": "structure-note", "status": "compiled",
             "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         }, "# Glossary\n\nCanonical terms for the knowledge base.\n")
+
+    # Create CLAUDE.md if missing
+    claude_md = loom_root / "CLAUDE.md"
+    if not claude_md.exists():
+        claude_md.write_text(_LOOM_CLAUDE_MD, encoding="utf-8")
+
+    # Create wiki/meta/conventions.md if missing
+    conventions = loom_root / "wiki" / "meta" / "conventions.md"
+    if not conventions.exists():
+        from loom_mcp.lib.frontmatter import write_frontmatter
+        write_frontmatter(conventions, {
+            "title": "Conventions",
+            "type": "structure-note",
+            "status": "compiled",
+            "created": "2026-04-07",
+        }, _LOOM_CONVENTIONS_CONTENT)
+
+    # Create loom-local config.yaml if missing
+    config_yaml = loom_root / "config.yaml"
+    if not config_yaml.exists():
+        config_yaml.write_text(_LOOM_CONFIG_YAML, encoding="utf-8")
+
+
+_LOOM_CLAUDE_MD = """\
+# Loom
+
+A knowledge base + project workspace on an infinite canvas.
+
+## Structure
+- `wiki/` — compiled knowledge (concepts, summaries, indexes, answers, meta)
+- `raw/` — ingested sources, chat transcripts
+- `projects/` — active code repos, experiments
+- `outputs/` — generated artifacts
+
+## Conventions
+- Pages are folders with README.md. Files are subpages.
+- Cross-reference with `[[wiki-links]]` (e.g. `[[Attention Mechanisms]]`)
+- The master index at `wiki/meta/index.md` catalogs all pages
+- Detailed conventions in `wiki/meta/conventions.md`
+
+## Available context
+Read these when relevant:
+- `wiki/meta/conventions.md` — project conventions and style
+- `wiki/meta/index.md` — master index of all pages
+- `wiki/meta/glossary.md` — canonical terminology
+
+## Memory
+Memories live in `wiki/meta/memory/` as individual files, tagged by project.
+Each project folder has a `MEMORY.md` index with one-liners for relevant memories.
+A global `MEMORY.md` lives at the loom root for cross-project preferences.
+
+When you learn something worth persisting:
+1. Create a timestamped file in `wiki/meta/memory/` (e.g. `2026-04-07-uses-typescript.md`)
+2. Add frontmatter with `type: memory` and `tags: [project-name]` (or `[global]`)
+3. Update the relevant project's `MEMORY.md` with a one-liner
+4. For global memories, update the root `MEMORY.md`
+
+Use loom MCP tools (ripgrep_search, read_wiki_page, write_wiki_page, etc.) to find and modify content.
+"""
+
+_LOOM_CONVENTIONS_CONTENT = """\
+# Conventions
+
+## Wiki Pages
+- Every wiki page has full YAML frontmatter (title, type, status, created, tags, etc.)
+- One concept per article. If a source covers multiple concepts, create multiple articles.
+- Internal links use `[[wiki-style]]` double-bracket syntax with optional alias: `[[page|display text]]`
+- Canonical terms live in the glossary. Consult it during compilation.
+
+## Compilation
+- Summaries go in `wiki/summaries/`, concept articles in `wiki/concepts/`
+- Set confidence (high/medium/low) based on source quality
+- Always link back to originating sources in `sources` frontmatter field
+- Never generate `[[links]]` to pages not in the page registry
+
+## Folder READMEs
+- Every folder is a page. Its README.md holds the content.
+- Folder READMEs explain the folder's purpose, list key children with descriptions, and show relationships.
+- Updated during `/compile`, not during normal conversation.
+
+## Style
+- Type hints everywhere. Docstrings on public functions.
+- Prefer functions over classes. Composition over inheritance.
+- Each MCP tool: structured input → deterministic output.
+"""
+
+_LOOM_CONFIG_YAML = """\
+loom:
+  root: "."
+  raw_dir: "raw"
+  wiki_dir: "wiki"
+  outputs_dir: "outputs"
+
+frontmatter:
+  wiki_required_fields:
+    - title
+    - type
+    - status
+    - created
+
+compilation:
+  prompt_version: "v1.0"
+
+search:
+  default_context_lines: 3
+
+context:
+  memory:
+    enabled: true
+    max_chars: 2000
+  page_content:
+    enabled: true
+    max_chars: 8000
+  folder_readme:
+    enabled: true
+"""
 
 
 @asynccontextmanager

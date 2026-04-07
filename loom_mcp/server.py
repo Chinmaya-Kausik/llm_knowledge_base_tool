@@ -30,6 +30,7 @@ def _bootstrap_loom(loom_root: Path) -> None:
     """Create the loom directory structure if it doesn't exist."""
     for d in ["raw/inbox", "raw/articles", "raw/papers", "raw/repos", "raw/media",
               "wiki/concepts", "wiki/summaries", "wiki/indexes", "wiki/answers", "wiki/meta",
+              "wiki/meta/memory",
               "outputs/slides", "outputs/reports", "outputs/visualizations"]:
         (loom_root / d).mkdir(parents=True, exist_ok=True)
     reg = loom_root / "wiki" / "meta" / "page-registry.json"

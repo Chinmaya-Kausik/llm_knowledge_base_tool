@@ -1,0 +1,9 @@
+{
+  "papers": [
+    {"title": "Attention Is All You Need", "year": 2017, "citations": 90000},
+    {"title": "BERT", "year": 2019, "citations": 65000},
+    {"title": "GPT-3", "year": 2020, "citations": 25000},
+    {"title": "LoRA", "year": 2021, "citations": 8000},
+    {"title": "FlashAttention", "year": 2022, "citations": 5000}
+  ]
+}
