@@ -132,6 +132,7 @@ Read these when relevant:
 Memories live in `wiki/meta/memory/` as individual files, tagged by project.
 Each project folder has a `MEMORY.md` index with one-liners for relevant memories.
 A global `MEMORY.md` lives at the loom root for cross-project preferences.
+When reading memories from `wiki/meta/memory/`, check the `tags` field in frontmatter to understand which project each memory belongs to. Memories tagged `global` apply everywhere. Memories tagged with a specific project are primarily about that project — they may still be useful in other contexts, but be aware of which project they come from.
 
 When you learn something worth persisting:
 1. Create a timestamped file in `wiki/meta/memory/` (e.g. `2026-04-07-uses-typescript.md`)
