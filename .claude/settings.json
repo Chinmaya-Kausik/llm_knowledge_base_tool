@@ -2,7 +2,7 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "vault:write_wiki_page",
+        "matcher": "loom:write_wiki_page",
         "command": "uv run mdformat --wrap 80 $(echo '$TOOL_INPUT' | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"path\",\"\"))')"
       }
     ]

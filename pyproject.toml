@@ -1,5 +1,5 @@
 [project]
-name = "vault-mcp"
+name = "loom-mcp"
 version = "0.1.0"
 description = "Local-first personal knowledge base — MCP server for deterministic tools"
 requires-python = ">=3.12"
@@ -32,12 +32,12 @@ web = [
 ]
 
 [project.scripts]
-vault-web = "vault_mcp.web:main"
+loom-web = "loom_mcp.web:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-testpaths = ["vault_mcp/tests"]
+testpaths = ["loom_mcp/tests"]
 asyncio_mode = "auto"

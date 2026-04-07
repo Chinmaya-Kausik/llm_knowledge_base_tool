@@ -1,4 +1,4 @@
-vault:
+loom:
   root: "."
   raw_dir: "raw"
   wiki_dir: "wiki"

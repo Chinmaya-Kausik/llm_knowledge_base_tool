@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicovell3on/tauri-docs/refs/heads/v2/tooling/cli/schema.json",
   "productName": "Vault",
   "version": "0.1.0",
-  "identifier": "com.vault.knowledge-base",
+  "identifier": "com.loom.workspace",
   "build": {
     "beforeBuildCommand": "",
     "beforeDevCommand": "",
