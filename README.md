@@ -1,29 +1,19 @@
-# Vault — Personal Knowledge Base
+# Vault
 
-A local-first workspace that combines a knowledge wiki, code projects, papers, and an embedded Claude Code chat — all in an infinite canvas UI. Inspired by [Karpathy's LLM wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+A local-first personal knowledge base with an infinite canvas UI and embedded Claude Code chat. Markdown files on disk, no cloud sync, no proprietary formats.
 
-## What It Does
-
-- **Everything is a page.** Folders, code files, PDFs, markdown articles — they all appear as cards on an infinite canvas with edges showing connections.
-- **LLM-maintained wiki.** Claude writes and maintains summaries (folder READMEs) and a master index. You read; Claude writes.
-- **Embedded chat.** A Claude Code chat panel with full agent capabilities — file access, tool use, subagents. Bills to your Max subscription.
-- **Cross-project knowledge.** The wiki connects standalone knowledge to active projects. Insights flow between them.
-- **No cloud, no vendor lock-in.** All data is plain files on your machine. The vault is a git repo.
+<!-- ![Vault screenshot](screenshot.png) -->
 
 ## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/Chinmaya-Kausik/llm_knowledge_base_tool.git
 cd llm_knowledge_base_tool
 
-# Install dependencies
 uv sync --extra web --extra dev
 
-# Set your vault directory (or omit to use current dir)
-export VAULT_ROOT=~/my-vault
+export VAULT_ROOT=~/my-vault   # or omit to use current dir
 
-# Launch the web UI
 uv run --extra web python -m vault_mcp.web
 # Open http://localhost:8420
 ```
@@ -33,93 +23,132 @@ Or double-click `vault-ui.command` to launch with auto browser open.
 ### Native App (macOS)
 
 ```bash
-# Install Rust (one-time)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Build the app
 cargo install tauri-cli
 cargo tauri build
-
-# Symlink to Applications (auto-updates on rebuild)
 ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Vault.app
 ```
 
+Produces a ~7.7 MB Tauri v2 binary that starts the Python server as a sidecar.
+
 ## Features
 
-### Canvas
-- Infinite pan/zoom canvas with document cards
-- WebCoLa constraint-based layout (replaces force-directed) with non-overlap constraints
-- Cards show rendered markdown, code, or PDF content (pdf.js with text layer for selection)
-- Click to expand file content, double-click to edit
-- Drag title bar to reposition, drag borders to resize
-- Multi-select cards with Cmd+click, drag selected group together
-- Drill into folders to see subpages
-- Edges show `[[wiki-link]]` connections between pages, aggregated at top level
+### Canvas and Views
+- Infinite pan/zoom canvas with document cards (d3-zoom, WebCoLa layout)
+- Files view with tree/tile toggle, Mac-style folder icons, breadcrumb navigation
+- Cards show rendered markdown, code with syntax highlighting, or PDF content
+- Drill into folders, expand/collapse/resize/reposition cards, multi-select with Cmd+click
+- Edges show `[[wiki-link]]` connections, aggregated at top level
 - Filetype filter (Markdown, Code, Papers, Data, Misc)
-- Keyboard shortcuts: Cmd+=/- zoom, Cmd+[/] back/drill, Enter drill, Escape back/collapse, Cmd+F search
 
-### Chat Panel
-- Full Claude Code agent via claude-agent-sdk subprocess (your Max subscription)
-- Context levels: Page (current file + parent README), Folder (folder README with children), Global (master index)
-- Custom system prompt that enhances Claude Code with vault conventions (does not replace its default behavior)
-- Streaming responses with thinking trace (collapsible, configurable budget)
-- Tool use display (collapsible blocks showing MCP tool calls)
-- Text selection in any card → "Ask Claude" floating button with context injection
-- Stop generation, highlight partial response, give feedback
-- Auto-saves chat transcripts to raw/chats/ on page close (toggle with Temp button)
-- Model selection per session
+### Chat
+- Multiple concurrent chat panels -- floating, dockable, forkable
+- Full Claude Code agent via Claude Agent SDK (bills to your Max subscription)
+- Context levels: Page, Folder, or Global (master index)
+- Streaming responses with collapsible thinking trace and tool use blocks
+- Activity summaries ("Read 3 files, Searched 2 patterns")
+- Subagent display with nested tool calls
+- Redirect/checkpoint, message queue, interrupt prompt, fork with context
+- Text selection in any card shows "Ask Claude" with context injection
+- Auto-saves transcripts to `raw/chats/` on page close
 
-### MCP Server (28 tools)
-- Ingestion: `ingest_url`, `ingest_pdf`, `ingest_text` (with image downloading)
-- Compilation: `write_wiki_page`, `update_master_index`, `write_index`
-- Linting: `validate_links`, `find_stale_pages`, `find_orphan_pages`, health report with scaling alerts
-- Search: `ripgrep_search` with file glob and scope filtering
-- Maintenance: `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
-- Git: `auto_commit`, `get_recent_changes`
+### Editing and Terminal
+- CodeMirror 6 editor with syntax highlighting (Cmd+E to edit, Cmd+S to save)
+- Embedded terminal panels via xterm.js (Cmd+` to open)
+- Plan mode -- interactive checklist panel for agent plans
+
+### Search
+- Content, name, and global search toggles with match highlighting in files
+- Powered by ripgrep (vendored binary auto-detected)
+
+### MCP Server (28+ tools)
+- **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text` (with image downloading)
+- **Compilation**: `write_wiki_page`, `update_master_index`, `write_index`
+- **Linting**: `validate_links`, `find_stale_pages`, `find_orphan_pages`, health report with scaling alerts
+- **Search**: `ripgrep_search` with file glob and scope filtering
+- **Maintenance**: `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
+- **Git**: `auto_commit`, `get_recent_changes`
 
 ### Slash Commands
-- `/compile` — incrementally compile changed sources into wiki pages
-- `/ingest <url>` — capture a URL into the vault
-- `/query <question>` — search and synthesize an answer
-- `/lint` — run health checks with scaling trigger monitoring
-- `/file-answer` — write the last answer back to the wiki
+- `/compile` -- incrementally compile changed sources into wiki pages
+- `/ingest <url>` -- capture a URL into the vault
+- `/query <question>` -- search and synthesize an answer
+- `/lint` -- run health checks with scaling trigger monitoring
+- `/file-answer` -- write the last answer back to the wiki
+
+## Keyboard Shortcuts
+
+All shortcuts are rebindable via Cmd+K.
+
+| Shortcut | Action |
+|----------|--------|
+| Cmd+1/2/3/4 | Switch views |
+| Cmd+J | Cycle chat focus |
+| Cmd+/ | Solo cycle chats |
+| Cmd+N | New chat |
+| Cmd+Shift+N | Fork chat with context |
+| Cmd+T | Toggle tree/tile |
+| Cmd+B | Toggle sidebar |
+| Cmd+E | Edit current file |
+| Cmd+S | Save |
+| Cmd+` | New terminal |
+| Cmd+K | Show/edit shortcuts |
+| Cmd+F | Focus search |
+| Cmd+=/- | Zoom in/out |
+| Cmd+[/] | Navigate back / drill in |
+| Escape | Collapse or navigate back |
 
 ## Architecture
 
 ```
 vault/
-  wiki/                  ← Standalone knowledge (LLM-maintained)
-    attention/
-      README.md          ← "Attention Mechanisms" article
-  projects/              ← Active work (code, papers)
-    my-app/
-      README.md          ← Project overview
-      src/main.py
-  raw/                   ← Ingested sources
-    chats/               ← Saved chat transcripts
+  wiki/                  <- LLM-maintained structured knowledge
+  raw/                   <- Ingested sources + saved chat transcripts
+  outputs/               <- Generated artifacts
 
-vault_mcp/               ← MCP server + web UI code
-  server.py              ← 28 MCP tools (stdio transport)
-  web.py                 ← FastAPI server + WebSocket chat
-  chat.py                ← Claude Code subprocess bridge
-  lib/pages.py           ← Folder-as-page abstraction
-  static/                ← Web UI (vanilla JS, no build step)
+vault_mcp/
+  server.py              <- 28+ MCP tools (stdio transport)
+  web.py                 <- FastAPI server + WebSocket endpoints
+  chat.py                <- Claude Agent SDK bridge
+  lib/                   <- Core: pages, frontmatter, links, hashing
+  tools/                 <- Ingest, compile, search, lint, git
+  static/
+    index.html           <- Single-page app shell
+    style.css            <- Dark theme styles
+    app.js               <- Frontend (~4200 lines, vanilla JS)
+    vendor/              <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js
 
-src-tauri/               ← Native app wrapper (optional)
+src-tauri/               <- Tauri v2 native app (optional)
 ```
 
-**Key design**: every folder is a page (README.md = content). Files are subpages. The canvas shows folders as cards with wiki content, files as compact cards expandable on click. Edges connect pages via `[[wiki-links]]`.
+**Key design decisions:**
+- Every folder is a page (README.md = content). Files are subpages.
+- All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic.
+- No API key needed -- Claude Code uses your Max subscription.
+- No build step -- vanilla JS with vendored libraries.
+
+## Tech Stack
+
+- **Backend**: Python 3.12+, FastAPI, Claude Agent SDK, MCP Python SDK
+- **Frontend**: Vanilla JS (~4200 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js
+- **Native**: Tauri v2 (Rust)
+- **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
+- **Tests**: pytest (180 tests across 19 files)
 
 ## Configuration
 
-- **`VAULT_ROOT`** env var, `~/.vault-app-config.json`, or Settings dropdown in the UI
-- **Settings dropdown**: vault root path, Claude auth status/login, code font size slider
-- **`.claude/mcp.json`** registers the vault MCP server for Claude Code
-- **`config.yaml`** for frontmatter schema and compilation settings
-- **Demo vault** at `~/Documents/vault-demo` is created by bootstrap if no vault exists
+- `VAULT_ROOT` env var, `~/.vault-app-config.json`, or Settings dropdown in the UI
+- `.claude/mcp.json` registers the vault MCP server for Claude Code
+- `config.yaml` for frontmatter schema and compilation settings
 
-## Tests
+## Development
+
+See [DEVELOPER.md](DEVELOPER.md) for detailed architecture, data model, API endpoints, chat backend internals, and contribution guidelines.
 
 ```bash
-uv run pytest  # 180 tests across 19 test files
+uv run pytest                    # All tests
+uv run pytest -k "test_chat"     # Subset
 ```
+
+## License
+
+[Business Source License 1.1](LICENSE) -- free for non-commercial use. Converts to Apache 2.0 on 2030-04-06.

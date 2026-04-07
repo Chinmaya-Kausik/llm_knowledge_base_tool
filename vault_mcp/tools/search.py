@@ -120,7 +120,7 @@ def filename_search(vault_root: Path, query: str, scope: str = "all") -> list[di
     pattern = re.compile(re.escape(query), re.IGNORECASE)
     matches = []
     for p in search_path.rglob("*"):
-        if p.is_file() and pattern.search(p.name):
+        if pattern.search(p.name):
             try:
                 rel = str(p.relative_to(vault_root))
             except ValueError:

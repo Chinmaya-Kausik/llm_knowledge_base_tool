@@ -91,7 +91,24 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
                     except (asyncio.CancelledError, Exception):
                         pass
                     query_task = None
-                    # Note: stream_query's CancelledError handler already sends "stopped"
+
+            elif msg_type == "permission_response":
+                # Browser responded to a permission prompt
+                if session_id:
+                    resolve_permission(session_id, msg.get("decision", "deny"))
+
+            elif msg_type == "set_permissions":
+                # Browser sends permission rules: {category: "allow"|"ask"|"deny"}
+                if session_id and session_id in sessions:
+                    sessions[session_id]["permission_rules"] = msg.get("rules", {})
+                    # Disconnect existing client so next query uses new rules
+                    client = sessions[session_id].pop("sdk_client", None)
+                    if client:
+                        try:
+                            await client.disconnect()
+                        except Exception:
+                            pass
+                    await websocket.send_json({"type": "permissions_set"})
 
     except WebSocketDisconnect:
         pass
@@ -103,6 +120,14 @@ async def ws_chat(websocket: WebSocket, vault_root: Path):
     finally:
         if query_task and not query_task.done():
             query_task.cancel()
+        # Clean up SDK client on disconnect
+        if session_id and session_id in sessions:
+            client = sessions[session_id].pop("sdk_client", None)
+            if client:
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
 
 
 def build_prompt(text: str, context: dict, session_id: str, vault_root: Path) -> str:
@@ -215,12 +240,152 @@ Permissions:
     return "\n\n".join(parts)
 
 
+def _map_tool_to_category(tool_name: str) -> str:
+    """Map a Claude tool name to a permission category."""
+    read_tools = {"Read", "Glob", "Grep", "WebSearch", "WebFetch"}
+    write_tools = {"Write", "Edit", "NotebookEdit"}
+    shell_tools = {"Bash"}
+    destructive_git = {"git push", "git reset", "git clean", "git branch -D"}
+
+    if tool_name in read_tools:
+        return "file_read"
+    if tool_name in write_tools:
+        return "file_write"
+    if tool_name in shell_tools:
+        return "shell"
+    if tool_name.startswith("mcp__"):
+        return "mcp_tools"
+    return "file_read"  # Default: treat unknown tools as read
+
+
+def _make_permission_handler(session_id: str, websocket: WebSocket):
+    """Create a can_use_tool callback that checks session permission settings.
+
+    Permission settings come from the browser (localStorage) and are stored
+    in the session dict as permission_rules: {category: "allow"|"ask"|"deny"}.
+    """
+    async def can_use_tool(
+        tool_name: str,
+        tool_input: dict[str, Any],
+        context: Any,
+    ) -> Any:
+        from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
+
+        session = sessions.get(session_id, {})
+        rules = session.get("permission_rules", {})
+        category = _map_tool_to_category(tool_name)
+
+        # Check for destructive git commands in Bash
+        if tool_name == "Bash":
+            cmd = tool_input.get("command", "")
+            for pattern in ["git push", "git reset --hard", "git clean", "git branch -D", "rm -rf"]:
+                if pattern in cmd:
+                    category = "destructive_git"
+                    break
+
+        rule = rules.get(category, "allow")
+
+        if rule == "allow":
+            return PermissionResultAllow()
+        if rule == "deny":
+            return PermissionResultDeny(message=f"Denied by user permission settings ({category})")
+
+        # rule == "ask": forward to browser and wait for response
+        try:
+            # Send permission prompt to browser
+            await websocket.send_json({
+                "type": "permission_request",
+                "tool": tool_name,
+                "input": {k: str(v)[:200] for k, v in tool_input.items()},
+                "category": category,
+            })
+            # Wait for browser response (with timeout)
+            response = await asyncio.wait_for(
+                _wait_for_permission_response(session_id),
+                timeout=120,
+            )
+            if response == "allow":
+                return PermissionResultAllow()
+            return PermissionResultDeny(message="Denied by user")
+        except asyncio.TimeoutError:
+            return PermissionResultDeny(message="Permission request timed out")
+        except Exception:
+            return PermissionResultAllow()  # Fail open on errors
+
+    return can_use_tool
+
+
+# Pending permission responses: session_id → asyncio.Future
+_permission_futures: dict[str, asyncio.Future] = {}
+
+
+async def _wait_for_permission_response(session_id: str) -> str:
+    """Wait for a permission response from the browser."""
+    loop = asyncio.get_event_loop()
+    future: asyncio.Future[str] = loop.create_future()
+    _permission_futures[session_id] = future
+    try:
+        return await future
+    finally:
+        _permission_futures.pop(session_id, None)
+
+
+def resolve_permission(session_id: str, decision: str) -> None:
+    """Called when the browser sends a permission response."""
+    future = _permission_futures.get(session_id)
+    if future and not future.done():
+        future.set_result(decision)
+
+
+async def _get_or_create_client(session_id: str, vault_root: Path, context_level: str, websocket: WebSocket):
+    """Get an existing ClaudeSDKClient for the session, or create a new one."""
+    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+
+    session = sessions.get(session_id, {})
+    client = session.get("sdk_client")
+
+    if client is not None:
+        # Update system prompt for new context
+        system_prompt = build_system_prompt(session_id, vault_root, context_level)
+        # Client is already connected — just return it
+        return client
+
+    system_prompt = build_system_prompt(session_id, vault_root, context_level)
+    model = session.get("model")
+    sdk_sid = session.get("sdk_session_id")
+    has_run = session.get("has_run", False)
+    rules = session.get("permission_rules", {})
+
+    # Use "default" permission mode when we have a can_use_tool callback,
+    # "auto" when no rules are set (backwards compatible)
+    has_rules = any(v != "allow" for v in rules.values())
+    perm_mode = "default" if has_rules else "auto"
+
+    can_use_tool_cb = _make_permission_handler(session_id, websocket) if has_rules else None
+
+    options = ClaudeAgentOptions(
+        cwd=str(vault_root),
+        system_prompt=system_prompt,
+        include_partial_messages=True,
+        thinking={"type": "enabled", "budget_tokens": 10000},
+        permission_mode=perm_mode,
+        resume=sdk_sid if has_run and sdk_sid else None,
+        model=model,
+        can_use_tool=can_use_tool_cb,
+    )
+
+    client = ClaudeSDKClient(options)
+    await client.connect()
+    session["sdk_client"] = client
+    session["has_run"] = True
+    return client
+
+
 async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault_root: Path, context_level: str = "page"):
-    """Stream a Claude Code query response to the WebSocket."""
+    """Stream a Claude Code query response to the WebSocket using ClaudeSDKClient."""
     try:
         from claude_agent_sdk import (
             AssistantMessage,
-            ClaudeAgentOptions,
             ResultMessage,
             StreamEvent,
             SystemMessage,
@@ -228,49 +393,19 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             TaskProgressMessage,
             TaskStartedMessage,
             UserMessage,
-            query,
         )
 
-        # MCP config is in the repo directory, not the vault
-        mcp_config = Path(__file__).parent.parent / ".claude" / "mcp.json"
-        system_prompt = build_system_prompt(session_id, vault_root, context_level)
+        client = await _get_or_create_client(session_id, vault_root, context_level, websocket)
+        await client.query(prompt)
 
-        # Use the SDK's session ID for resume (not our browser session ID)
-        sdk_sid = sessions.get(session_id, {}).get("sdk_session_id")
-        has_run = sessions.get(session_id, {}).get("has_run", False)
-        model = sessions.get(session_id, {}).get("model")
+        current_subagent_task_id = None
 
-        perm_mode = sessions.get(session_id, {}).get("permission_mode", "auto")
-
-        options = ClaudeAgentOptions(
-            cwd=str(vault_root),
-            system_prompt=system_prompt,
-            include_partial_messages=True,
-            thinking={"type": "enabled", "budget_tokens": 10000},
-            permission_mode=perm_mode,
-            resume=sdk_sid if has_run and sdk_sid else None,
-            model=model,
-        )
-
-        sessions.setdefault(session_id, {})["has_run"] = True
-
-        streamed_text = False
-        sent_tool_ids = set()
-        current_subagent_task_id = None  # Track which subagent is active
-
-        async for event in query(prompt=prompt, options=options):
+        async for event in client.receive_response():
             try:
                 if isinstance(event, StreamEvent):
                     ev = getattr(event, 'event', None) or {}
                     if isinstance(ev, dict):
-                        ev_type = ev.get("type", "")
                         delta = ev.get("delta", {})
-                        content_block = ev.get("content_block", {})
-
-                        # Note: content_block_start for tool_use has empty input
-                        # We wait for AssistantMessage ToolUseBlock which has the full input
-
-                        # Handle deltas
                         if isinstance(delta, dict):
                             dtype = delta.get("type", "")
                             if dtype == "thinking_delta":
@@ -280,18 +415,13 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                                     "content": delta.get("thinking", ""),
                                 })
                             elif dtype == "text_delta":
-                                streamed_text = True
                                 await websocket.send_json({
                                     "type": "text",
                                     "subagent_id": current_subagent_task_id,
                                     "content": delta.get("text", ""),
                                 })
-                            elif dtype == "input_json_delta":
-                                # Tool input being streamed — we already sent tool_use on block_start
-                                pass
 
                 elif isinstance(event, AssistantMessage):
-                    # Full message — only use for tool_use blocks (text already streamed)
                     for block in getattr(event, 'content', []):
                         block_cls = type(block).__name__
                         if block_cls == 'ToolUseBlock':
@@ -309,10 +439,8 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                                     "subagent_id": current_subagent_task_id,
                                     "content": thinking,
                                 })
-                        # Skip TextBlock — already sent via text_delta streaming
 
                 elif isinstance(event, UserMessage):
-                    # Tool results come as UserMessage with ToolResultBlock content
                     for block in getattr(event, 'content', []):
                         block_cls = type(block).__name__
                         if block_cls == 'ToolResultBlock':
@@ -363,7 +491,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                         "status": getattr(event, 'status', ''),
                         "summary": getattr(event, 'summary', ''),
                     })
-                    current_subagent_task_id = None  # Back to parent
+                    current_subagent_task_id = None
 
                 elif isinstance(event, SystemMessage):
                     subtype = getattr(event, 'subtype', '')
@@ -372,7 +500,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
                         if isinstance(data, dict) and 'session_id' in data:
                             sessions[session_id]["sdk_session_id"] = data["session_id"]
 
-            except Exception as send_err:
+            except Exception:
                 continue
 
         try:
@@ -381,11 +509,32 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, vault
             pass
 
     except asyncio.CancelledError:
+        # Interrupt the client and disconnect so next query starts fresh
+        try:
+            await client.interrupt()
+        except Exception:
+            pass
+        # Disconnect client — interrupted state is unreliable for reuse
+        session = sessions.get(session_id, {})
+        old_client = session.pop("sdk_client", None)
+        if old_client:
+            try:
+                await old_client.disconnect()
+            except Exception:
+                pass
         try:
             await websocket.send_json({"type": "stopped"})
         except Exception:
             pass
     except Exception as e:
+        # On error, disconnect the client so next message creates a fresh one
+        session = sessions.get(session_id, {})
+        client = session.pop("sdk_client", None)
+        if client:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
         try:
             await websocket.send_json({"type": "error", "message": str(e)})
         except Exception:

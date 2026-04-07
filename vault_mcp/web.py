@@ -542,15 +542,75 @@ async def api_claude_auth():
 async def api_update_settings(request: Request):
     body = await request.json()
     new_root = body.get("vault_root")
-    if new_root:
-        # Write to config file so it persists across restarts
-        config_path = Path.home() / ".vault-app-config.json"
-        config_path.write_text(json.dumps({"vault_root": new_root}), encoding="utf-8")
-        return {"ok": True, "vault_root": new_root, "note": "Restart the server for changes to take effect."}
-    return {"ok": False, "error": "No vault_root provided"}
+    if not new_root:
+        return {"ok": False, "error": "No vault_root provided"}
+
+    if not new_root.startswith("/") and not new_root.startswith("~"):
+        return {"ok": False, "error": f"Path must be absolute (got '{new_root}'). Did you mean '/{new_root}'?"}
+    root_path = Path(new_root).expanduser().resolve()
+    if not root_path.exists():
+        return {"ok": False, "error": f"Path does not exist: {root_path}"}
+    if not root_path.is_dir():
+        return {"ok": False, "error": f"Path is not a directory: {root_path}"}
+
+    # Write to config file so it persists across restarts
+    config_path = Path.home() / ".vault-app-config.json"
+    config_path.write_text(json.dumps({"vault_root": str(root_path)}), encoding="utf-8")
+    # Also update the env var so a restart within this process picks it up
+    os.environ["VAULT_ROOT"] = str(root_path)
+    return {"ok": True, "vault_root": str(root_path)}
+
+
+@app.post("/api/restart")
+async def api_restart():
+    """Re-resolve vault root and re-bootstrap. Browser should hard-refresh after."""
+    global VAULT_ROOT, LAYOUT_FILE
+    VAULT_ROOT = _resolve_vault_root()
+    LAYOUT_FILE = VAULT_ROOT / "wiki" / "meta" / "canvas-layout.json"
+    bootstrap_vault(VAULT_ROOT)
+    # Clear all chat sessions (they reference old paths)
+    from vault_mcp.chat import sessions
+    sessions.clear()
+    return {"ok": True, "vault_root": str(VAULT_ROOT)}
 
 
 # --- Chat transcript saving ---
+
+@app.post("/api/chat/append")
+async def api_append_chat(request: Request):
+    """Append new messages to an existing chat transcript."""
+    body = await request.json()
+    rel_path = body.get("path", "")
+    messages = body.get("messages", [])
+    if not rel_path or not messages:
+        return {"ok": False, "error": "Missing path or messages"}
+
+    full_path = (VAULT_ROOT / rel_path).resolve()
+    chats_dir = (VAULT_ROOT / "raw" / "chats").resolve()
+    if not str(full_path).startswith(str(chats_dir)):
+        return {"ok": False, "error": "Invalid path"}
+    if not full_path.exists():
+        return {"ok": False, "error": "File not found"}
+
+    from datetime import datetime, timezone
+    from vault_mcp.tools.compile import _render_messages
+
+    now = datetime.now()  # Local timezone
+    lines = [
+        "",
+        f"---",
+        f"*Continued: {now.strftime('%Y-%m-%d %H:%M')}*",
+        "",
+    ]
+    lines.extend(_render_messages(messages))
+
+    try:
+        with open(full_path, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 
 @app.post("/api/chat/save")
 async def api_save_chat(request: Request):
@@ -558,12 +618,164 @@ async def api_save_chat(request: Request):
     body = await request.json()
     session_id = body.get("session_id", "unknown")
     messages = body.get("messages", [])
+    title = body.get("title")  # LLM-generated title if available
     if not messages:
         return {"ok": False, "error": "No messages to save"}
 
     from vault_mcp.tools.compile import save_chat_transcript
-    result = save_chat_transcript(VAULT_ROOT, session_id, messages)
+    result = save_chat_transcript(VAULT_ROOT, session_id, messages, title=title)
     return {"ok": True, **result}
+
+
+@app.post("/api/chat/generate-title")
+async def api_generate_chat_title(request: Request):
+    """Generate a title and filename slug for a chat using Haiku.
+
+    Expects: {messages: [{role, content}, ...]} — first 2-3 exchanges.
+    Returns: {ok, title, slug} or {ok: false, error}.
+    """
+    body = await request.json()
+    messages = body.get("messages", [])
+    if not messages:
+        return {"ok": False, "error": "No messages"}
+
+    # Build a concise summary of the conversation start
+    summary_parts = []
+    for msg in messages[:6]:  # Max 3 exchanges (user+assistant)
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            label = "User" if role == "user" else "Assistant"
+            summary_parts.append(f"{label}: {content[:300]}")
+
+    if not summary_parts:
+        return {"ok": False, "error": "No user/assistant messages"}
+
+    conversation = "\n\n".join(summary_parts)
+
+    try:
+        from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+
+        prompt = f"""Based on this conversation start, generate:
+1. A descriptive title (5-8 words, like a document heading)
+2. A filename slug (2-4 words, lowercase, hyphenated)
+
+Conversation:
+{conversation}
+
+Respond in exactly this format, nothing else:
+TITLE: <title here>
+SLUG: <slug here>"""
+
+        title = None
+        slug = None
+
+        async for event in query(
+            prompt=prompt,
+            options=ClaudeAgentOptions(
+                cwd=str(VAULT_ROOT),
+                permission_mode="auto",
+                model="haiku",
+                max_turns=1,
+            ),
+        ):
+            if isinstance(event, ResultMessage):
+                result_text = getattr(event, "result", "") or ""
+                for line in result_text.strip().split("\n"):
+                    line = line.strip()
+                    if line.startswith("TITLE:"):
+                        title = line[6:].strip()
+                    elif line.startswith("SLUG:"):
+                        slug = line[5:].strip().lower().replace(" ", "-")
+
+        if title and slug:
+            # Sanitize slug
+            slug = "".join(c if c.isalnum() or c == "-" else "" for c in slug)
+            return {"ok": True, "title": title, "slug": slug}
+        return {"ok": False, "error": "Could not parse LLM response"}
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/chat/update-title")
+async def api_update_chat_title(request: Request):
+    """Update a saved chat transcript's heading after async title generation.
+
+    Expects: {path: "raw/chats/file.md", title: "New Title"}
+    Replaces the first `# ...` heading line with `# New Title`.
+    """
+    body = await request.json()
+    rel_path = body.get("path", "")
+    title = body.get("title", "")
+    if not rel_path or not title:
+        return {"ok": False, "error": "Missing path or title"}
+
+    full_path = (VAULT_ROOT / rel_path).resolve()
+    chats_dir = (VAULT_ROOT / "raw" / "chats").resolve()
+    if not str(full_path).startswith(str(chats_dir)):
+        return {"ok": False, "error": "Invalid path"}
+    if not full_path.exists():
+        return {"ok": False, "error": "File not found"}
+
+    try:
+        content = full_path.read_text(encoding="utf-8")
+        lines = content.split("\n")
+        # Replace the first heading line
+        for i, line in enumerate(lines):
+            if line.startswith("# "):
+                lines[i] = f"# {title}"
+                break
+        full_path.write_text("\n".join(lines), encoding="utf-8")
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# --- File operations ---
+
+@app.post("/api/mkdir")
+async def api_mkdir(request: Request):
+    """Create a new directory in the vault."""
+    body = await request.json()
+    rel_path = body.get("path", "")
+    if not rel_path:
+        return {"ok": False, "error": "No path"}
+    full_path = (VAULT_ROOT / rel_path).resolve()
+    if not str(full_path).startswith(str(VAULT_ROOT.resolve())):
+        return {"ok": False, "error": "Invalid path"}
+    try:
+        full_path.mkdir(parents=True, exist_ok=True)
+        # Create README.md for the folder
+        readme = full_path / "README.md"
+        if not readme.exists():
+            readme.write_text(f"# {full_path.name}\n\n", encoding="utf-8")
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/delete")
+async def api_delete(request: Request):
+    """Delete a file or empty folder from the vault."""
+    body = await request.json()
+    rel_path = body.get("path", "")
+    if not rel_path:
+        return {"ok": False, "error": "No path"}
+    full_path = (VAULT_ROOT / rel_path).resolve()
+    if not str(full_path).startswith(str(VAULT_ROOT.resolve())):
+        return {"ok": False, "error": "Invalid path"}
+    if not full_path.exists():
+        return {"ok": False, "error": "File not found"}
+    try:
+        if full_path.is_file():
+            full_path.unlink()
+        elif full_path.is_dir():
+            import shutil
+            shutil.rmtree(full_path)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # --- Plan file API ---

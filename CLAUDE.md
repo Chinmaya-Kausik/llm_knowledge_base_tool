@@ -35,14 +35,13 @@ A local-first personal knowledge management system. Markdown files + Claude Code
 
 ## Web UI
 
-A visual knowledge base explorer at `http://localhost:8420`. Launch with:
+Visual knowledge base at `http://localhost:8420`. Launch with:
 
 ```bash
 VAULT_ROOT=/path/to/vault uv run --extra web python -m vault_mcp.web
 ```
 
-Views: Graph (force-directed), Tree, Tags, Provenance, Health Dashboard, Search.
-Draggable/resizable/maximizable document windows with clickable `[[wiki-links]]`.
+Features: infinite canvas (d3-zoom, WebCoLa layout), files view (tree/tile toggle), multiple concurrent chat panels (floating, dockable, forkable), embedded terminals (xterm.js), CodeMirror 6 editing, PDF rendering, search with content/name/global toggles, plan mode, custom rebindable keyboard shortcuts (Cmd+K). Also available as a Tauri v2 native app.
 
 ## Configuration
 
@@ -52,9 +51,12 @@ The data directories (`raw/`, `wiki/`, `outputs/`) are gitignored.
 ## Tech Stack
 
 - Python 3.12+, managed with `uv`
+- FastAPI + WebSocket chat bridge to Claude Agent SDK
 - MCP Python SDK (stdio transport)
 - trafilatura (web extraction), PyMuPDF4LLM (PDF extraction)
 - python-frontmatter, mdformat, pytest
+- Vanilla JS (~4200 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js
+- Tauri v2 native app (optional)
 - ripgrep for search (via subprocess)
 
 ## Style

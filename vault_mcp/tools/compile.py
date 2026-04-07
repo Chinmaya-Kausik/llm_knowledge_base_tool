@@ -407,19 +407,20 @@ def get_stale_readmes(vault_root: Path) -> list[dict]:
     return stale
 
 
-def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]) -> dict:
+def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict], title: str | None = None) -> dict:
     """Save a chat transcript to raw/chats/ with collapsible sections.
 
     Args:
         session_id: Chat session ID.
         messages: List of {role, content, subagent_id?} message dicts.
+        title: Optional LLM-generated title. If provided, used as heading.
 
     Returns: {path, message_count}
     """
     chats_dir = vault_root / "raw" / "chats"
     chats_dir.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now()  # Local timezone
     # Name file from first user message (slugified)
     first_msg = next((m.get("content", "") for m in messages if m.get("role") == "user"), "")
     slug = first_msg[:40].strip().lower()
@@ -428,11 +429,26 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
     filename = f"{slug}_{now.strftime('%Y-%m-%d_%H%M')}.md"
     path = chats_dir / filename
 
+    heading = title or f"Chat — {now.strftime('%Y-%m-%d %H:%M')}"
     lines = [
-        f"# Chat — {now.strftime('%Y-%m-%d %H:%M')} UTC",
+        f"# {heading}",
         f"Session: {session_id}",
         "",
     ]
+
+    lines.extend(_render_messages(messages))
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+    return {
+        "path": str(path.relative_to(vault_root)),
+        "message_count": len(messages),
+    }
+
+
+def _render_messages(messages: list[dict]) -> list[str]:
+    """Render a list of chat messages into markdown lines."""
+    lines: list[str] = []
 
     # Group consecutive thinking/tool/tool_result messages into activity blocks
     i = 0
@@ -581,12 +597,7 @@ def save_chat_transcript(vault_root: Path, session_id: str, messages: list[dict]
             lines.append("")
             i += 1
 
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-    return {
-        "path": str(path.relative_to(vault_root)),
-        "message_count": len(messages),
-    }
+    return lines
 
 
 def _summarize_tools(tool_counts: dict[str, int]) -> list[str]:

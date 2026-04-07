@@ -563,9 +563,10 @@ class TestGraph:
         data = client.get("/api/graph").json()
         node_labels = {n["data"]["label"] for n in data["nodes"]}
 
-        # Our vault has a Transformers concept
-        assert "Transformers" in node_labels, (
-            f"Expected 'Transformers' in graph nodes. Got: {node_labels}"
+        # Our vault has a transformers concept (folder name is lowercase)
+        node_labels_lower = {l.lower() for l in node_labels}
+        assert "transformers" in node_labels_lower, (
+            f"Expected 'transformers' in graph nodes. Got: {node_labels}"
         )
 
     def test_graph_node_structure(self, vault_client):

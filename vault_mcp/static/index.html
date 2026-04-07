@@ -40,8 +40,21 @@
     </div>
     <div class="toolbar-right">
       <input type="search" id="search-input" placeholder="Search... (Ctrl+F)">
-      <button id="btn-new-chat" class="filter-btn" title="New chat (Cmd+N)" onclick="openNewChat()" style="padding:3px 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
-      <button id="btn-terminal" class="filter-btn" title="New terminal (Cmd+`)" onclick="createTerminalPanel()" style="padding:2px 6px"><span style="font-size:14px;line-height:1;display:block">›_</span></button>
+      <div class="filter-dropdown" id="action-menu-dropdown">
+        <button class="filter-btn" id="btn-action-menu" title="Actions">+</button>
+        <div class="filter-menu action-menu" id="action-menu">
+          <div class="action-item" onclick="createNewFile(); closeActionMenu()">New File</div>
+          <div class="action-item" onclick="createNewFolder(); closeActionMenu()">New Folder</div>
+          <hr>
+          <div class="action-item" onclick="openNewChat(); closeActionMenu()">New Chat</div>
+          <div class="action-item" onclick="createTerminalPanel(); closeActionMenu()">New Terminal</div>
+          <hr>
+          <div class="action-item" onclick="deleteCurrentFile(); closeActionMenu()">Delete File</div>
+          <hr>
+          <div class="action-item" onclick="restartServer(); closeActionMenu()">Restart Server</div>
+          <div id="action-context-items"></div>
+        </div>
+      </div>
       <div class="filter-dropdown" id="toolbar-menu-dropdown">
         <button class="filter-btn" id="btn-toolbar-menu" title="Settings &amp; Filters"><span style="font-size:22px;line-height:1;display:block;margin-top:-2px">⚙</span><span id="filter-active-dot" style="display:none">●</span></button>
         <div class="filter-menu toolbar-menu" id="toolbar-menu">
@@ -105,6 +118,9 @@
             <span id="settings-code-font-val">13px</span>
           </div>
           <hr>
+          <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label" onclick="openPermissionsPanel(); document.getElementById('toolbar-menu').classList.remove('open');">Agent Permissions</div>
+          </div>
           <div class="toolbar-menu-section">
             <div class="toolbar-menu-label" onclick="openKeybindingPanel(); document.getElementById('toolbar-menu').classList.remove('open');">Keyboard Shortcuts (Cmd+K)</div>
           </div>

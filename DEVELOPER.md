@@ -26,8 +26,8 @@ vault_mcp/
   static/
     index.html       Single-page app shell (includes settings dropdown, chat panel)
     style.css        All styles (dark theme, canvas, cards, chat, PDF)
-    app.js           All frontend logic (~2100 lines)
-    vendor/          Vendored JS libs (marked, d3-zoom, d3-drag, pdf.js, cola.min.js)
+    app.js           All frontend logic (~4200 lines)
+    vendor/          Vendored JS libs (marked, d3-zoom, d3-drag, pdf.js, cola.min.js, CodeMirror 6, xterm.js)
 
   tests/             pytest tests (180 total across 19 files)
 
@@ -80,6 +80,8 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 | `/api/claude-auth` | POST | Trigger Claude CLI OAuth login |
 | `/api/chat/save` | POST | Save chat transcript to raw/chats/ |
 | `/ws/chat` | WebSocket | Claude Code chat (streaming) |
+| `/ws/terminal` | WebSocket | PTY terminal session |
+| `/api/plan` | GET/PUT/DELETE | Plan file for checklist panel |
 | `/media/{path}` | GET | Serve files (PDFs, images) from vault |
 
 ### Bootstrap
@@ -117,7 +119,7 @@ Sessions track `page_path`, `history`, `model`, `sdk_session_id`, and `has_run` 
 
 ## Frontend (Vanilla JS)
 
-`vault_mcp/static/app.js` (~2100 lines) — no framework, no build step. Key modules:
+`vault_mcp/static/app.js` (~4200 lines) — no framework, no build step. Key modules:
 
 - **Canvas Controller**: d3-zoom on `#infinite-canvas`, CSS transform on `#world`
 - **Card Rendering**: `createDocCard()` — folder cards show README, file cards show summary (click to expand)
@@ -125,9 +127,17 @@ Sessions track `page_path`, `history`, `model`, `sdk_session_id`, and `has_run` 
 - **Layout Engine**: WebCoLa constraint-based layout (`cola.min.js`) with non-overlap constraints; falls back to grid if WebCoLa is unavailable
 - **Edge Rendering**: SVG paths with rAF debouncing, straight lines at >100 edges
 - **Multi-select**: Cmd+click adds/removes cards from `selectedCards` Set; drag moves entire group
-- **Chat Panel**: WebSocket connection, streaming markdown, thinking trace, tool use blocks, model selection, Temp/New buttons
+- **Chat Panel**: Multiple concurrent panels (floating, dockable, forkable). WebSocket connection, streaming markdown, thinking trace, tool use blocks, model selection, Temp/New buttons. Redirect/checkpoint, message queue, interrupt prompt, fork with context.
+- **Activity Summaries**: Displays counts of tool actions ("Read 3 files, Searched 2 patterns")
+- **Subagent Display**: Nested tool calls shown inline with collapsible detail
+- **Plan Mode**: Interactive checklist panel for agent plans (GET/PUT/DELETE via `/api/plan`)
+- **Files View**: Tree/tile toggle with Mac-style folder icons, breadcrumb navigation
+- **CodeMirror Editor**: CodeMirror 6 with syntax highlighting (Cmd+E to edit, Cmd+S to save)
+- **Terminal Panels**: Embedded xterm.js terminals via PTY WebSocket endpoint (Cmd+` to open)
 - **Selection Tooltip**: `mouseup` listener, shows "Ask Claude" on text selection with context injection
 - **PDF Rendering**: Lazy-loaded pdf.js (`pdf.min.mjs` + worker) with text layer for selection
+- **Search**: Content/name/global toggles with match highlighting in file cards
+- **Keyboard Shortcuts**: Custom rebindable shortcuts (Cmd+K to view/edit). Covers view switching, chat management, editing, terminal, zoom, navigation.
 - **Settings Dropdown**: vault root path, Claude auth status/login trigger, code font size slider
 - **Auto-save**: chat transcripts saved via `sendBeacon` on `beforeunload` to `/api/chat/save`
 
@@ -144,14 +154,27 @@ Sessions track `page_path`, `history`, `model`, `sdk_session_id`, and `has_run` 
 
 ### Keyboard Shortcuts
 
+All shortcuts are rebindable via Cmd+K.
+
 | Shortcut | Action |
 |----------|--------|
+| Cmd+1/2/3/4 | Switch views |
+| Cmd+J | Cycle chat focus |
+| Cmd+/ | Solo cycle chats |
+| Cmd+N | New chat |
+| Cmd+Shift+N | Fork chat with context |
+| Cmd+T | Toggle tree/tile |
+| Cmd+B | Toggle sidebar |
+| Cmd+E | Edit current file |
+| Cmd+S | Save |
+| Cmd+` | New terminal |
+| Cmd+K | Show/edit shortcuts |
+| Cmd+F | Focus search |
 | Cmd+= / Cmd+- | Zoom in / out |
 | Cmd+[ | Navigate back (canvas stack) |
 | Cmd+] | Drill into focused/selected folder |
 | Enter | Drill into focused/selected folder |
 | Escape | Collapse full-page view, or navigate back |
-| Cmd+F | Focus search input |
 
 ## MCP Server
 

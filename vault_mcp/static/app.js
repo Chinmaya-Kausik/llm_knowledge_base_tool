@@ -26,6 +26,8 @@ const DEFAULT_KEYBINDINGS = {
   'cycle-chat-focus': { key: 'j', mod: true, label: 'Cycle chat focus' },
   'cycle-chat-solo':  { key: '/', mod: true, label: 'Solo cycle chats' },
   'new-terminal':   { key: '`', mod: true, label: 'New terminal' },
+  'restart-server': { key: 'R', mod: true, shift: true, label: 'Restart server' },
+  'delete-file':    { key: 'Backspace', mod: true, label: 'Delete file' },
 };
 
 let keyBindings = { ...DEFAULT_KEYBINDINGS };
@@ -46,6 +48,7 @@ function matchesBinding(e, action) {
   if (b.alt && !e.altKey) return false;
   if (!b.alt && e.altKey) return false;
   if (b.shift && !e.shiftKey) return false;
+  if (!b.shift && e.shiftKey) return false;
   return e.key === b.key || e.key.toLowerCase() === b.key.toLowerCase();
 }
 
@@ -104,6 +107,15 @@ let cardElements = new Map();
 let cardMeta = new Map();
 let saveLayoutTimer = null;
 let expandedCard = null;
+let lastFocusedPath = null; // Last clicked/viewed file or folder path
+
+function setFocusedItem(path, element) {
+  // Clear all previous focus highlights
+  document.querySelectorAll('.item-focused').forEach(el => el.classList.remove('item-focused'));
+  lastFocusedPath = path || null;
+  if (element) element.classList.add('item-focused');
+  console.log('[focus]', lastFocusedPath, element?.className);
+}
 let edgeRAF = null;         // rAF handle for edge debouncing
 
 // Canvas stack for drill-in navigation
@@ -153,11 +165,33 @@ function initCanvas() {
   zoomSelection = d3.select(container);
   zoomSelection.call(zoomBehavior);
 
-  // Click outside any card → dismiss active edit
+  // Click outside any card → dismiss active edit and clear focus
   // Use capture phase to catch before other handlers
   document.addEventListener('pointerdown', (e) => {
-    if (!activeEditCard) return;
     const clickedCard = e.target.closest('.doc-card');
+    const clickedTreeItem = e.target.closest('.tree-item, .ftree-item, .file-tile');
+
+    // Set focus / multi-select on clicked item
+    if (clickedCard) {
+      if ((e.metaKey || e.ctrlKey) && !e.target.closest('.doc-controls')) {
+        // Cmd+click toggles multi-select
+        if (selectedCards.has(clickedCard)) {
+          selectedCards.delete(clickedCard);
+          clickedCard.classList.remove('selected');
+        } else {
+          selectedCards.add(clickedCard);
+          clickedCard.classList.add('selected');
+        }
+      }
+      setFocusedItem(clickedCard.dataset.path, clickedCard);
+    } else if (clickedTreeItem && clickedTreeItem.dataset.id) {
+      setFocusedItem(clickedTreeItem.dataset.id, clickedTreeItem);
+    } else if (!e.target.closest('.floating-chat-panel') && !e.target.closest('#chat-panel') && !e.target.closest('.floating-terminal') && !e.target.closest('#toolbar') && !e.target.closest('#sidebar') && !e.target.closest('.action-menu') && !e.target.closest('.filter-menu') && !e.target.closest('#fullpage-overlay')) {
+      // Clicking empty space clears focus
+      setFocusedItem(null, null);
+    }
+
+    if (!activeEditCard) return;
     if (!clickedCard || clickedCard !== activeEditCard) {
       exitCardEdit(activeEditCard);
     }
@@ -220,9 +254,14 @@ function createDocCard(nodeData, content, pos, options = {}) {
   if (isMarkdown && content) {
     bodyHTML = marked.parse(content);
   } else if (!isFolder && !isMarkdown) {
-    // File: show summary placeholder (will be replaced on click)
-    const summary = nodeData.summary || nodeData.label;
-    bodyHTML = `<div class="file-summary">${summary}</div>`;
+    // File: show code preview if content available, otherwise summary
+    if (content && (category === 'code' || category === 'data')) {
+      const preview = content.slice(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      bodyHTML = `<pre><code>${preview}${content.length > 500 ? '\n...' : ''}</code></pre>`;
+    } else {
+      const summary = nodeData.summary || nodeData.label;
+      bodyHTML = `<div class="file-summary">${summary}</div>`;
+    }
   } else {
     bodyHTML = content ? marked.parse(content) : '<em>Empty</em>';
   }
@@ -264,6 +303,7 @@ function wireCardButtons(card, hasChildren) {
   card.querySelector('.doc-handle').addEventListener('click', (e) => {
     e.stopPropagation();
     if (card._wasDragged) { card._wasDragged = false; return; }
+    setFocusedItem(path, card);
     if (card.dataset.expanded === 'false' || body.style.display === 'none') {
       card.dataset.expanded = 'true';
       card.dataset.collapseState = 'expanded';
@@ -307,14 +347,14 @@ function wireCardButtons(card, hasChildren) {
   const body = card.querySelector('.doc-body');
 
   // Single click body → expand content (for non-markdown files in summary mode)
-  if (!isMarkdown) {
-    body.addEventListener('click', (e) => {
+  // Single click body → set focus + expand non-markdown content
+  body.addEventListener('click', (e) => {
+    setFocusedItem(path, card);
+    if (!isMarkdown && card.dataset.expanded !== 'true' && card.dataset.editing !== 'true') {
       e.stopPropagation();
-      if (card.dataset.expanded !== 'true' && card.dataset.editing !== 'true') {
-        expandCardContent(card, path);
-      }
-    });
-  }
+      expandCardContent(card, path);
+    }
+  });
 
   // Double-click body → edit if expanded, fullpage if collapsed
   body.addEventListener('dblclick', (e) => {
@@ -849,6 +889,7 @@ function focusCardByTitle(title) {
 }
 
 function focusCard(card) {
+  setFocusedItem(card.dataset.path, card);
   const container = document.getElementById('infinite-canvas');
   const x = parseInt(card.style.left)||0, y = parseInt(card.style.top)||0;
   const k = 0.8;
@@ -864,6 +905,7 @@ function expandCardFullPage(card, highlightQuery) {
   if (expandedCard) collapseFullPage();
   // Dismiss any canvas edit
   if (activeEditCard) exitCardEdit(activeEditCard);
+  setFocusedItem(card.dataset.path, null);
 
   const path = card.dataset.path;
   const meta = cardMeta.get(path);
@@ -879,6 +921,7 @@ function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
+      <button class="fullpage-chat" title="Chat about this file">Chat</button>
       <button class="fullpage-toggle">Edit</button>
     </div>
     <div class="fullpage-content"></div>
@@ -886,6 +929,21 @@ function expandCardFullPage(card, highlightQuery) {
   document.getElementById('canvas-container').appendChild(overlay);
   expandedCard = overlay;
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
+  overlay.querySelector('.fullpage-chat').onclick = () => {
+    createFloatingPanel({ contextPath: path });
+  };
+
+  // Show "Continue" button for saved chat transcripts
+  if (path.startsWith('raw/chats/')) {
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'fullpage-chat';
+    continueBtn.textContent = 'Continue';
+    continueBtn.title = 'Continue this conversation';
+    overlay.querySelector('.fullpage-header').insertBefore(
+      continueBtn, overlay.querySelector('.fullpage-toggle')
+    );
+    continueBtn.onclick = () => continueSavedChat(path, rawContent);
+  }
 
   const contentEl = overlay.querySelector('.fullpage-content');
 
@@ -894,7 +952,11 @@ function expandCardFullPage(card, highlightQuery) {
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
     createCodeEditor(contentEl, rawContent, path).then(view => {
       overlay._cmView = view;
-      // TODO: CodeMirror search highlight via SearchCursor
+      // Cmd+[ to collapse even when CodeMirror is focused
+      view.dom.addEventListener('keydown', (ev) => {
+        const m = ev.metaKey || ev.ctrlKey;
+        if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
+      });
     });
   } else {
     // Render markdown with marked
@@ -955,7 +1017,26 @@ async function toggleFullPageEdit(overlay, path) {
     contentEl.innerHTML = `<textarea class="fullpage-edit-area">${(meta?.content||'').replace(/</g,'&lt;')}</textarea>`;
     overlay.dataset.mode = 'edit';
     toggleBtn.textContent = 'Preview';
-    contentEl.querySelector('.fullpage-edit-area')?.focus();
+    const editArea = contentEl.querySelector('.fullpage-edit-area');
+    editArea?.addEventListener('keydown', (ev) => {
+      const m = ev.metaKey || ev.ctrlKey;
+      if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
+    });
+    // Selection tooltip in edit mode
+    editArea?.addEventListener('mouseup', () => {
+      const ta = editArea;
+      if (ta.selectionStart === ta.selectionEnd) return;
+      const selectedText = ta.value.substring(ta.selectionStart, ta.selectionEnd);
+      if (selectedText.trim().length < 5) return;
+      const tooltip = document.getElementById('selection-tooltip');
+      // Position near textarea cursor — approximate with textarea bounding rect
+      const rect = ta.getBoundingClientRect();
+      tooltip.style.left = (rect.left + rect.width / 2 - 40) + 'px';
+      tooltip.style.top = (rect.top - 30) + 'px';
+      tooltip.style.display = '';
+      pendingSelection = { text: selectedText, file: path };
+    });
+    editArea?.focus();
   } else {
     // Save and switch to preview
     const textarea = contentEl.querySelector('.fullpage-edit-area');
@@ -1151,6 +1232,7 @@ async function initSidebar() {
   container.addEventListener('click', (e) => {
     const item = e.target.closest('.tree-item');
     if (!item) return;
+    if (item.dataset.id) setFocusedItem(item.dataset.id, item);
     if (item.classList.contains('folder')) {
       const ch = item.nextElementSibling; if (ch) ch.classList.toggle('open');
     } else if (item.classList.contains('file')) {
@@ -1180,7 +1262,7 @@ function renderTree(items, depth) {
     const indent = `padding-left:${8+depth*14}px`;
     if (item.type === 'folder') {
       const kids = item.children ? renderTree(item.children, depth+1) : '';
-      return `<div class="tree-item folder" style="${indent}"><span class="tree-icon">+</span>${item.name}</div>
+      return `<div class="tree-item folder" style="${indent}" data-id="${item.id || ''}"><span class="tree-icon">+</span>${item.name}</div>
               <div class="tree-children${depth===0?' open':''}">${kids}</div>`;
     }
     return `<div class="tree-item file" style="${indent}" data-id="${item.id}"><span class="tree-icon">~</span>${item.title||item.name}</div>`;
@@ -1304,6 +1386,7 @@ function renderTreeItems(container, items, depth) {
       let lastClickTime = 0;
       row.onclick = (e) => {
         e.stopPropagation();
+        if (item.id) setFocusedItem(item.id, row);
         const now = Date.now();
         if (now - lastClickTime < 300) {
           // Fast double click — enter folder
@@ -1320,6 +1403,7 @@ function renderTreeItems(container, items, depth) {
       };
       row.ondblclick = (e) => e.stopPropagation(); // Suppress native dblclick
     } else {
+      row.onclick = () => { if (item.id) setFocusedItem(item.id, row); };
       row.ondblclick = (e) => openFileItem(item, e.metaKey || e.ctrlKey);
     }
   }
@@ -1360,6 +1444,7 @@ function renderFilesTiles() {
     tile.appendChild(iconEl);
     tile.appendChild(nameEl);
 
+    tile.onclick = () => { if (item.id) setFocusedItem(item.id, tile); };
     if (item.type === 'folder') {
       tile.ondblclick = () => {
         filesTilePath.push(item.name);
@@ -1451,6 +1536,7 @@ function openExternal(path) {
 }
 
 function openFileItem(item, external = false) {
+  setFocusedItem(item.id, null);
   if (external) { openExternal(item.id); return; }
   fullpageReturnView = 'files';
   const card = cardElements.get(item.id);
@@ -1599,14 +1685,12 @@ function switchView(name) {
   if (name==='files') {
     // Sync tile path to current canvas level
     const level = currentLevel();
-    if (level.parentPath) {
-      filesTilePath = level.parentPath.split('/');
-    }
+    filesTilePath = level.parentPath ? level.parentPath.split('/') : [];
     if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     initFilesView();
   }
-  if (name==='graph' && filesMode === 'tiles' && filesTilePath.length > 0) {
-    // Sync canvas to the folder we were browsing in Files tile mode
+  if (name==='graph' && filesTilePath.length > 0) {
+    // Sync canvas to the folder we were browsing in Files view
     const tilePath = filesTilePath.join('/');
     if (tilePath && currentLevel().parentPath !== tilePath) {
       // Navigate canvas to match
@@ -1646,7 +1730,7 @@ class ChatPanel {
     this.thinkingEl = null;
     this.thinkingWrapper = null;
     this.contextLevel = options.contextLevel || 'page';
-    this.contextPath = null; // Custom context path (Browse...)
+    this.contextPath = options.contextPath || null; // Custom context path
     this.messages = options.messages ? [...options.messages] : [];
     this.isTemporary = false;
     this.startTime = null;
@@ -1738,6 +1822,78 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 let chatFocusHistory = ['main']; // Ordered by recency of focus
 let chatCycleIndex = -1;
+
+// ========================================
+// Action Menu
+// ========================================
+
+function closeActionMenu() {
+  document.getElementById('action-menu')?.classList.remove('open');
+}
+
+async function createNewFile() {
+  const name = prompt('File name (e.g. notes.md):');
+  if (!name) return;
+  // Determine parent path from current context
+  const level = currentLevel();
+  const parent = level.parentPath || 'wiki';
+  const path = `${parent}/${name}`;
+  try {
+    await fetch(`/api/page/${path}`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ frontmatter: {}, content: `# ${name.replace(/\.\w+$/, '')}\n\n` }),
+    });
+    await refreshFileTree();
+  } catch (e) { console.error('Create file failed:', e); }
+}
+
+async function createNewFolder() {
+  const name = prompt('Folder name:');
+  if (!name) return;
+  const level = currentLevel();
+  const parent = level.parentPath || '';
+  const path = parent ? `${parent}/${name}` : name;
+  try {
+    await fetch('/api/mkdir', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path }),
+    });
+    await refreshFileTree();
+  } catch (e) { console.error('Create folder failed:', e); }
+}
+
+async function deleteCurrentFile() {
+  // Collect paths to delete: multi-selected cards > fullpage > last focused
+  let paths = [];
+  if (selectedCards.size > 0) {
+    paths = [...selectedCards].map(c => c.dataset.path).filter(Boolean);
+  }
+  if (paths.length === 0 && expandedCard?.dataset.path) {
+    paths = [expandedCard.dataset.path];
+  }
+  if (paths.length === 0 && lastFocusedPath) {
+    paths = [lastFocusedPath];
+  }
+  if (paths.length === 0) { alert('No file or folder selected'); return; }
+
+  const msg = paths.length === 1
+    ? `Delete "${paths[0]}"?`
+    : `Delete ${paths.length} items?\n${paths.join('\n')}`;
+  if (!confirm(msg)) return;
+
+  for (const path of paths) {
+    try {
+      await fetch('/api/delete', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ path }),
+      });
+    } catch (e) { console.error('Delete failed:', path, e); }
+  }
+  if (expandedCard) collapseFullPage();
+  selectedCards.clear();
+  setFocusedItem(null, null);
+  await refreshFileTree();
+}
 
 function openNewChat() {
   // If main panel is hidden, reopen it
@@ -2111,10 +2267,30 @@ function createPanelHeader(panelId, label = 'Chat') {
     } else {
       // Floating panel: save transcript, close and remove
       if (panel && panel.messages.length > 0 && !panel.isTemporary) {
-        fetch('/api/chat/save', {
-          method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages }),
-        }).then(() => refreshFileTree()).catch(() => {});
+        // Only save NEW messages (not the forked history that was injected)
+        const newMsgs = panel._forkedHistory
+          ? panel.messages.slice(panel._forkedHistory.length)
+          : panel.messages;
+        if (newMsgs.length > 0) {
+          if (panel._continuedFromPath) {
+            // Append to original file
+            fetch('/api/chat/append', {
+              method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ path: panel._continuedFromPath, session_id: panel.sessionId, messages: newMsgs }),
+            }).then(() => refreshFileTree()).catch(() => {});
+          } else {
+            const panelTitle = panel._generatedTitle || null;
+            fetch('/api/chat/save', {
+              method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ session_id: panel.sessionId, messages: newMsgs, title: panelTitle }),
+            }).then(r => r.json()).then(data => {
+              refreshFileTree();
+              if (!panelTitle && data.ok && data.path && newMsgs.some(m => m.role === 'user')) {
+                generateAndUpdateTitle(data.path, newMsgs);
+              }
+            }).catch(() => {});
+          }
+        }
       }
       if (panel?.ws) panel.ws.close();
       chatPanels.delete(panelId);
@@ -2131,11 +2307,13 @@ function createPanelHeader(panelId, label = 'Chat') {
 function createFloatingPanel(options = {}) {
   if (chatPanels.size >= 6) { alert('Max 6 chat panels'); return null; }
   const panelId = 'panel-' + (++panelCounter);
-  const label = options.label || (options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`);
+  const ctxName = options.contextPath ? options.contextPath.split('/').pop() : '';
+  const label = options.label || (options.contextPath ? `Chat: ${ctxName}` : (options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`));
   const panel = new ChatPanel(null, {
     sessionId: crypto.randomUUID(),
     messages: options.fork ? [...activePanel.messages] : [],
-    contextLevel: activePanel.contextLevel,
+    contextLevel: options.contextPath ? 'page' : activePanel.contextLevel,
+    contextPath: options.contextPath || null,
   });
 
   // Create floating card
@@ -2186,6 +2364,10 @@ function createFloatingPanel(options = {}) {
   const sendBtn = document.createElement('button');
   sendBtn.className = 'fcp-send';
   sendBtn.textContent = 'Send';
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
   inputArea.appendChild(input);
   inputArea.appendChild(sendBtn);
   card.appendChild(inputArea);
@@ -2222,6 +2404,30 @@ function createFloatingPanel(options = {}) {
     panel._forkedHistory = panel.messages.filter(m => m.role === 'user' || m.role === 'assistant');
   }
 
+  // Message queue for floating panel
+  panel._messageQueue = [];
+
+  function sendFloatingMessage(text) {
+    // If forked, prepend conversation history to first message
+    let sendText = text;
+    if (panel._forkedHistory) {
+      const historyStr = panel._forkedHistory.map(m =>
+        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+      ).join('\n\n');
+      sendText = `This is a forked conversation. Here is the prior conversation history:\n\n${historyStr}\n\n---\n\nNow continuing from here:\n\n${text}`;
+      panel._forkedHistory = null;
+    }
+
+    panel.ws.send(JSON.stringify({
+      type: 'message', text: sendText,
+      context_level: panel.contextLevel,
+      context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
+    }));
+
+    panel.generating = true;
+    panel.startTime = Date.now();
+  }
+
   // Send handler — uses panel directly, never touches activePanel/globals
   sendBtn.onclick = () => {
     const text = input.value.trim();
@@ -2239,25 +2445,16 @@ function createFloatingPanel(options = {}) {
     messagesEl.appendChild(userEl);
     panel.messages.push({ role: 'user', content: text });
     input.value = '';
+    input.style.height = 'auto';
 
-    // If forked, prepend conversation history to first message
-    let sendText = text;
-    if (panel._forkedHistory) {
-      const historyStr = panel._forkedHistory.map(m =>
-        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
-      ).join('\n\n');
-      sendText = `This is a forked conversation. Here is the prior conversation history:\n\n${historyStr}\n\n---\n\nNow continuing from here:\n\n${text}`;
-      panel._forkedHistory = null; // Only inject once
+    if (panel.generating) {
+      // Queue it — show as queued
+      userEl.classList.add('chat-msg-queued');
+      panel._messageQueue.push({ text, el: userEl });
+      return;
     }
 
-    panel.ws.send(JSON.stringify({
-      type: 'message', text: sendText,
-      context_level: panel.contextLevel,
-      context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
-    }));
-
-    panel.generating = true;
-    panel.startTime = Date.now();
+    sendFloatingMessage(text);
     panel.tokenCount = 0;
 
     const assistantEl = document.createElement('div');
@@ -2340,8 +2537,12 @@ function connectPanelChat(panel, messagesEl) {
     thisWs.send(JSON.stringify({
       type: 'init',
       session_id: panel.sessionId,
-      page_path: currentLevel().parentPath || '',
+      page_path: panel.contextPath || currentLevel().parentPath || '',
     }));
+    const rules = getPermissionRules();
+    if (Object.keys(rules).length > 0) {
+      thisWs.send(JSON.stringify({ type: 'set_permissions', rules }));
+    }
   };
 
   // Queue events and process without corrupting main panel's globals
@@ -2377,6 +2578,31 @@ function connectPanelChat(panel, messagesEl) {
     lastResultUsage = panel.lastResultUsage; lastResultCost = panel.lastResultCost;
 
     handleChatEvent(msg);
+
+    // Generate title and drain queue after done event
+    if (msg.type === 'done' || msg.type === 'stopped') {
+      maybeGenerateChatTitle(panel);
+      // Process queued messages for this floating panel
+      if (panel._messageQueue && panel._messageQueue.length > 0) {
+        // Combine all queued messages into one
+        const queued = panel._messageQueue.splice(0);
+        const combined = queued.map(q => q.text).join('\n\n');
+        queued.forEach(q => { if (q.el) q.el.classList.remove('chat-msg-queued'); });
+        // Need to restore globals briefly to send
+        setTimeout(() => {
+          if (panel.ws?.readyState === WebSocket.OPEN) {
+            panel.ws.send(JSON.stringify({
+              type: 'message', text: combined,
+              context_level: panel.contextLevel,
+              context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
+            }));
+            panel.generating = true;
+            panel.startTime = Date.now();
+            panel.tokenCount = 0;
+          }
+        }, 100);
+      }
+    }
 
     // Save this panel's state back (but NOT ws — it's managed separately)
     panel.sessionId = chatSessionId;
@@ -2891,6 +3117,11 @@ function connectChat() {
       session_id: mainP.sessionId,
       page_path: level.parentPath || '',
     }));
+    // Send permission rules
+    const rules = getPermissionRules();
+    if (Object.keys(rules).length > 0) {
+      ws.send(JSON.stringify({ type: 'set_permissions', rules }));
+    }
   };
 
   // Main panel's onmessage — always operates on the main panel's state
@@ -3477,10 +3708,14 @@ function handleChatEvent(msg) {
         else currentActivityGroup = ag;
       }
 
-      // Update inner header with last tool call detail
+      // Update inner header with running summary + latest tool
       ag._tools.push(toolName);
       const latestEl = ag.querySelector('.activity-latest');
-      if (latestEl) latestEl.innerHTML = `${toolIcon(toolName)} <b>${escapeHtml(toolName)}</b> ${escapeHtml(toolDesc)}`;
+      if (latestEl) {
+        const summary = summarizeTools(ag._tools);
+        const elapsed = ((Date.now() - ag._startTime) / 1000).toFixed(1);
+        latestEl.innerHTML = `${summary} (${elapsed}s)`;
+      }
 
       // Update outer subagent header with aggregated summary (if inside a subagent)
       if (sub) {
@@ -3510,6 +3745,8 @@ function handleChatEvent(msg) {
         toolEntry._startTime = Date.now();
         toolEntry._count = 1;
         toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${escapeHtml(toolDesc)}</span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
+        // Store full input for detail view
+        toolEntry._toolInput = msg.input || {};
         // Store the message index for this tool call (for checkpoint truncation)
         toolEntry.dataset.msgIndex = chatMessages.length - 1;
         const toolResult = document.createElement('div');
@@ -3567,7 +3804,31 @@ function handleChatEvent(msg) {
             if (!targetResult?.classList?.contains('chat-tool-result')) targetResult = null;
           }
           if (targetResult?.classList?.contains('chat-tool-result')) {
-            targetResult.textContent = msg.output || '';
+            // Show input details + output
+            const toolInput = lastGroup._toolInput || {};
+            let detailHtml = '';
+            const tName = ag3._lastToolName || '';
+            if (tName === 'Edit' && (toolInput.old_string || toolInput.new_string)) {
+              if (toolInput.file_path) detailHtml += `<div class="tool-detail-section"><span class="tool-detail-label">file</span><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
+              if (toolInput.old_string) detailHtml += `<div class="tool-detail-section diff-old"><span class="tool-detail-label">removed</span><pre>${escapeHtml(toolInput.old_string)}</pre></div>`;
+              if (toolInput.new_string) detailHtml += `<div class="tool-detail-section diff-new"><span class="tool-detail-label">added</span><pre>${escapeHtml(toolInput.new_string)}</pre></div>`;
+            } else if (tName === 'Bash' && toolInput.command) {
+              detailHtml += `<div class="tool-detail-section diff-cmd"><pre>$ ${escapeHtml(toolInput.command)}</pre></div>`;
+              if (msg.output) detailHtml += `<div class="tool-detail-output"><pre>${escapeHtml(msg.output)}</pre></div>`;
+            } else if (tName === 'Write') {
+              if (toolInput.file_path) detailHtml += `<div class="tool-detail-section"><span class="tool-detail-label">file</span><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
+              if (toolInput.content) detailHtml += `<div class="tool-detail-section diff-new"><span class="tool-detail-label">content</span><pre>${escapeHtml(toolInput.content)}</pre></div>`;
+            } else if (tName === 'Read' && toolInput.file_path) {
+              detailHtml += `<div class="tool-detail-section"><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
+              if (msg.output) detailHtml += `<div class="tool-detail-output"><pre>${escapeHtml((msg.output || '').slice(0, 500))}</pre></div>`;
+            } else if (tName === 'Grep') {
+              detailHtml += `<div class="tool-detail-section diff-cmd"><pre>${escapeHtml(toolInput.pattern || '')} ${toolInput.path ? 'in ' + toolInput.path : ''}</pre></div>`;
+              if (msg.output) detailHtml += `<div class="tool-detail-output"><pre>${escapeHtml((msg.output || '').slice(0, 500))}</pre></div>`;
+            }
+            if (!detailHtml && msg.output) {
+              detailHtml = `<div class="tool-detail-output"><pre>${escapeHtml(msg.output)}</pre></div>`;
+            }
+            targetResult.innerHTML = detailHtml;
           }
           const elapsed = ((Date.now() - (targetEntry._startTime || Date.now())) / 1000).toFixed(1);
           const timeEl = lastGroup.querySelector('.tool-time');
@@ -3767,12 +4028,15 @@ function handleChatEvent(msg) {
       activeSubagents.clear();
       chatStartTime = null;
 
-      // Process queued messages
+      // Generate LLM title after first exchange
+      maybeGenerateChatTitle(activePanel);
+
+      // Process queued messages — combine all into one
       if (messageQueue.length > 0) {
-        const next = messageQueue.shift();
-        // Reuse the queued message element — remove queued styling, dispatch directly
-        if (next.el) next.el.classList.remove('chat-msg-queued');
-        setTimeout(() => sendQueuedMessage(next.text), 100);
+        const all = messageQueue.splice(0);
+        const combined = all.map(q => q.text).join('\n\n');
+        all.forEach(q => { if (q.el) q.el.classList.remove('chat-msg-queued'); });
+        setTimeout(() => sendQueuedMessage(combined), 100);
       }
       break;
     }
@@ -3819,28 +4083,284 @@ function handleChatEvent(msg) {
       pendingAgentPrompt = null;
       if (checkpointMode) exitCheckpointMode();
       break;
+
+    case 'permission_request': {
+      // Agent is asking for permission to use a tool
+      const promptEl = document.createElement('div');
+      promptEl.className = 'chat-permission-prompt';
+      const toolName = msg.tool || 'unknown';
+      const inputSummary = Object.entries(msg.input || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+      promptEl.innerHTML = `
+        <div class="perm-label">Claude wants to use: <strong>${escapeHtml(toolName)}</strong></div>
+        <div class="perm-detail">${escapeHtml(inputSummary).slice(0, 300)}</div>
+        <div class="perm-actions">
+          <button class="perm-allow" data-decision="allow">Allow</button>
+          <button class="perm-deny" data-decision="deny">Deny</button>
+        </div>`;
+      const container = chatMessagesContainer || document.getElementById('chat-messages');
+      container.appendChild(promptEl);
+      container.scrollTop = container.scrollHeight;
+
+      promptEl.querySelectorAll('.perm-actions button').forEach(btn => {
+        btn.onclick = () => {
+          const decision = btn.dataset.decision;
+          // Send response back to backend
+          const ws = activePanel?.ws || chatWs;
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'permission_response', decision }));
+          }
+          // Update UI
+          promptEl.innerHTML = `<div class="perm-label">${decision === 'allow' ? 'Allowed' : 'Denied'}: ${escapeHtml(toolName)}</div>`;
+          promptEl.style.opacity = '0.6';
+        };
+      });
+      break;
+    }
   }
 
+}
+
+function buildDetailsElement(html) {
+  // Parse <details><summary>Title</summary>content</details> into live-chat DOM
+  const summaryMatch = html.match(/<summary>([\s\S]*?)<\/summary>/);
+  const summary = summaryMatch ? summaryMatch[1].trim() : 'Activity';
+  const content = html.replace(/<details>/, '').replace(/<\/details>/, '').replace(/<summary>[\s\S]*?<\/summary>/, '').trim();
+
+  const isThinking = /^Thought/i.test(summary);
+
+  if (isThinking) {
+    // Build .chat-thinking-wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-thinking-wrapper';
+    const header = document.createElement('div');
+    header.className = 'chat-thinking-header';
+    header.innerHTML = `<span class="chat-thinking-toggle">▶</span> ${escapeHtml(summary)}`;
+    const body = document.createElement('div');
+    body.className = 'chat-thinking-body';
+    body.textContent = content;
+    header.addEventListener('click', () => {
+      body.classList.toggle('open');
+      header.querySelector('.chat-thinking-toggle').classList.toggle('open');
+    });
+    wrapper.appendChild(header);
+    wrapper.appendChild(body);
+    return wrapper;
+  } else {
+    // Build .chat-activity-group matching live chat DOM structure
+    const group = document.createElement('div');
+    group.className = 'chat-activity-group';
+    const header = document.createElement('div');
+    header.className = 'chat-activity-header';
+    header.innerHTML = `<span class="chat-thinking-toggle">▶</span> ${escapeHtml(summary)}`;
+    const body = document.createElement('div');
+    body.className = 'chat-activity-body';
+
+    // Parse tool entries from saved markdown format:
+    // - **ToolName** — description
+    //   - result text
+    const lines = content.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      if (!line) { i++; continue; }
+
+      // Match "- **ToolName** — description" or "- **ToolName** — description"
+      const toolMatch = line.match(/^[-*]\s*\*\*(\w+)\*\*\s*[—–-]\s*(.*)/);
+      if (toolMatch) {
+        const tName = toolMatch[1];
+        const tDesc = toolMatch[2];
+        const toolEntry = document.createElement('div');
+        toolEntry.className = 'chat-tool-entry';
+        toolEntry.innerHTML = `${toolIcon(tName)} <span class="tool-name">${escapeHtml(tName)}</span> <span class="tool-desc">${escapeHtml(tDesc)}</span>`;
+        const toolResult = document.createElement('div');
+        toolResult.className = 'chat-tool-result';
+
+        // Collect indented result lines
+        let resultText = '';
+        while (i + 1 < lines.length && /^\s{2,}[-*]?\s*/.test(lines[i + 1]) && !lines[i + 1].trim().startsWith('**')) {
+          i++;
+          resultText += lines[i].trim().replace(/^[-*]\s*/, '') + '\n';
+        }
+        if (resultText.trim()) {
+          toolResult.textContent = resultText.trim().slice(0, 500);
+        }
+
+        toolEntry.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toolResult.classList.toggle('open');
+        });
+        body.appendChild(toolEntry);
+        body.appendChild(toolResult);
+      }
+      i++;
+    }
+
+    header.addEventListener('click', () => {
+      body.classList.toggle('open');
+      header.querySelector('.chat-thinking-toggle').classList.toggle('open');
+    });
+    group.appendChild(header);
+    group.appendChild(body);
+    return group;
+  }
+}
+
+function continueSavedChat(path, content) {
+  if (!content.trim()) return;
+
+  // Extract title from first line (# Title)
+  const titleMatch = content.match(/^# (.+)/m);
+  const label = titleMatch ? titleMatch[1] : path.split('/').pop();
+
+  // Create floating panel
+  const panel = createFloatingPanel({ label: `${label} (continued)` });
+  if (!panel) return;
+
+  const messagesEl = panel.messagesContainer;
+
+  // Split on ## You/Claude/User/Assistant headers and render each as a chat bubble
+  let pendingActivity = '';
+  const sections = content.split(/^(?=## (?:You|Claude|User|Assistant)\b)/m);
+  for (const section of sections) {
+    const trimmed = section.trim();
+    if (!trimmed) continue;
+
+    const userMatch = trimmed.match(/^## (?:You|User)\b/);
+    const assistantMatch = trimmed.match(/^## (?:Claude|Assistant)\b/);
+
+    if (userMatch) {
+      const body = trimmed.replace(/^## (?:You|User)\s*/, '').trim();
+      if (!body) continue;
+      // Split user text from activity blocks (<details> tags come after user text)
+      const detailsIdx = body.indexOf('<details>');
+      const userText = detailsIdx >= 0 ? body.slice(0, detailsIdx).trim() : body;
+      // Stash activity HTML to prepend to the next Claude section
+      pendingActivity = detailsIdx >= 0 ? body.slice(detailsIdx) : '';
+      if (userText) {
+        const el = document.createElement('div');
+        el.className = 'chat-msg chat-msg-user';
+        el.textContent = userText;
+        messagesEl.appendChild(el);
+      }
+    } else if (assistantMatch) {
+      const body = trimmed.replace(/^## (?:Claude|Assistant)\s*/, '').trim();
+      if (!body && !pendingActivity) continue;
+      const el = document.createElement('div');
+      el.className = 'chat-msg chat-msg-assistant';
+
+      // Render pending activity (thinking/tools) as live-chat-style DOM
+      const allActivity = (pendingActivity || '') + '\n' + (body || '');
+      pendingActivity = '';
+      const parts = allActivity.split(/(<details>[\s\S]*?<\/details>)/g);
+      for (const part of parts) {
+        if (part.startsWith('<details>')) {
+          el.appendChild(buildDetailsElement(part));
+        } else if (part.trim()) {
+          const textEl = document.createElement('div');
+          textEl.innerHTML = marked.parse(part);
+          renderLatex(textEl);
+          // Append children directly to avoid extra wrapper div
+          while (textEl.firstChild) el.appendChild(textEl.firstChild);
+        }
+      }
+      messagesEl.appendChild(el);
+    }
+    // Skip preamble (# title, Session: line)
+  }
+
+  // Add separator
+  const sep = document.createElement('div');
+  sep.className = 'chat-fork-separator';
+  sep.textContent = '— continued from saved chat —';
+  messagesEl.appendChild(sep);
+
+  // Inject the full transcript as context for the first message
+  panel._forkedHistory = [
+    { role: 'user', content: 'Here is our previous conversation transcript:' },
+    { role: 'assistant', content: content },
+  ];
+
+  // Track source file so on close we append instead of creating a new file
+  panel._continuedFromPath = path;
+
+  // Collapse fullpage
+  collapseFullPage();
+}
+
+async function maybeGenerateChatTitle(panel) {
+  // Generate title after first user+assistant exchange, but only once
+  if (!panel || panel._titleGenerated || panel._titlePending) return;
+  const userMsgs = panel.messages.filter(m => m.role === 'user');
+  if (userMsgs.length < 3) return;
+
+  panel._titlePending = true;
+  try {
+    const resp = await fetch('/api/chat/generate-title', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ messages: panel.messages.slice(0, 6) }),
+    });
+    const data = await resp.json();
+    if (data.ok && data.title) {
+      panel._titleGenerated = true;
+      panel._generatedTitle = data.title;
+      panel._generatedSlug = data.slug;
+      // Update panel label in header
+      const panelId = [...chatPanels.entries()].find(([, p]) => p === panel)?.[0];
+      if (panelId) {
+        const labelEl = panel.container?.querySelector('.panel-label');
+        if (labelEl) labelEl.textContent = data.title;
+      }
+      // Update main chat header if this is the main panel
+      if (panel === activePanel) {
+        const mainLabel = document.querySelector('#chat-header .panel-label');
+        if (mainLabel) mainLabel.textContent = data.title;
+      }
+    }
+  } catch (e) { /* silent — title generation is best-effort */ }
+  panel._titlePending = false;
 }
 
 async function saveChatTranscript() {
   if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
   try {
+    const title = activePanel?._generatedTitle || null;
     const resp = await fetch('/api/chat/save', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages }),
+      body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages, title }),
     });
     const data = await resp.json();
     console.log('Chat saved:', data);
     refreshFileTree();
+
+    // If title wasn't generated yet, trigger async generation and update the file
+    if (!title && data.ok && data.path && chatMessages.some(m => m.role === 'user')) {
+      generateAndUpdateTitle(data.path, chatMessages);
+    }
   } catch (e) { console.error('Chat save failed:', e); }
+}
+
+async function generateAndUpdateTitle(savedPath, messages) {
+  try {
+    const resp = await fetch('/api/chat/generate-title', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ messages: messages.slice(0, 6) }),
+    });
+    const data = await resp.json();
+    if (data.ok && data.title) {
+      await fetch('/api/chat/update-title', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ path: savedPath, title: data.title }),
+      });
+      refreshFileTree();
+    }
+  } catch (e) { /* silent — best effort */ }
 }
 
 function saveChatBeacon() {
   // For beforeunload — sendBeacon is the only reliable method
   if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
   const blob = new Blob([JSON.stringify({
-    session_id: chatSessionId, messages: chatMessages,
+    session_id: chatSessionId, messages: chatMessages, title: activePanel?._generatedTitle || null,
   })], { type: 'application/json' });
   navigator.sendBeacon('/api/chat/save', blob);
 }
@@ -3924,24 +4444,39 @@ function initSelectionTooltip() {
 
   askBtn.onclick = () => {
     tooltip.style.display = 'none';
-    // Open chat panel if closed
-    const panel = document.getElementById('chat-panel');
-    if (panel.classList.contains('chat-collapsed') || panel.classList.contains('chat-collapsed-right') || panel.classList.contains('chat-collapsed-float')) {
-      const allC = ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
-      allC.forEach(c => panel.classList.remove(c));
-      panel.classList.add('chat-bottom');
-      connectChat();
+    if (!pendingSelection?.text) return;
+
+    // Find the right input — check if selection is inside a floating panel
+    const selAnchor = window.getSelection()?.anchorNode?.parentElement;
+    const floatPanel = selAnchor?.closest('.floating-chat-panel');
+    let input;
+    if (floatPanel) {
+      input = floatPanel.querySelector('.fcp-input');
+    } else {
+      // Use main chat panel — open it if collapsed
+      const panel = document.getElementById('chat-panel');
+      if (panel.classList.contains('chat-collapsed') || panel.classList.contains('chat-collapsed-right') || panel.classList.contains('chat-collapsed-float')) {
+        const allC = ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
+        allC.forEach(c => panel.classList.remove(c));
+        panel.classList.add('chat-bottom');
+        connectChat();
+      }
+      input = document.getElementById('chat-input');
     }
-    // Show context preview block above input
-    if (pendingSelection?.text) {
-      const preview = document.getElementById('chat-context-preview');
-      const fileName = pendingSelection.file ? pendingSelection.file.split('/').pop() : '';
-      const textSnip = pendingSelection.text.slice(0, 80).replace(/\n/g, ' ');
-      preview.innerHTML = `<span class="ctx-file">${fileName || 'selection'}</span><span class="ctx-text">"${textSnip}${pendingSelection.text.length > 80 ? '...' : ''}"</span><span class="ctx-remove" title="Remove context">✕</span>`;
-      preview.style.display = 'flex';
-      preview.querySelector('.ctx-remove').onclick = () => { preview.style.display = 'none'; pendingSelection = null; };
-    }
-    document.getElementById('chat-input').focus();
+    if (!input) return;
+
+    // Insert selection as blockquote directly into the textarea
+    const fileName = pendingSelection.file ? pendingSelection.file.split('/').pop() : '';
+    const prefix = fileName ? `From \`${fileName}\`:\n` : '';
+    const quoted = pendingSelection.text.split('\n').map(l => `> ${l}`).join('\n');
+    const insertion = `${prefix}${quoted}\n\n`;
+    const pos = input.selectionStart || input.value.length;
+    input.value = input.value.slice(0, pos) + insertion + input.value.slice(pos);
+    input.selectionStart = input.selectionEnd = pos + insertion.length;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    pendingSelection = null;
+    input.focus();
   };
 
   // Hide tooltip on click elsewhere
@@ -4064,6 +4599,42 @@ function isCodeFile(path) {
 // ========================================
 // Settings
 // ========================================
+function initActionMenu() {
+  const btn = document.getElementById('btn-action-menu');
+  const menu = document.getElementById('action-menu');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Close settings menu if open
+    document.getElementById('toolbar-menu')?.classList.remove('open');
+    menu.classList.toggle('open');
+    // Update context-dependent items
+    const ctxItems = document.getElementById('action-context-items');
+    ctxItems.innerHTML = '';
+    // Compile TeX if viewing a .tex file
+    const viewingPath = expandedCard?.dataset.path || '';
+    if (viewingPath.endsWith('.tex')) {
+      const item = document.createElement('div');
+      item.className = 'action-item';
+      item.textContent = 'Compile TeX';
+      item.onclick = () => { closeActionMenu(); /* compileTeX() */ };
+      ctxItems.appendChild(document.createElement('hr'));
+      ctxItems.appendChild(item);
+    }
+    // Continue Chat if viewing a saved chat
+    if (viewingPath.startsWith('raw/chats/')) {
+      const item = document.createElement('div');
+      item.className = 'action-item';
+      item.textContent = 'Continue Chat';
+      item.onclick = () => { closeActionMenu(); continueSavedChat(viewingPath, cardMeta.get(viewingPath)?.content || ''); };
+      ctxItems.appendChild(document.createElement('hr'));
+      ctxItems.appendChild(item);
+    }
+  });
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => menu.classList.remove('open'));
+}
+
 function initSettings() {
   const btn = document.getElementById('btn-toolbar-menu');
   const toolbarMenu = document.getElementById('toolbar-menu');
@@ -4098,13 +4669,18 @@ function initSettings() {
   document.getElementById('settings-save-root').addEventListener('click', async () => {
     const newRoot = document.getElementById('settings-vault-root').value.trim();
     if (!newRoot) return;
+    const btn = document.getElementById('settings-save-root');
+    btn.textContent = 'Saving...';
     const result = await fetch('/api/settings', {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ vault_root: newRoot }),
     }).then(r => r.json());
     if (result.ok) {
-      document.getElementById('settings-save-root').textContent = 'Saved! Restart server.';
-      setTimeout(() => document.getElementById('settings-save-root').textContent = 'Save & Restart', 3000);
+      btn.textContent = 'Restarting...';
+      await restartServer();
+    } else {
+      btn.textContent = 'Save & Restart';
+      alert(result.error || 'Failed to save settings');
     }
   });
 
@@ -4127,6 +4703,107 @@ function initSettings() {
 
   // Keybinding editor
   renderKeybindingEditor();
+}
+
+async function restartServer() {
+  // Save all active chats before restarting
+  document.title = 'Saving chats...';
+  document.body.style.opacity = '0.5';
+  try { await saveChatTranscript(); } catch {}
+  for (const [id, panel] of chatPanels) {
+    if (id !== 'main' && panel.messages.length > 0 && !panel.isTemporary) {
+      try {
+        await fetch('/api/chat/save', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages, title: panel._generatedTitle || null }),
+        });
+      } catch {}
+    }
+  }
+  // Restart
+  document.title = 'Restarting...';
+  try {
+    await fetch('/api/restart', { method: 'POST' });
+  } catch {}
+  window.location.href = window.location.pathname + '?_=' + Date.now();
+}
+
+function getPermissionRules() {
+  return JSON.parse(localStorage.getItem('vault-permissions') || '{}');
+}
+
+function sendPermissionsToBackend(rules) {
+  // Send to main panel
+  const mainPanel = chatPanels.get('main');
+  if (mainPanel?.ws?.readyState === WebSocket.OPEN) {
+    mainPanel.ws.send(JSON.stringify({ type: 'set_permissions', rules }));
+  }
+  // Send to floating panels
+  for (const [id, panel] of chatPanels) {
+    if (id !== 'main' && panel.ws?.readyState === WebSocket.OPEN) {
+      panel.ws.send(JSON.stringify({ type: 'set_permissions', rules }));
+    }
+  }
+}
+
+function openPermissionsPanel() {
+  document.getElementById('permissions-panel')?.remove();
+
+  const categories = [
+    { cat: 'file_read', label: 'File Read' },
+    { cat: 'file_write', label: 'File Write' },
+    { cat: 'shell', label: 'Shell Commands' },
+    { cat: 'destructive_git', label: 'Destructive Git' },
+    { cat: 'mcp_tools', label: 'MCP Tools' },
+  ];
+
+  const saved = getPermissionRules();
+
+  const panel = document.createElement('div');
+  panel.id = 'permissions-panel';
+  panel.className = 'keybinding-panel'; // reuse same styling
+  panel.innerHTML = `
+    <div class="keybinding-panel-header">
+      <span>Agent Permissions</span>
+      <span style="flex:1"></span>
+      <button onclick="document.getElementById('permissions-panel').remove()" title="Close">✕</button>
+    </div>
+    <div class="keybinding-panel-body" id="permissions-panel-body"></div>
+  `;
+  document.getElementById('canvas-container').appendChild(panel);
+
+  const values = ['allow', 'ask', 'deny'];
+  const body = panel.querySelector('#permissions-panel-body');
+  for (const { cat, label } of categories) {
+    const row = document.createElement('div');
+    row.className = 'keybind-row';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'keybind-label';
+    labelEl.textContent = label;
+    const current = saved[cat] || (cat === 'destructive_git' ? 'ask' : 'allow');
+    const btn = document.createElement('button');
+    btn.className = 'keybind-key perm-toggle';
+    btn.dataset.cat = cat;
+    btn.dataset.value = current;
+    btn.textContent = current.charAt(0).toUpperCase() + current.slice(1);
+    btn.onclick = () => {
+      const idx = (values.indexOf(btn.dataset.value) + 1) % values.length;
+      btn.dataset.value = values[idx];
+      btn.textContent = values[idx].charAt(0).toUpperCase() + values[idx].slice(1);
+      const rules = {};
+      body.querySelectorAll('.perm-toggle').forEach(b => { rules[b.dataset.cat] = b.dataset.value; });
+      localStorage.setItem('vault-permissions', JSON.stringify(rules));
+      sendPermissionsToBackend(rules);
+    };
+    row.appendChild(labelEl);
+    row.appendChild(btn);
+    body.appendChild(row);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
 }
 
 function openKeybindingPanel() {
@@ -4220,6 +4897,7 @@ async function init() {
     document.getElementById('sidebar').classList.toggle('collapsed');
   };
   initSettings();
+  initActionMenu();
 
   document.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
@@ -4227,10 +4905,17 @@ async function init() {
     const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
 
     if (e.key === 'Escape') {
-      // Stop chat generation first
-      if (chatGenerating && chatWs && chatWs.readyState === WebSocket.OPEN) {
-        wasUserInterrupt = true;
-        chatWs.send(JSON.stringify({ type: 'stop' }));
+      // Stop the most recently focused panel's generation
+      const focusedId = chatFocusHistory[0] || 'main';
+      const focusedPanel = chatPanels.get(focusedId);
+      if (focusedId === 'main') {
+        if (chatGenerating && chatWs && chatWs.readyState === WebSocket.OPEN) {
+          wasUserInterrupt = true;
+          chatWs.send(JSON.stringify({ type: 'stop' }));
+          return;
+        }
+      } else if (focusedPanel?.generating && focusedPanel.ws?.readyState === WebSocket.OPEN) {
+        focusedPanel.ws.send(JSON.stringify({ type: 'stop' }));
         return;
       }
       if (checkpointMode) { exitCheckpointMode(); return; }
@@ -4267,6 +4952,8 @@ async function init() {
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
+    if (matchesBinding(e, 'restart-server')) { e.preventDefault(); restartServer(); return; }
+    if (matchesBinding(e, 'delete-file') && !inInput) { e.preventDefault(); deleteCurrentFile(); return; }
     // Cmd+J: cycle focus between chat inputs (in visit order)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
