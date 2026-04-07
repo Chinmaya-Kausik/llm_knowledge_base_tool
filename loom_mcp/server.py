@@ -323,6 +323,22 @@ def generate_health_report() -> str:
 # --- Search Tools ---
 
 @mcp.tool()
+def search_by_tags(tags: list[str], scope: str = "all", match_all: bool = False) -> str:
+    """Find pages and memories by frontmatter tags.
+
+    Args:
+        tags: Tags to search for (e.g. ["transformer-from-scratch"] or ["attention", "global"]).
+        scope: "wiki", "memory", "projects", or "all".
+        match_all: If True, page must have ALL tags. If False (default), any tag matches.
+
+    Returns JSON: [{path, title, type, tags, summary}]
+    """
+    from loom_mcp.tools.search import search_by_tags as _search_tags
+    result = _search_tags(LOOM_ROOT, tags, scope, match_all)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
 def ripgrep_search(query: str, scope: str = "all", context_lines: int = 3, file_glob: str = "*") -> str:
     """Full-text search using ripgrep.
 

@@ -32,4 +32,7 @@ When you learn something worth persisting:
 3. Update the relevant project's `MEMORY.md` with a one-liner
 4. For global memories, update the root `MEMORY.md`
 
-Use loom MCP tools (ripgrep_search, read_wiki_page, write_wiki_page, etc.) to find and modify content.
+Use loom MCP tools to find and modify content:
+- `search_by_tags` — find pages/memories by tag (e.g. `search_by_tags(tags=["my-project"], scope="memory")`)
+- `ripgrep_search` — full-text search across the loom
+- `read_wiki_page`, `write_wiki_page` — read/write wiki content

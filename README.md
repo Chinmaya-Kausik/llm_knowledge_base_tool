@@ -12,7 +12,7 @@ Loom is a single workspace that unifies all of this. Your files live on an infin
 
 It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
-A demo loom is included in the `demo/` directory.
+A demo loom is included in the `demo/` directory. Its `CLAUDE.md`, `config.yaml`, and `wiki/meta/conventions.md` serve as templates — bootstrap creates these in any new loom.
 
 ## Quick Start
 

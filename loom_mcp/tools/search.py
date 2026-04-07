@@ -202,3 +202,68 @@ def write_index(loom_root: Path, topic: str, content: str) -> dict:
 
     rel_path = str(path.relative_to(loom_root))
     return {"path": rel_path, "topic": topic, "created": is_new}
+
+
+def search_by_tags(
+    loom_root: Path,
+    tags: list[str],
+    scope: str = "all",
+    match_all: bool = False,
+) -> list[dict]:
+    """Find pages and memories by frontmatter tags.
+
+    Args:
+        tags: Tags to search for.
+        scope: "wiki", "memory", "projects", or "all".
+        match_all: If True, page must have ALL tags. If False, any tag matches.
+
+    Returns: [{path, title, type, tags, summary}]
+    """
+    scope_dirs = {
+        "wiki": [loom_root / "wiki"],
+        "memory": [loom_root / "wiki" / "meta" / "memory"],
+        "projects": [loom_root / "projects"],
+        "all": [loom_root / "wiki", loom_root / "projects", loom_root / "raw"],
+    }
+    dirs = scope_dirs.get(scope, scope_dirs["all"])
+    tags_lower = {t.lower() for t in tags}
+    results = []
+
+    for search_dir in dirs:
+        if not search_dir.exists():
+            continue
+        for md_file in search_dir.rglob("*.md"):
+            try:
+                meta, content = read_frontmatter(md_file)
+            except Exception:
+                continue
+
+            page_tags = meta.get("tags", [])
+            if not page_tags:
+                continue
+            page_tags_lower = {t.lower() for t in page_tags}
+
+            if match_all:
+                if not tags_lower.issubset(page_tags_lower):
+                    continue
+            else:
+                if not tags_lower & page_tags_lower:
+                    continue
+
+            # Extract first non-heading line as summary
+            summary = ""
+            for line in content.split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#") and not line.startswith("---"):
+                    summary = line[:150]
+                    break
+
+            results.append({
+                "path": str(md_file.relative_to(loom_root)),
+                "title": meta.get("title", md_file.stem),
+                "type": meta.get("type", "unknown"),
+                "tags": page_tags,
+                "summary": summary,
+            })
+
+    return results
