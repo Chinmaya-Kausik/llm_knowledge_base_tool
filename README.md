@@ -38,9 +38,9 @@ ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Va
 
 Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
-## What Vault adds over Claude Code
+## How Vault extends Claude Code
 
-Claude Code is a terminal. Vault gives it a visual workspace and extends it in ways the CLI can't:
+Vault builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
 
 - **Expandable tool call history.** Every Read, Edit, Bash, and Grep call is logged with full input/output. Edit calls show inline diffs (removed/added). Bash calls show the command and output. Everything is expandable and stays open while the agent keeps working — you don't lose context as it scrolls by.
 - **Persistent chat transcripts as markdown.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to resume where you left off. This bridges Claude Code (CLI) and Claude.ai (web) — your conversation history is just files.
