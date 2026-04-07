@@ -114,7 +114,6 @@ function setFocusedItem(path, element) {
   document.querySelectorAll('.item-focused').forEach(el => el.classList.remove('item-focused'));
   lastFocusedPath = path || null;
   if (element) element.classList.add('item-focused');
-  console.log('[focus]', lastFocusedPath, element?.className);
 }
 let edgeRAF = null;         // rAF handle for edge debouncing
 
@@ -3482,15 +3481,25 @@ async function checkForPlanFile(filePath) {
 }
 
 function summarizeTools(tools) {
-  const counts = {};
-  tools.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+  // tools is array of {name, file} objects
+  // For file-based tools, count unique files; for others, count invocations
+  const fileTools = new Set(['Read', 'Write', 'Edit']);
+  const groups = {};
+  tools.forEach(t => {
+    const name = typeof t === 'string' ? t : t.name;
+    if (!groups[name]) groups[name] = { count: 0, files: new Set() };
+    groups[name].count++;
+    const file = typeof t === 'object' ? t.file : null;
+    if (file && fileTools.has(name)) groups[name].files.add(file);
+  });
   const friendly = {
     Read: ['Read', 'file'], Bash: ['Ran', 'command'], Grep: ['Searched', 'pattern'],
     Glob: ['Found', 'pattern'], Edit: ['Edited', 'file'], Write: ['Wrote', 'file'],
     Agent: ['Spawned', 'agent'],
   };
-  return Object.entries(counts).map(([tool, n]) => {
+  return Object.entries(groups).map(([tool, g]) => {
     const f = friendly[tool];
+    const n = fileTools.has(tool) && g.files.size > 0 ? g.files.size : g.count;
     if (f) return `${f[0]} ${n} ${f[1]}${n > 1 ? 's' : ''}`;
     return n > 1 ? `${tool} x${n}` : tool;
   }).join(', ');
@@ -3709,7 +3718,8 @@ function handleChatEvent(msg) {
       }
 
       // Update inner header with running summary + latest tool
-      ag._tools.push(toolName);
+      const toolFile = (msg.input || {}).file_path || (msg.input || {}).path || null;
+      ag._tools.push({ name: toolName, file: toolFile });
       const latestEl = ag.querySelector('.activity-latest');
       if (latestEl) {
         const summary = summarizeTools(ag._tools);
@@ -3723,46 +3733,52 @@ function handleChatEvent(msg) {
         if (outerDesc) outerDesc.textContent = `${sub._description || ''} — ${summarizeTools(ag._tools)}`;
       }
 
-      // Same-tool grouping: if same tool as last, increment counter
+      // Same-tool grouping: if same tool, add sub-entry to existing group
       const agBody = ag.querySelector('.chat-activity-body');
       if (ag._lastToolName === toolName && ag._lastToolGroup) {
-        // Increment existing group
+        // Add sub-entry for this call
         ag._lastToolGroup._count = (ag._lastToolGroup._count || 1) + 1;
-        // Add sub-entry
         const subEntry = document.createElement('div');
         subEntry.className = 'chat-tool-subentry';
         subEntry.textContent = toolDesc;
         subEntry._startTime = Date.now();
+        subEntry._toolInput = msg.input || {};
         const subResult = document.createElement('div');
         subResult.className = 'chat-tool-result';
         subEntry.addEventListener('click', (e) => { e.stopPropagation(); subResult.classList.toggle('open'); });
         ag._lastToolGroup._subList.appendChild(subEntry);
         ag._lastToolGroup._subList.appendChild(subResult);
       } else {
-        // New tool entry
+        // New tool group — title is not clickable, all calls go in subList
         const toolEntry = document.createElement('div');
         toolEntry.className = 'chat-tool-entry';
         toolEntry._startTime = Date.now();
         toolEntry._count = 1;
         toolEntry.innerHTML = `${toolIcon(toolName)} <span class="tool-name">${escapeHtml(toolName)}</span> <span class="tool-desc">${escapeHtml(toolDesc)}</span> <span class="tool-time pondering"></span> <span class="checkpoint-marker" title="Set redirect breakpoint here"></span>`;
-        // Store full input for detail view
         toolEntry._toolInput = msg.input || {};
-        // Store the message index for this tool call (for checkpoint truncation)
         toolEntry.dataset.msgIndex = chatMessages.length - 1;
-        const toolResult = document.createElement('div');
-        toolResult.className = 'chat-tool-result';
         const subList = document.createElement('div');
         subList.className = 'chat-tool-sublist';
         subList.style.display = 'none';
         toolEntry._subList = subList;
+        // First call also goes into subList as a sub-entry
+        const firstSub = document.createElement('div');
+        firstSub.className = 'chat-tool-subentry';
+        firstSub.textContent = toolDesc;
+        firstSub._startTime = Date.now();
+        firstSub._toolInput = msg.input || {};
+        const firstSubResult = document.createElement('div');
+        firstSubResult.className = 'chat-tool-result';
+        firstSub.addEventListener('click', (e) => { e.stopPropagation(); firstSubResult.classList.toggle('open'); });
+        subList.appendChild(firstSub);
+        subList.appendChild(firstSubResult);
+        // Click title to toggle subList visibility
         toolEntry.addEventListener('click', (e) => {
           e.stopPropagation();
-          toolResult.classList.toggle('open');
-          if (toolEntry._count > 1) subList.style.display = subList.style.display === 'none' ? '' : 'none';
+          subList.style.display = subList.style.display === 'none' ? '' : 'none';
         });
         agBody.appendChild(toolEntry);
         agBody.appendChild(subList);
-        agBody.appendChild(toolResult);
         ag._lastToolName = toolName;
         ag._lastToolGroup = toolEntry;
       }
@@ -3789,37 +3805,39 @@ function handleChatEvent(msg) {
       const sub3 = getEventTarget(msg);
       const ag3 = sub3 ? sub3.activityGroup : currentActivityGroup;
       if (ag3) {
-        // Find the last tool entry or subentry
+        // Find the next tool entry/subentry that hasn't received a result yet
         const lastGroup = ag3._lastToolGroup;
         if (lastGroup) {
+          // All results go to sub-entries in order
+          if (!lastGroup._resultCount) lastGroup._resultCount = 0;
+          const resultIdx = lastGroup._resultCount;
+          lastGroup._resultCount++;
+
           const subList = lastGroup._subList;
-          const subEntries = subList?.querySelectorAll('.chat-tool-subentry');
-          let targetEntry = lastGroup;
+          const subEntries = subList ? Array.from(subList.querySelectorAll('.chat-tool-subentry')) : [];
+
+          let targetEntry;
           let targetResult;
-          if (subEntries && subEntries.length > 0) {
-            targetEntry = subEntries[subEntries.length - 1];
+          if (resultIdx < subEntries.length) {
+            targetEntry = subEntries[resultIdx];
             targetResult = targetEntry.nextElementSibling;
-          } else {
-            targetResult = lastGroup.nextElementSibling?.nextElementSibling; // skip subList
             if (!targetResult?.classList?.contains('chat-tool-result')) targetResult = null;
           }
+
           if (targetResult?.classList?.contains('chat-tool-result')) {
-            // Show input details + output
-            const toolInput = lastGroup._toolInput || {};
+            // Show input details + output — use the target entry's input, not the group parent
+            const toolInput = targetEntry._toolInput || lastGroup._toolInput || {};
             let detailHtml = '';
             const tName = ag3._lastToolName || '';
             if (tName === 'Edit' && (toolInput.old_string || toolInput.new_string)) {
-              if (toolInput.file_path) detailHtml += `<div class="tool-detail-section"><span class="tool-detail-label">file</span><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
               if (toolInput.old_string) detailHtml += `<div class="tool-detail-section diff-old"><span class="tool-detail-label">removed</span><pre>${escapeHtml(toolInput.old_string)}</pre></div>`;
               if (toolInput.new_string) detailHtml += `<div class="tool-detail-section diff-new"><span class="tool-detail-label">added</span><pre>${escapeHtml(toolInput.new_string)}</pre></div>`;
             } else if (tName === 'Bash' && toolInput.command) {
               detailHtml += `<div class="tool-detail-section diff-cmd"><pre>$ ${escapeHtml(toolInput.command)}</pre></div>`;
               if (msg.output) detailHtml += `<div class="tool-detail-output"><pre>${escapeHtml(msg.output)}</pre></div>`;
             } else if (tName === 'Write') {
-              if (toolInput.file_path) detailHtml += `<div class="tool-detail-section"><span class="tool-detail-label">file</span><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
               if (toolInput.content) detailHtml += `<div class="tool-detail-section diff-new"><span class="tool-detail-label">content</span><pre>${escapeHtml(toolInput.content)}</pre></div>`;
             } else if (tName === 'Read' && toolInput.file_path) {
-              detailHtml += `<div class="tool-detail-section"><pre>${escapeHtml(toolInput.file_path)}</pre></div>`;
               if (msg.output) detailHtml += `<div class="tool-detail-output"><pre>${escapeHtml((msg.output || '').slice(0, 500))}</pre></div>`;
             } else if (tName === 'Grep') {
               detailHtml += `<div class="tool-detail-section diff-cmd"><pre>${escapeHtml(toolInput.pattern || '')} ${toolInput.path ? 'in ' + toolInput.path : ''}</pre></div>`;
