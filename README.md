@@ -12,6 +12,8 @@ Loom is a single workspace that unifies all of this. Your files live on an infin
 
 It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
+A demo loom is included in the `demo/` directory.
+
 ## Quick Start
 
 ```bash
@@ -140,32 +142,47 @@ All shortcuts are rebindable via Cmd+K.
 ## Architecture
 
 ```
-loom/
-  wiki/                  <- LLM-maintained structured knowledge
-  raw/                   <- Ingested sources + saved chat transcripts
-  outputs/               <- Generated artifacts
+loom/                       <- A loom directory (user content)
+  CLAUDE.md                 <- Project context for Claude (auto-created)
+  MEMORY.md                 <- Global memory index (user-created)
+  config.yaml               <- Loom-local config (context tuning)
+  wiki/                     <- LLM-maintained structured knowledge
+    meta/
+      memory/               <- Cross-project memory files
+      conventions.md        <- Editable project conventions
+      index.md              <- Master page catalog
+      glossary.md           <- Canonical terms
+  raw/                      <- Ingested sources + saved chat transcripts
+  projects/                 <- Active code repos, experiments
+    my-project/
+      MEMORY.md             <- Project-specific memory index
+  outputs/                  <- Generated artifacts
 
-loom_mcp/
-  server.py              <- 28 MCP tools (stdio transport)
-  web.py                 <- FastAPI server + WebSocket endpoints
-  chat.py                <- Claude Agent SDK bridge with permission system
-  lib/                   <- Core: pages, frontmatter, links, hashing
-  tools/                 <- Ingest, compile, search, lint, git
+loom_mcp/                   <- This repo (the tool)
+  server.py                 <- 28 MCP tools (stdio transport)
+  web.py                    <- FastAPI server + WebSocket endpoints
+  chat.py                   <- Claude Agent SDK bridge with modular context pipeline
+  lib/                      <- Core: pages, frontmatter, links, hashing
+  tools/                    <- Ingest, compile, search, lint, git
   static/
-    index.html           <- Single-page app shell
-    style.css            <- Dark theme styles
-    app.js               <- Frontend (~5100 lines, vanilla JS)
-    vendor/              <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js, KaTeX
+    index.html              <- Single-page app shell
+    style.css               <- Dark theme styles
+    app.js                  <- Frontend (~5200 lines, vanilla JS)
+    vendor/                 <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js, KaTeX
 
-src-tauri/               <- Tauri v2 native app (optional)
+demo/                       <- Demo loom (included in repo)
+src-tauri/                  <- Tauri v2 native app (optional)
 ```
 
 **Key design decisions:**
 - Every folder is a page (README.md = content). Files are subpages.
 - All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic — no API calls from the backend.
 - No API key needed. Claude Code uses your Max subscription.
-- No build step. ~5100 lines of vanilla JS with vendored libraries.
+- No build step. ~5200 lines of vanilla JS with vendored libraries.
 - The permission system is enforced programmatically via `can_use_tool`, not just via system prompt instructions.
+- The chat backend uses Claude Code's preset system prompt with project-specific additions appended, and loads CLAUDE.md natively via `setting_sources=["project"]`.
+- The system prompt is assembled from modular, independently configurable context blocks (permissions, memory, page/folder context). Each block can be tuned or disabled via loom-local `config.yaml`.
+- Memory files live centrally in `wiki/meta/memory/`, tagged by project. Each project has a MEMORY.md index with one-liners that gets injected at session start. Cross-pollination happens through the wiki, not through memory.
 
 ## Tech Stack
 
@@ -173,13 +190,16 @@ src-tauri/               <- Tauri v2 native app (optional)
 - **Frontend**: Vanilla JS (~5100 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js, KaTeX
 - **Native**: Tauri v2 (Rust)
 - **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
-- **Tests**: pytest (293 tests across 25 files)
+- **Tests**: pytest (300 tests across 25 files)
 
 ## Configuration
 
 - `LOOM_ROOT` env var, `~/.loom-app-config.json`, or the Settings dropdown in the UI
 - `.claude/mcp.json` registers the loom MCP server for Claude Code (auto-created on startup)
-- `config.yaml` for frontmatter schema and compilation settings
+- `.claude/settings.json` hooks (e.g., mdformat after wiki page writes) — auto-copied on startup
+- `CLAUDE.md` at loom root — project context loaded by the Agent SDK subprocess
+- `config.yaml` at loom root — context pipeline tuning (memory caps, page content limits, enable/disable blocks)
+- `wiki/meta/conventions.md` — detailed project conventions, editable from the canvas
 
 ## Development
 

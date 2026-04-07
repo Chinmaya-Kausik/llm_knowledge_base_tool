@@ -96,10 +96,14 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 
 ### Bootstrap
 
-On startup (`lifespan`), `bootstrap_loom()` creates:
-- Directory structure: `raw/{inbox,articles,papers,repos,media}`, `wiki/{concepts,summaries,indexes,answers,meta}`, `outputs/{slides,reports,visualizations}`
-- `page-registry.json` and `glossary.md` if missing
-- `.claude/mcp.json` in the loom directory so the Claude agent subprocess can find MCP tools
+On startup (`lifespan`), `bootstrap_loom()` creates (if missing):
+- Directory structure: `raw/{inbox,articles,papers,repos,media}`, `wiki/{concepts,summaries,indexes,answers,meta,meta/memory}`, `outputs/{slides,reports,visualizations}`
+- `page-registry.json` and `glossary.md`
+- `.claude/mcp.json` — registers the MCP server so the Agent SDK subprocess can find loom tools
+- `.claude/settings.json` — copies hooks (e.g., mdformat after wiki page writes) from the repo
+- `CLAUDE.md` — project context loaded natively by the Agent SDK subprocess via `setting_sources=["project"]`. Includes loom structure, conventions pointers, and memory instructions.
+- `wiki/meta/conventions.md` — detailed project conventions (editable from the canvas)
+- `config.yaml` — loom-local context pipeline configuration (memory caps, page content limits, enable/disable blocks)
 
 ## Chat Backend
 
@@ -117,17 +121,40 @@ On startup (`lifespan`), `bootstrap_loom()` creates:
 8. Server spawns/reuses a `ClaudeSDKClient` with `ClaudeAgentOptions`
 9. Streams events back: `thinking`, `text`, `tool_use`, `tool_result`, `result`, `done`
 
-### System Prompt
+### System Prompt (Modular Context Pipeline)
 
-`build_system_prompt()` constructs a system prompt that enhances (does not replace) Claude Code's defaults. It injects loom structure, conventions, MCP tool references, and context depending on the level. Uses `__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__` to separate cached static content from per-request dynamic context. Page content is truncated to 8K characters.
+The Agent SDK subprocess uses Claude Code's preset system prompt with loom-specific context appended:
+
+```python
+system_prompt={"type": "preset", "preset": "claude_code", "append": system_prompt},
+setting_sources=["project"],  # Loads CLAUDE.md from loom root
+```
+
+`build_system_prompt()` assembles the appended text from independent **context blocks**:
+
+- **`_permissions_block(loom_root)`** — safety permissions + responsiveness guidelines. Always injected. Falls back to including full conventions if CLAUDE.md is missing.
+- **`_memory_block(loom_root, page_path, config)`** — reads the current project's `MEMORY.md` (or root `MEMORY.md` if not in a project). Injects one-liner index, capped at `config.context.memory.max_chars`.
+- **`_location_block(loom_root, page_path, context_level, config)`** — dynamic page/folder/global context (see table below).
+
+Uses `__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__` to separate cached static content (permissions, memory) from per-request dynamic context. Configuration loaded from loom-local `config.yaml`.
 
 ### Context Levels
 
 | Level | What Claude receives |
 |-------|---------------------|
-| `page` | Current file content (truncated to 8K) + parent folder README |
+| `page` | Current file content (truncated, configurable max) + parent folder README |
 | `folder` | Current folder README (lists children with summaries) |
 | `global` | Full master index from wiki/meta/index.md |
+
+### Memory System
+
+Memories are individual files in `wiki/meta/memory/`, each with frontmatter including `type: memory` and `tags: [project-name]` (or `[global]`). Timestamped filenames prevent collisions.
+
+Each project folder has a `MEMORY.md` index with one-liners for relevant memories. A root `MEMORY.md` holds global memories. The `_memory_block()` reads the appropriate index and injects it into the system prompt.
+
+- **Single-project memories**: Claude manages autonomously (create, update, remove)
+- **Cross-project/global memories**: managed via interactive `/memory` command
+- **`/compile`**: read-only on memories — reports staleness, verifies index drift
 
 ### Permission System (ClaudeSDKClient `can_use_tool`)
 
@@ -251,7 +278,7 @@ uv run python -c "from loom_mcp.server import mcp; print(len(mcp._tool_manager._
 ## Testing
 
 ```bash
-uv run pytest                    # All 293 tests
+uv run pytest                    # All 300 tests
 uv run pytest loom_mcp/tests/test_pages.py -v  # Just page model
 uv run pytest -k "test_chat"     # Just chat tests
 ```
