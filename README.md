@@ -1,8 +1,14 @@
 # Vault
 
-A local-first personal knowledge base with an infinite canvas UI and embedded Claude Code chat. Markdown files on disk, no cloud sync, no proprietary formats.
+A local-first personal knowledge base that puts your files on an infinite canvas and gives Claude Code a visual interface to operate on all of it. Markdown on disk, git-versioned, no cloud sync.
 
 <!-- ![Vault screenshot](screenshot.png) -->
+
+## Why
+
+I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things.
+
+Vault puts everything on a canvas where documents are cards you can arrange, connect, and drill into. Claude Code runs inside the UI with multiple chat panels, inline diffs, and a programmatic permission system. The knowledge base compounds over time: ingest sources, compile them into structured wiki pages, and every future conversation benefits from the accumulated context.
 
 ## Quick Start
 
@@ -35,38 +41,48 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 ### Canvas and Views
 - Infinite pan/zoom canvas with document cards (d3-zoom, WebCoLa layout)
 - Files view with tree/tile toggle, Mac-style folder icons, breadcrumb navigation
-- Provenance graph view (raw sources linked to wiki pages)
-- Cards show rendered markdown, code with syntax highlighting, or PDF content
+- Provenance graph view linking raw sources to wiki pages
+- Cards show rendered markdown, syntax-highlighted code, or PDF content
 - Drill into folders, expand/collapse/resize/reposition cards, multi-select with Cmd+click
 - Edges show `[[wiki-link]]` connections, aggregated at top level
-- Filetype filter (Markdown, Code, Papers, Data, Misc)
+- Filetype filtering (Markdown, Code, Papers, Data, Misc)
 
 ### Chat
-- Multiple concurrent chat panels -- floating, dockable, forkable
-- Full Claude Code agent via Claude Agent SDK (bills to your Max subscription)
+- Multiple concurrent chat panels — floating, dockable, forkable
+- Full Claude Code agent via the Agent SDK (bills to your Max subscription, no API key)
 - Context levels: Page, Folder, or Global (master index)
 - Streaming responses with collapsible thinking trace and tool use blocks
-- Activity summaries ("Read 3 files, Searched 2 patterns")
+- Inline diffs for Edit calls, command display for Bash, expandable tool details
+- Activity summaries that count unique files ("Edited 1 file, Read 3 files")
 - Subagent display with nested tool calls
-- Redirect/checkpoint, message queue, interrupt prompt, fork with context
-- Text selection in any card shows "Ask Claude" with context injection
-- Auto-saves transcripts to `raw/chats/` on page close
-- KaTeX LaTeX rendering in chat and fullpage views
+- Redirect/checkpoint, message queue, interrupt prompt, fork with full context
+- Text selection anywhere shows "Ask Claude" with context injection
+- Auto-saves transcripts to `raw/chats/` on close
+- KaTeX rendering in chat and fullpage views
 
 ### Permissions
-- Programmatic permission system via ClaudeSDKClient's `can_use_tool` callback
-- Per-category rules (file read, file write, shell, MCP tools, destructive git) set from the browser
-- Three modes per category: allow, ask (interactive browser prompt), or deny
-- Destructive command detection (rm, force push, hard reset) with separate category
+- Programmatic enforcement via the Agent SDK's `can_use_tool` callback — not just system prompt instructions
+- Per-category rules (file read, file write, shell, MCP tools, destructive operations) configurable from the browser
+- Three modes: Allow, Ask (interactive prompt with Enter to confirm), Deny
+- Destructive command detection (`rm`, `git push --force`, `git reset --hard`) with its own category
 
 ### Editing and Terminal
 - CodeMirror 6 editor with syntax highlighting (Cmd+E to edit, Cmd+S to save)
 - Embedded terminal panels via xterm.js (Cmd+` to open)
-- Plan mode -- interactive checklist panel for agent plans
+- Plan mode — interactive checklist panel for agent plans
 
 ### Search
-- Content, name, and global search toggles with match highlighting in files
+- Content, name, and global search with match highlighting inside files
 - Powered by ripgrep (vendored binary auto-detected)
+
+### Knowledge Base Workflows
+- `/ingest <url>` — capture a URL or PDF into `raw/`
+- `/compile` — incrementally compile changed sources into structured wiki pages
+- `/query <question>` — search the wiki and synthesize an answer
+- `/lint` — run health checks with scaling trigger monitoring
+- `/file-answer` — write the last answer back to the wiki
+
+The compilation pipeline produces wiki pages with full YAML frontmatter, `[[wiki-link]]` cross-references, and a master index. The more you ingest, the better the context gets.
 
 ### MCP Server (28 tools)
 - **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text`, `classify_inbox_item`
@@ -77,13 +93,6 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 - **Search**: `ripgrep_search` with file glob and scope filtering
 - **Maintenance**: `get_changed_sources`, `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
 - **Git**: `auto_commit`, `get_recent_changes`
-
-### Slash Commands
-- `/compile` -- incrementally compile changed sources into wiki pages
-- `/ingest <url>` -- capture a URL into the vault
-- `/query <question>` -- search and synthesize an answer
-- `/lint` -- run health checks with scaling trigger monitoring
-- `/file-answer` -- write the last answer back to the wiki
 
 ## Keyboard Shortcuts
 
@@ -107,6 +116,7 @@ All shortcuts are rebindable via Cmd+K.
 | Cmd+0 | Fit view |
 | Cmd+L | Auto layout |
 | Cmd+[/] | Navigate back / drill in |
+| Cmd+Shift+R | Restart server (full process restart) |
 | Cmd+, | Open settings |
 | Escape | Collapse or navigate back |
 
@@ -135,9 +145,10 @@ src-tauri/               <- Tauri v2 native app (optional)
 
 **Key design decisions:**
 - Every folder is a page (README.md = content). Files are subpages.
-- All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic.
-- No API key needed -- Claude Code uses your Max subscription.
-- No build step -- vanilla JS with vendored libraries.
+- All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic — no API calls from the backend.
+- No API key needed. Claude Code uses your Max subscription.
+- No build step. ~5100 lines of vanilla JS with vendored libraries.
+- The permission system is enforced programmatically via `can_use_tool`, not just via system prompt instructions.
 
 ## Tech Stack
 
@@ -149,13 +160,13 @@ src-tauri/               <- Tauri v2 native app (optional)
 
 ## Configuration
 
-- `VAULT_ROOT` env var, `~/.vault-app-config.json`, or Settings dropdown in the UI
+- `VAULT_ROOT` env var, `~/.vault-app-config.json`, or the Settings dropdown in the UI
 - `.claude/mcp.json` registers the vault MCP server for Claude Code (auto-created on startup)
 - `config.yaml` for frontmatter schema and compilation settings
 
 ## Development
 
-See [DEVELOPER.md](DEVELOPER.md) for detailed architecture, data model, API endpoints, chat backend internals, and contribution guidelines.
+See [DEVELOPER.md](DEVELOPER.md) for the full architecture, data model, API endpoints, chat backend internals, and how to add new features.
 
 ```bash
 uv run pytest                    # All tests
@@ -164,4 +175,4 @@ uv run pytest -k "test_chat"     # Subset
 
 ## License
 
-[Business Source License 1.1](LICENSE) -- free for non-commercial use. Converts to Apache 2.0 on 2030-04-06.
+[Business Source License 1.1](LICENSE) — free for non-commercial use. Converts to Apache 2.0 on 2030-04-06.
