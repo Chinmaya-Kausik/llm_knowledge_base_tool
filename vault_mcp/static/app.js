@@ -4109,9 +4109,22 @@ function handleChatEvent(msg) {
           <button class="perm-allow" data-decision="allow">Allow</button>
           <button class="perm-deny" data-decision="deny">Deny</button>
         </div>`;
-      const container = chatMessagesContainer || document.getElementById('chat-messages');
-      container.appendChild(promptEl);
-      container.scrollTop = container.scrollHeight;
+      // Insert into current activity group if available, otherwise chat container
+      const sub = getEventTarget(msg);
+      const ag = sub ? sub.activityGroup : currentActivityGroup;
+      const agBody = ag?.querySelector('.chat-activity-body');
+      if (agBody) {
+        // Make sure the activity body is visible so the user sees the prompt
+        agBody.classList.add('open');
+        const toggle = ag.querySelector('.chat-thinking-toggle');
+        if (toggle) toggle.classList.add('open');
+        agBody.appendChild(promptEl);
+      } else {
+        const container = chatMessagesContainer || document.getElementById('chat-messages');
+        container.appendChild(promptEl);
+      }
+      const scrollTarget = chatMessagesContainer || document.getElementById('chat-messages');
+      scrollTarget.scrollTop = scrollTarget.scrollHeight;
 
       // Focus Allow button so Enter confirms
       const allowBtn = promptEl.querySelector('.perm-allow');
@@ -4122,10 +4135,21 @@ function handleChatEvent(msg) {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'permission_response', decision }));
         }
-        // Replace with compact notification (like "Modified 1 file")
-        promptEl.className = 'chat-file-notification';
+        // Replace with compact tool-entry-style line
         const label = decision === 'allow' ? 'Allowed' : 'Denied';
-        promptEl.innerHTML = `${label}: ${escapeHtml(toolName)} — ${escapeHtml(inputSummary)}`;
+        const color = decision === 'allow' ? 'var(--green, #9ece6a)' : 'var(--red, #f7768e)';
+        const icon = decision === 'allow' ? '🔓' : '🚫';
+        promptEl.className = 'chat-tool-entry perm-resolved';
+        promptEl.style.cssText = '';
+        const shortDesc = (msg.input?.command || msg.input?.file_path || inputSummary).slice(0, 120);
+        promptEl.innerHTML = `${icon} <span class="tool-name" style="color:${color}">${label}</span> <span class="tool-desc">${escapeHtml(shortDesc)}</span>`;
+        // Click to expand full details
+        const detailEl = document.createElement('div');
+        detailEl.className = 'chat-tool-result';
+        detailEl.innerHTML = `<div class="tool-detail-output"><pre>${escapeHtml(inputSummary)}</pre></div>`;
+        promptEl.after(detailEl);
+        promptEl.style.cursor = 'pointer';
+        promptEl.onclick = () => detailEl.classList.toggle('open');
         promptEl.removeEventListener('keydown', onKey);
       }
 

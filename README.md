@@ -28,13 +28,14 @@ cargo tauri build
 ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Vault.app
 ```
 
-Produces a ~7.7 MB Tauri v2 binary that starts the Python server as a sidecar.
+Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
 ## Features
 
 ### Canvas and Views
 - Infinite pan/zoom canvas with document cards (d3-zoom, WebCoLa layout)
 - Files view with tree/tile toggle, Mac-style folder icons, breadcrumb navigation
+- Provenance graph view (raw sources linked to wiki pages)
 - Cards show rendered markdown, code with syntax highlighting, or PDF content
 - Drill into folders, expand/collapse/resize/reposition cards, multi-select with Cmd+click
 - Edges show `[[wiki-link]]` connections, aggregated at top level
@@ -50,6 +51,13 @@ Produces a ~7.7 MB Tauri v2 binary that starts the Python server as a sidecar.
 - Redirect/checkpoint, message queue, interrupt prompt, fork with context
 - Text selection in any card shows "Ask Claude" with context injection
 - Auto-saves transcripts to `raw/chats/` on page close
+- KaTeX LaTeX rendering in chat and fullpage views
+
+### Permissions
+- Programmatic permission system via ClaudeSDKClient's `can_use_tool` callback
+- Per-category rules (file read, file write, shell, MCP tools, destructive git) set from the browser
+- Three modes per category: allow, ask (interactive browser prompt), or deny
+- Destructive command detection (rm, force push, hard reset) with separate category
 
 ### Editing and Terminal
 - CodeMirror 6 editor with syntax highlighting (Cmd+E to edit, Cmd+S to save)
@@ -60,12 +68,14 @@ Produces a ~7.7 MB Tauri v2 binary that starts the Python server as a sidecar.
 - Content, name, and global search toggles with match highlighting in files
 - Powered by ripgrep (vendored binary auto-detected)
 
-### MCP Server (28+ tools)
-- **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text` (with image downloading)
-- **Compilation**: `write_wiki_page`, `update_master_index`, `write_index`
-- **Linting**: `validate_links`, `find_stale_pages`, `find_orphan_pages`, health report with scaling alerts
+### MCP Server (28 tools)
+- **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text`, `classify_inbox_item`
+- **Reading**: `read_source`, `read_wiki_page`, `get_page_registry`, `get_glossary`
+- **Compilation**: `write_wiki_page`, `mark_source_compiled`, `update_glossary`, `update_master_index`, `append_log`
+- **Indexes**: `read_index`, `write_index`
+- **Linting**: `validate_links`, `find_stale_pages`, `find_orphan_pages`, `find_missing_concepts`, `check_terminology`, `generate_health_report`
 - **Search**: `ripgrep_search` with file glob and scope filtering
-- **Maintenance**: `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
+- **Maintenance**: `get_changed_sources`, `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
 - **Git**: `auto_commit`, `get_recent_changes`
 
 ### Slash Commands
@@ -94,7 +104,10 @@ All shortcuts are rebindable via Cmd+K.
 | Cmd+K | Show/edit shortcuts |
 | Cmd+F | Focus search |
 | Cmd+=/- | Zoom in/out |
+| Cmd+0 | Fit view |
+| Cmd+L | Auto layout |
 | Cmd+[/] | Navigate back / drill in |
+| Cmd+, | Open settings |
 | Escape | Collapse or navigate back |
 
 ## Architecture
@@ -106,16 +119,16 @@ vault/
   outputs/               <- Generated artifacts
 
 vault_mcp/
-  server.py              <- 28+ MCP tools (stdio transport)
+  server.py              <- 28 MCP tools (stdio transport)
   web.py                 <- FastAPI server + WebSocket endpoints
-  chat.py                <- Claude Agent SDK bridge
+  chat.py                <- Claude Agent SDK bridge with permission system
   lib/                   <- Core: pages, frontmatter, links, hashing
   tools/                 <- Ingest, compile, search, lint, git
   static/
     index.html           <- Single-page app shell
     style.css            <- Dark theme styles
-    app.js               <- Frontend (~4200 lines, vanilla JS)
-    vendor/              <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js
+    app.js               <- Frontend (~5100 lines, vanilla JS)
+    vendor/              <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js, KaTeX
 
 src-tauri/               <- Tauri v2 native app (optional)
 ```
@@ -129,15 +142,15 @@ src-tauri/               <- Tauri v2 native app (optional)
 ## Tech Stack
 
 - **Backend**: Python 3.12+, FastAPI, Claude Agent SDK, MCP Python SDK
-- **Frontend**: Vanilla JS (~4200 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js
+- **Frontend**: Vanilla JS (~5100 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js, KaTeX
 - **Native**: Tauri v2 (Rust)
 - **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
-- **Tests**: pytest (180 tests across 19 files)
+- **Tests**: pytest (293 tests across 25 files)
 
 ## Configuration
 
 - `VAULT_ROOT` env var, `~/.vault-app-config.json`, or Settings dropdown in the UI
-- `.claude/mcp.json` registers the vault MCP server for Claude Code
+- `.claude/mcp.json` registers the vault MCP server for Claude Code (auto-created on startup)
 - `config.yaml` for frontmatter schema and compilation settings
 
 ## Development

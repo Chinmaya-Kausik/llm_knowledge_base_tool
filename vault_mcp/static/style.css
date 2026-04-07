@@ -993,7 +993,7 @@ body {
 }
 .chat-tool-entry:last-of-type { border-bottom: none; }
 .chat-tool-entry:hover { color: var(--text-bright); }
-.tool-name { font-weight: 600; color: var(--cyan); min-width: 40px; }
+.tool-name { font-weight: 600; color: var(--cyan); min-width: 40px; white-space: nowrap; flex-shrink: 0; }
 .tool-desc { font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-input { font-size: 10px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
 .activity-latest { font-size: 11px; color: var(--text); }
