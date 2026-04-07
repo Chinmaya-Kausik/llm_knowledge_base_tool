@@ -266,7 +266,7 @@ def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str |
         memory_content = memory_content[:max_chars] + "\n\n[... more memories available ...]"
 
     log.info("[memory] injecting from %s (%d chars) for page_path=%s", source, len(memory_content), page_path)
-    return f"## Memories\n{memory_content}"
+    return f"What you know about this workspace and user:\n{memory_content}"
 
 
 def _location_block(loom_root: Path, page_path: str | None, context_level: str, config: dict) -> str | None:
