@@ -38,6 +38,20 @@ ln -sf "$(pwd)/src-tauri/target/release/bundle/macos/Vault.app" /Applications/Va
 
 Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
+## What Vault adds over Claude Code
+
+Claude Code is a terminal. Vault gives it a visual workspace and extends it in ways the CLI can't:
+
+- **Expandable tool call history.** Every Read, Edit, Bash, and Grep call is logged with full input/output. Edit calls show inline diffs (removed/added). Bash calls show the command and output. Everything is expandable and stays open while the agent keeps working — you don't lose context as it scrolls by.
+- **Persistent chat transcripts as markdown.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to resume where you left off. This bridges Claude Code (CLI) and Claude.ai (web) — your conversation history is just files.
+- **Fork any conversation.** Click Fork to branch a chat with full context. The new panel gets the conversation history injected as context, so you can explore an alternative direction without losing the original thread.
+- **Multiple concurrent agents.** Open several chat panels at once — floating, docked, or minimized. Each has its own WebSocket connection and session. Work on different parts of a project in parallel.
+- **Spatial file navigation.** Your files aren't a flat list — they're cards on a canvas with wiki-link edges. Drill into folders, arrange things spatially, see the structure of your project at a glance.
+- **Programmatic permissions.** Not just "please don't delete my files" in the system prompt — actual `can_use_tool` enforcement via the Agent SDK. Per-category rules (allow/ask/deny) with interactive browser prompts for destructive operations.
+- **Integrated terminals.** Embedded xterm.js terminals in the same workspace. No context-switching to a separate terminal app.
+- **Knowledge base pipeline.** Ingest URLs and PDFs, compile them into structured wiki pages with cross-links and a master index. The accumulated knowledge becomes persistent context for every future conversation.
+- **Selection-to-Claude.** Highlight any text in any card or editor and get an "Ask Claude" tooltip that injects the selection as context. No copy-pasting into a chat window.
+
 ## Features
 
 ### Canvas and Views
