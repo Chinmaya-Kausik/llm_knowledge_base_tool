@@ -127,6 +127,10 @@ def loom_client(tmp_path):
     client = TestClient(web_module.app)
     yield client, root
 
+    # Clean up chat sessions to prevent background tasks from hanging pytest
+    from loom_mcp.chat import sessions
+    sessions.clear()
+
     web_module.LOOM_ROOT = original_root
     web_module.LAYOUT_FILE = original_layout
 

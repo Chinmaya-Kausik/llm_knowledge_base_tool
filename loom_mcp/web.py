@@ -567,12 +567,16 @@ async def api_restart():
     """Full process restart — re-exec the server so code changes take effect.
 
     Responds with OK, then a background thread replaces the process after a delay.
+    Skips the actual os.execv when running under pytest (detected by sys.argv).
     """
     import threading
 
     def _restart():
         import time
         time.sleep(0.5)  # Let the HTTP response flush
+        # Skip actual restart in test mode
+        if "pytest" in sys.argv[0] or "pytest" in sys.modules:
+            return
         print(f"[restart] os.execv: {sys.executable} {sys.argv}", flush=True)
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
