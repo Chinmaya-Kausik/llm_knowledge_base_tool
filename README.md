@@ -1,4 +1,4 @@
-# Vault
+# Loom
 
 An interactive workspace and knowledge base on an infinite canvas. Navigate, edit, compile, and run agents across all your files — with Claude Code as the built-in agent. Local-first, markdown on disk, git-versioned.
 
