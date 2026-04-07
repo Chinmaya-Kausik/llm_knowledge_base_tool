@@ -1,6 +1,6 @@
 # Vault
 
-A local-first workspace for managing files, knowledge, and agents on an infinite canvas. Claude Code runs inside the UI with visual tool traces, programmatic permissions, and persistent context across everything in your vault. Markdown on disk, git-versioned, no cloud sync.
+An interactive workspace and knowledge base on an infinite canvas. Navigate, edit, compile, and run agents across all your files — with Claude Code as the built-in agent. Local-first, markdown on disk, git-versioned.
 
 <!-- ![Vault screenshot](screenshot.png) -->
 
