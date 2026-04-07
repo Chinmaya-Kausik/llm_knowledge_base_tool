@@ -1,6 +1,6 @@
 ---
 created: '2026-04-07'
-last_compiled: '2026-04-07T01:50:00.443434+00:00'
+last_compiled: '2026-04-07T15:40:31.714906+00:00'
 status: compiled
 title: Wiki Health Report
 type: structure-note
@@ -8,11 +8,11 @@ type: structure-note
 
 # Wiki Health Report
 
-Generated: 2026-04-07T01:50:00.443434+00:00
+Generated: 2026-04-07T15:40:31.714906+00:00
 
-**Total issues: 303**
+**Total issues: 377**
 
-## Broken Links (303)
+## Broken Links (377)
 
 - `wiki/README.md` links to missing `[[Attention Mechanisms]]`
 - `wiki/README.md` links to missing `[[Transformer Architecture]]`
@@ -34,6 +34,9 @@ Generated: 2026-04-07T01:50:00.443434+00:00
 - `wiki/answers/bert-vs-gpt.md` links to missing `[[BERT]]`
 - `wiki/answers/bert-vs-gpt.md` links to missing `[[GPT]]`
 - `wiki/answers/bert-vs-gpt.md` links to missing `[[GPT]]`
+- `wiki/meta/conventions.md` links to missing `[[wiki-style]]`
+- `wiki/meta/conventions.md` links to missing `[[page]]`
+- `wiki/meta/conventions.md` links to missing `[[links]]`
 - `wiki/meta/health.md` links to missing `[[Attention Mechanisms]]`
 - `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
 - `wiki/meta/health.md` links to missing `[[BERT]]`
@@ -80,8 +83,15 @@ Generated: 2026-04-07T01:50:00.443434+00:00
 - `wiki/meta/health.md` links to missing `[[GPT]]`
 - `wiki/meta/health.md` links to missing `[[Reinforcement Learning]]`
 - `wiki/meta/health.md` links to missing `[[Software Design Patterns]]`
+- `wiki/meta/health.md` links to missing `[[Fine-tuning]]`
+- `wiki/meta/health.md` links to missing `[[Gradient Descent]]`
 - `wiki/meta/health.md` links to missing `[[Self-Attention]]`
 - `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Attention Is All You Need]]`
 - `wiki/meta/health.md` links to missing `[[BERT]]`
 - `wiki/meta/health.md` links to missing `[[GPT]]`
 - `wiki/meta/health.md` links to missing `[[BERT]]`
@@ -113,6 +123,19 @@ Generated: 2026-04-07T01:50:00.443434+00:00
 - `wiki/meta/health.md` links to missing `[[BERT]]`
 - `wiki/meta/health.md` links to missing `[[GPT]]`
 - `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Attention Mechanisms]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Reinforcement Learning]]`
+- `wiki/meta/health.md` links to missing `[[Software Design Patterns]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
 - `wiki/meta/health.md` links to missing `[[Self-Attention]]`
 - `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
 - `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
@@ -160,6 +183,57 @@ Generated: 2026-04-07T01:50:00.443434+00:00
 - `wiki/meta/health.md` links to missing `[[Self-Attention]]`
 - `wiki/meta/health.md` links to missing `[[BERT]]`
 - `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Gradient Descent]]`
+- `wiki/meta/health.md` links to missing `[[Backpropagation]]`
+- `wiki/meta/health.md` links to missing `[[Loss Functions]]`
+- `wiki/meta/health.md` links to missing `[[Regularization]]`
+- `wiki/meta/health.md` links to missing `[[Embeddings]]`
+- `wiki/meta/health.md` links to missing `[[Fine-tuning]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Attention Mechanisms]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Reinforcement Learning]]`
+- `wiki/meta/health.md` links to missing `[[Tokenization]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Gradient Descent]]`
+- `wiki/meta/health.md` links to missing `[[Backpropagation]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[Attention Mechanisms]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Gradient Descent]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Reinforcement Learning]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[Self-Attention]]`
+- `wiki/meta/health.md` links to missing `[[BERT]]`
+- `wiki/meta/health.md` links to missing `[[GPT]]`
+- `wiki/meta/health.md` links to missing `[[Reinforcement Learning]]`
+- `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
 - `wiki/meta/health.md` links to missing `[[GPT]]`
 - `wiki/meta/health.md` links to missing `[[Multi-Head Attention]]`
 - `wiki/meta/health.md` links to missing `[[Transformer Architecture]]`
@@ -336,17 +410,17 @@ No missing concepts found.
 - `wiki` — outdated: answers, meta, concepts, indexes
 - `outputs` — missing: slides, visualizations, reports
 - `raw` — outdated: articles, chats
-- `projects/research-journal` — outdated: 2026-04-03.md, 2026-04-01.md
 - `projects/transformer-from-scratch` — outdated: config.yaml, src
 - `projects/attention-efficiency-paper` — outdated: references.bib, paper.tex, figures
 - `projects/data-pipeline` — outdated: ingest.py, config.yaml, export.py, transform.py, data
 - `wiki/answers` — outdated: lora-vs-full-finetuning.md, attention-scaling.md, why-transformers-won.md, bert-vs-gpt.md
-- `wiki/meta` — missing: glossary.md, log.md, index.md, canvas-layout.json, page-registry.json
+- `wiki/meta` — missing: memory, conventions.md, glossary.md, log.md, index.md
 - `wiki/concepts` — missing: loss-functions, attention, embeddings, gpt, regularization
 - `wiki/indexes` — missing: machine-learning
 - `raw/articles` — missing: gpt3-paper.md, lora-paper.md, scaling-laws.md, attention-is-all-you-need.md, bert-paper.md
-- `raw/chats` — missing: 2026-04-06_689912c5.md, 2026-04-06_46cd55d3.md, 2026-04-06_ba446ea8.md, 2026-04-04_coding.md, 2026-04-06_5b457207.md
+- `raw/chats` — missing: try-writing-and-deleting-a-useless-file_2026-04-07_0357.md, what-would-you-do-next-in-this-project_2026-04-07_0628.md, try-writing-and-deleting-a-useless-file_2026-04-07_0356.md, try-writing-and-deleting-a-useless-file_2026-04-07_0342.md, try-writing-and-deleting-a-useless-file_2026-04-07_0423.md
+- `wiki/concepts/attention` — outdated: self-attention
 - `wiki/concepts/attention/self-attention` — outdated: multi-head-attention
-- `projects/transformer-from-scratch/src` — missing: attention.py, model.py, train.py
+- `projects/transformer-from-scratch/src` — missing: lr_schedule.py, attention.py, translation_data.py, model.py, tokenizer.py
 - `projects/attention-efficiency-paper/figures` — missing: placeholder.txt
 - `projects/data-pipeline/data` — missing: sample.csv, sample.json

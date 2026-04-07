@@ -1,27 +1,27 @@
 {
   "outputs": {
-    "x": 668,
-    "y": 972
+    "x": 694,
+    "y": 660
   },
   "projects": {
-    "x": 1084,
-    "y": 608
+    "x": 1095,
+    "y": 452
   },
   "raw": {
-    "x": 718,
-    "y": 334
+    "x": 883,
+    "y": 338
   },
   "wiki": {
-    "x": 1509,
-    "y": 246
+    "x": 1453,
+    "y": 303
   },
   "projects/attention-efficiency-paper": {
-    "x": -21,
-    "y": 259
+    "x": 655,
+    "y": 315
   },
   "projects/transformer-from-scratch": {
-    "x": 1127,
-    "y": -83
+    "x": 655,
+    "y": 955
   },
   "projects/attention-efficiency-paper/figures": {
     "x": 0,
@@ -112,16 +112,16 @@
     "y": 870
   },
   "projects/data-pipeline": {
-    "x": 1435,
-    "y": 420
+    "x": 1095,
+    "y": 315
   },
   "projects/future-project": {
-    "x": 729,
-    "y": 195
+    "x": 655,
+    "y": 635
   },
   "projects/research-journal": {
-    "x": 404,
-    "y": 414
+    "x": 1095,
+    "y": 635
   },
   "projects/research-journal/2026-04-01.md": {
     "x": 0,
@@ -470,5 +470,105 @@
   "config.yaml": {
     "x": 281,
     "y": 549
+  },
+  "outputs/reports": {
+    "x": 0,
+    "y": 450
+  },
+  "outputs/slides": {
+    "x": 440,
+    "y": 450
+  },
+  "outputs/visualizations": {
+    "x": 0,
+    "y": 830
+  },
+  "raw/articles/flash-attention.md": {
+    "x": 880,
+    "y": 450
+  },
+  "raw/articles/gpt3-paper.md": {
+    "x": 0,
+    "y": 830
+  },
+  "raw/articles/lora-paper.md": {
+    "x": 440,
+    "y": 830
+  },
+  "raw/chats/again-for-testing_2026-04-07_0353.md": {
+    "x": 440,
+    "y": 450
+  },
+  "raw/chats/can-we-modify-some-code-in-my-transforme_2026-04-07_0611.md": {
+    "x": 880,
+    "y": 450
+  },
+  "raw/chats/can-you-use-the-edit-tool-thrice-in-triv_2026-04-07_0720.md": {
+    "x": 1320,
+    "y": 450
+  },
+  "raw/chats/can-you-use-the-grepread-write-edit-a_2026-04-07_0729.md": {
+    "x": 1760,
+    "y": 450
+  },
+  "raw/chats/look-into-my-transformers-projects-code_2026-04-07_0619.md": {
+    "x": 0,
+    "y": 830
+  },
+  "raw/chats/try-to-do-somethign-that-needs-permissio_2026-04-07_0733.md": {
+    "x": 1320,
+    "y": 830
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0340.md": {
+    "x": 1760,
+    "y": 830
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0342.md": {
+    "x": 0,
+    "y": 1210
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0350.md": {
+    "x": 440,
+    "y": 1210
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0356.md": {
+    "x": 880,
+    "y": 1210
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0357.md": {
+    "x": 1320,
+    "y": 1210
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0359.md": {
+    "x": 1760,
+    "y": 1210
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0401.md": {
+    "x": 0,
+    "y": 1590
+  },
+  "raw/chats/try-writing-and-deleting-a-useless-file_2026-04-07_0423.md": {
+    "x": 440,
+    "y": 1590
+  },
+  "raw/chats/use-the-edit-tool-3-times-on-a-single-fi_2026-04-07_0715.md": {
+    "x": 880,
+    "y": 1590
+  },
+  "raw/chats/what-next-here_2026-04-07_0704.md": {
+    "x": 1320,
+    "y": 1590
+  },
+  "raw/chats/what-next-here_2026-04-07_0711.md": {
+    "x": 1760,
+    "y": 1590
+  },
+  "raw/chats/what-would-you-do-next-here_2026-04-07_0651.md": {
+    "x": 0,
+    "y": 1970
+  },
+  "raw/chats/what-would-you-do-next-in-this-project_2026-04-07_0628.md": {
+    "x": 440,
+    "y": 1970
   }
 }
