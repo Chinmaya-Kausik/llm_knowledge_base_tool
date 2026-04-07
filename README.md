@@ -42,7 +42,7 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
 Loom builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
 
-- **Selective tool call expansion.** Expand any individual tool call to see its details while the rest stay collapsed — and they stay open while the agent keeps working. Edit calls show inline diffs with colored removed/added text. Same-tool runs are grouped by unique file count ("Edited 1 file" not "Edited 3 files"). Tool call details are preserved in saved chat transcripts.
+- **Selective tool call expansion.** Expand any individual tool call to see its details while the rest stay collapsed — and they stay open while the agent keeps working. Edit calls show inline diffs with colored removed/added text. Tool call details are preserved in saved chat transcripts.
 - **Browsable chat transcripts.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to pick up where you left off — your conversation history is just files in the loom.
 - **Fork any conversation.** Branch a chat with full context injected into the new panel. Explore an alternative direction without losing the original thread.
 - **Redirect with checkpoints.** Set breakpoints on specific tool calls and intervene at that point with corrective feedback. More granular than Escape — you choose *where* to redirect, and the agent resumes with your instructions as context.
