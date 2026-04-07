@@ -75,9 +75,9 @@ function saveKeyBindings() {
 
 // --- API ---
 const api = {
-  graph:       () => fetch('/api/graph').then(r => r.json()),
+  graph:       () => fetch(`/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`).then(r => r.json()),
   page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
-  tree:        () => fetch('/api/tree').then(r => r.json()),
+  tree:        () => fetch(`/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}`).then(r => r.json()),
   search:      (q, s='all', mode='both') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
   health:      () => fetch('/api/health').then(r => r.json()),
   brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
@@ -4748,6 +4748,23 @@ function initSettings() {
     const size = slider.value + 'px';
     valDisplay.textContent = size;
     document.documentElement.style.setProperty('--code-font-size', size);
+  });
+
+  // Show loom internals toggle
+  const internalsCheckbox = document.getElementById('settings-show-internals');
+  internalsCheckbox.checked = localStorage.getItem('loom-show-internals') === 'true';
+  internalsCheckbox.addEventListener('change', () => {
+    localStorage.setItem('loom-show-internals', internalsCheckbox.checked);
+    loadGraph();
+    loadTree();
+  });
+
+  // Show hidden files toggle (files view only)
+  const hiddenCheckbox = document.getElementById('settings-show-hidden');
+  hiddenCheckbox.checked = localStorage.getItem('loom-show-hidden') === 'true';
+  hiddenCheckbox.addEventListener('change', () => {
+    localStorage.setItem('loom-show-hidden', hiddenCheckbox.checked);
+    loadTree();
   });
 
   // Keybinding editor

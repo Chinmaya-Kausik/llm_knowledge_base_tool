@@ -1,19 +1,19 @@
 {
   "outputs": {
-    "x": 914,
-    "y": 487
+    "x": 668,
+    "y": 972
   },
   "projects": {
-    "x": 663,
-    "y": 904
+    "x": 1084,
+    "y": 608
   },
   "raw": {
-    "x": 259,
-    "y": 730
+    "x": 718,
+    "y": 334
   },
   "wiki": {
-    "x": 1090,
-    "y": 640
+    "x": 1509,
+    "y": 246
   },
   "projects/attention-efficiency-paper": {
     "x": -21,
@@ -462,5 +462,13 @@
   "projects/transformer-from-scratch/src/lr_schedule.py": {
     "x": 880,
     "y": 450
+  },
+  "CLAUDE.md": {
+    "x": 1388,
+    "y": 920
+  },
+  "config.yaml": {
+    "x": 281,
+    "y": 549
   }
 }

@@ -424,10 +424,10 @@ def build_provenance(loom_root: Path) -> dict[str, Any]:
 
 # --- New graph builder (folder-as-page) ---
 
-def build_graph_v2(loom_root: Path) -> dict[str, Any]:
+def build_graph_v2(loom_root: Path, show_internals: bool = False) -> dict[str, Any]:
     """Build page graph using folder-as-page model."""
     from loom_mcp.lib.pages import build_page_graph, get_page_content, FILETYPE_CATEGORIES
-    graph = build_page_graph(loom_root)
+    graph = build_page_graph(loom_root, show_internals=show_internals)
 
     # Convert to frontend-compatible format
     def page_to_node(p):
@@ -449,10 +449,10 @@ def build_graph_v2(loom_root: Path) -> dict[str, Any]:
     }
 
 
-def build_tree_v2(loom_root: Path) -> dict[str, Any]:
+def build_tree_v2(loom_root: Path, show_internals: bool = False, include_hidden: bool = False) -> dict[str, Any]:
     """Build folder tree using the new page model."""
     from loom_mcp.lib.pages import walk_pages
-    pages = walk_pages(loom_root)
+    pages = walk_pages(loom_root, include_hidden=include_hidden, show_internals=show_internals)
 
     # Build nested tree from flat page list
     page_map = {p["id"]: {**p, "children": []} for p in pages}
@@ -503,8 +503,8 @@ def _serialize_dict(d: dict) -> dict:
 # --- API Endpoints ---
 
 @app.get("/api/graph")
-def api_graph():
-    return build_graph_v2(LOOM_ROOT)
+def api_graph(show_internals: bool = False):
+    return build_graph_v2(LOOM_ROOT, show_internals=show_internals)
 
 
 @app.get("/api/provenance")
@@ -548,8 +548,8 @@ async def api_pages_bulk(request: Request):
 
 
 @app.get("/api/tree")
-def api_tree():
-    return build_tree_v2(LOOM_ROOT)
+def api_tree(show_internals: bool = False, include_hidden: bool = False):
+    return build_tree_v2(LOOM_ROOT, show_internals=show_internals, include_hidden=include_hidden)
 
 
 @app.get("/api/search")
