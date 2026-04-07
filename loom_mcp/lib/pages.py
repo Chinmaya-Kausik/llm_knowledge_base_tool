@@ -136,8 +136,8 @@ def walk_pages(loom_root: Path, include_hidden: bool = False) -> list[dict[str, 
             if item.is_symlink():
                 continue
 
-            # Skip README.md files — they're represented by their parent folder
-            if item.name == "README.md" and item.is_file():
+            # Skip README.md and MEMORY.md — represented by parent folder / memory system
+            if item.name in ("README.md", "MEMORY.md") and item.is_file():
                 continue
 
             rel = str(item.relative_to(loom_root))

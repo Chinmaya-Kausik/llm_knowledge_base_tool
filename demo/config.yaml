@@ -1,0 +1,28 @@
+loom:
+  root: "."
+  raw_dir: "raw"
+  wiki_dir: "wiki"
+  outputs_dir: "outputs"
+
+frontmatter:
+  wiki_required_fields:
+    - title
+    - type
+    - status
+    - created
+
+compilation:
+  prompt_version: "v1.0"
+
+search:
+  default_context_lines: 3
+
+context:
+  memory:
+    enabled: true
+    max_chars: 2000
+  page_content:
+    enabled: true
+    max_chars: 8000
+  folder_readme:
+    enabled: true

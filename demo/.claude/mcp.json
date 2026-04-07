@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "loom": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/Users/ckausik/Documents/GitHub/loom",
+        "python",
+        "-m",
+        "loom_mcp.server"
+      ]
+    }
+  }
+}

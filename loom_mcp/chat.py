@@ -153,15 +153,43 @@ def build_prompt(text: str, context: dict, session_id: str, loom_root: Path) -> 
     return "\n".join(parts)
 
 
-def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str:
-    """Build system prompt based on context level.
+def _load_context_config(loom_root: Path) -> dict:
+    """Load context config from loom-local config.yaml, with defaults."""
+    defaults = {
+        "memory": {"enabled": True, "max_chars": 2000},
+        "page_content": {"enabled": True, "max_chars": 8000},
+        "folder_readme": {"enabled": True},
+    }
+    config_path = loom_root / "config.yaml"
+    if not config_path.exists():
+        return defaults
+    try:
+        import yaml
+        with open(config_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        ctx = data.get("context", {})
+        for key in defaults:
+            if key in ctx:
+                defaults[key].update(ctx[key])
+        return defaults
+    except Exception:
+        return defaults
 
-    Levels:
-    - page: current file content + parent folder README
-    - folder: current folder README (lists children with summaries)
-    - global: full master index (titles + summaries for all pages)
-    """
-    parts = ["""This workspace is a Loom — a unified knowledge base + project workspace.
+
+def _read_wiki_file(loom_root: Path, rel_path: str) -> str | None:
+    """Read a wiki file's content body (frontmatter stripped), or None."""
+    path = loom_root / rel_path
+    if not path.exists():
+        return None
+    try:
+        from loom_mcp.lib.frontmatter import read_frontmatter
+        _, content = read_frontmatter(path)
+        return content.strip() if content else None
+    except Exception:
+        return None
+
+
+_DEFAULT_CONVENTIONS = """This workspace is a Loom — a unified knowledge base + project workspace.
 
 Structure:
 - wiki/ — standalone knowledge articles (each folder has a README.md)
@@ -174,9 +202,12 @@ Loom conventions:
 - The master index at wiki/meta/index.md catalogs all pages
 - When you discover cross-cutting knowledge, suggest adding it to the wiki
 
-You have MCP loom tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful.
+You have MCP loom tools available: ripgrep_search, write_index, update_master_index, ingest_url, auto_commit, etc. Use them when helpful."""
 
-Responsiveness: If you need to do multi-step work (searching, reading files, running tools), acknowledge first in one line (e.g. "On it — checking the wiki for attention mechanisms") before starting. Without the ack the user is staring at a spinner.
+
+def _permissions_block(loom_root: Path) -> str:
+    """Safety permissions + responsiveness. Always injected."""
+    perm = """Responsiveness: If you need to do multi-step work (searching, reading files, running tools), acknowledge first in one line before starting.
 
 Permissions:
 - You may read and write any file inside this loom directory.
@@ -186,39 +217,81 @@ Permissions:
 - NEVER modify .claude/ configuration files (mcp.json, settings).
 - NEVER run destructive git commands (push, reset --hard, clean -f, branch -D) without explicit user approval.
 - NEVER delete files without asking the user first.
-- Prefer MCP tools over raw shell commands when both can accomplish the task."""]
+- Prefer MCP tools over raw shell commands when both can accomplish the task."""
+    # Fallback: if no CLAUDE.md at loom root, also inject default conventions
+    if not (loom_root / "CLAUDE.md").exists():
+        return _DEFAULT_CONVENTIONS + "\n\n" + perm
+    return perm
 
-    # Dynamic boundary — Claude Code caches everything above this marker
-    # and rebuilds everything below per-request
-    parts.append("__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__")
 
-    session = sessions.get(session_id, {})
-    page_path = session.get("page_path")
+def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str | None:
+    """Read project MEMORY.md or root MEMORY.md, inject capped."""
+    if not config.get("memory", {}).get("enabled", True):
+        return None
+    max_chars = config.get("memory", {}).get("max_chars", 2000)
 
+    memory_content = None
+
+    # If in a project, try project-level MEMORY.md
+    if page_path:
+        parts = page_path.split("/")
+        if len(parts) >= 2 and parts[0] == "projects":
+            project_memory = loom_root / "projects" / parts[1] / "MEMORY.md"
+            if project_memory.exists():
+                try:
+                    memory_content = project_memory.read_text(encoding="utf-8").strip()
+                except Exception:
+                    pass
+
+    # Fall back to root MEMORY.md
+    if not memory_content:
+        root_memory = loom_root / "MEMORY.md"
+        if root_memory.exists():
+            try:
+                memory_content = root_memory.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+
+    if not memory_content:
+        return None
+
+    if len(memory_content) > max_chars:
+        memory_content = memory_content[:max_chars] + "\n\n[... more memories available ...]"
+
+    return f"## Memories\n{memory_content}"
+
+
+def _location_block(loom_root: Path, page_path: str | None, context_level: str, config: dict) -> str | None:
+    """Dynamic context: page content, folder README, or master index."""
     if not page_path:
-        return "\n\n".join(parts)  # Static + boundary only, no dynamic context
+        return None
 
-    if context_level == "page" and page_path:
-        # Inject the current page content (truncated to avoid huge prompts)
+    page_content_enabled = config.get("page_content", {}).get("enabled", True)
+    page_content_max = config.get("page_content", {}).get("max_chars", 8000)
+    folder_readme_enabled = config.get("folder_readme", {}).get("enabled", True)
+
+    parts = []
+
+    if context_level == "page":
         full_path = loom_root / page_path
-        if full_path.exists():
+        if full_path.exists() and page_content_enabled:
             content = get_page_content(full_path)
             if content:
-                if len(content) > 8000:
-                    content = content[:8000] + "\n\n[... truncated ...]"
+                if len(content) > page_content_max:
+                    content = content[:page_content_max] + "\n\n[... truncated ...]"
                 parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
 
-            # Also inject parent folder README for local context
-            parent = full_path.parent
-            if parent != loom_root:
-                parent_readme = parent / "README.md"
-                if parent_readme.exists():
-                    parent_content = get_page_content(parent)
-                    if parent_content:
-                        parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
+            # Parent folder README for local context
+            if folder_readme_enabled:
+                parent = full_path.parent
+                if parent != loom_root:
+                    parent_readme = parent / "README.md"
+                    if parent_readme.exists():
+                        parent_content = get_page_content(parent)
+                        if parent_content:
+                            parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
 
-    elif context_level == "folder" and page_path:
-        # Inject folder README (which lists children + summaries)
+    elif context_level == "folder":
         full_path = loom_root / page_path
         folder = full_path if full_path.is_dir() else full_path.parent
         if folder.exists():
@@ -227,7 +300,6 @@ Permissions:
             parts.append(f"The user is browsing folder: `{folder_rel}`\n\n{content}")
 
     elif context_level == "global":
-        # Inject full master index
         index_path = loom_root / "wiki" / "meta" / "index.md"
         if index_path.exists():
             try:
@@ -236,6 +308,37 @@ Permissions:
                 parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
             except Exception:
                 pass
+
+    return "\n\n".join(parts) if parts else None
+
+
+def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str:
+    """Build system prompt from modular context blocks.
+
+    Levels:
+    - page: current file content + parent folder README
+    - folder: current folder README (lists children with summaries)
+    - global: full master index (titles + summaries for all pages)
+    """
+    config = _load_context_config(loom_root)
+    session = sessions.get(session_id, {})
+    page_path = session.get("page_path")
+
+    parts = []
+
+    # Static blocks
+    parts.append(_permissions_block(loom_root))
+    mem = _memory_block(loom_root, page_path, config)
+    if mem:
+        parts.append(mem)
+
+    # Dynamic boundary — Claude Code caches everything above this marker
+    parts.append("__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__")
+
+    # Dynamic blocks
+    loc = _location_block(loom_root, page_path, context_level, config)
+    if loc:
+        parts.append(loc)
 
     return "\n\n".join(parts)
 
@@ -368,7 +471,8 @@ async def _get_or_create_client(session_id: str, loom_root: Path, context_level:
 
     options = ClaudeAgentOptions(
         cwd=str(loom_root),
-        system_prompt=system_prompt,
+        system_prompt={"type": "preset", "preset": "claude_code", "append": system_prompt},
+        setting_sources=["project"],
         include_partial_messages=True,
         thinking={"type": "enabled", "budget_tokens": 10000},
         permission_mode=perm_mode,
