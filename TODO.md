@@ -26,5 +26,10 @@
 - `/memory` interactive cleanup command: plan-mode style review for cross-project and global memories
 - End-to-end test: verify Claude creates memories following CLAUDE.md instructions in web chat
 
+## Chat Transcripts
+- Auto-tag chat transcripts on save: Claude infers tags from conversation context (project, topics) and writes them to frontmatter
+- UI: filter/group chats by tag in files view and chat history
+- Tags should use the same vocabulary as wiki pages and memory files
+
 ## Known Issues
 - System prompt not updated when client is reused mid-session (chat.py lines 454-458). Context changes don't take effect until next session. Pre-existing bug.
