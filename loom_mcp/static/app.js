@@ -2316,7 +2316,7 @@ function createPanelHeader(panelId, label = 'Chat') {
             const panelTitle = panel._generatedTitle || null;
             fetch('/api/chat/save', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ session_id: panel.sessionId, messages: newMsgs, title: panelTitle }),
+              body: JSON.stringify({ session_id: panel.sessionId, messages: newMsgs, title: panelTitle, context_path: panel.contextPath || null }),
             }).then(r => r.json()).then(data => {
               refreshFileTree();
               if (!panelTitle && data.ok && data.path && newMsgs.some(m => m.role === 'user')) {
@@ -4419,7 +4419,7 @@ async function saveChatTranscript() {
     const title = activePanel?._generatedTitle || null;
     const resp = await fetch('/api/chat/save', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages, title }),
+      body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages, title, context_path: activePanel?.contextPath || null }),
     });
     const data = await resp.json();
     console.log('Chat saved:', data);
@@ -4453,7 +4453,7 @@ function saveChatBeacon() {
   // For beforeunload — sendBeacon is the only reliable method
   if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
   const blob = new Blob([JSON.stringify({
-    session_id: chatSessionId, messages: chatMessages, title: activePanel?._generatedTitle || null,
+    session_id: chatSessionId, messages: chatMessages, title: activePanel?._generatedTitle || null, context_path: activePanel?.contextPath || null,
   })], { type: 'application/json' });
   navigator.sendBeacon('/api/chat/save', blob);
 }
@@ -4808,7 +4808,7 @@ async function restartServer() {
       try {
         await fetch('/api/chat/save', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages, title: panel._generatedTitle || null }),
+          body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages, title: panel._generatedTitle || null, context_path: panel.contextPath || null }),
         });
       } catch {}
     }

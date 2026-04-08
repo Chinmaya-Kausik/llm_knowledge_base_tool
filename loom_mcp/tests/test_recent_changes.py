@@ -79,7 +79,7 @@ class TestSaveTranscriptWithTitle:
                 {"role": "assistant", "content": "hello"},
             ], title="Deep Dive into Attention")
             content = (root / result["path"]).read_text()
-            assert "# Deep Dive into Attention" in content
+            assert "Deep Dive into Attention" in content  # In frontmatter title field
 
     def test_no_title_uses_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -89,7 +89,7 @@ class TestSaveTranscriptWithTitle:
                 {"role": "assistant", "content": "hello"},
             ])
             content = (root / result["path"]).read_text()
-            assert "# Chat" in content
+            assert "Chat" in content  # Default title in frontmatter
 
 
 # ---------------------------------------------------------------------------

@@ -407,13 +407,24 @@ def get_stale_readmes(loom_root: Path) -> list[dict]:
     return stale
 
 
-def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict], title: str | None = None) -> dict:
-    """Save a chat transcript to raw/chats/ with collapsible sections.
+def _derive_chat_tags(context_path: str | None) -> list[str]:
+    """Derive tags for a chat transcript from its context path."""
+    if not context_path:
+        return []
+    parts = context_path.split("/")
+    if len(parts) >= 2 and parts[0] == "projects":
+        return [parts[1]]
+    return []
+
+
+def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict], title: str | None = None, context_path: str | None = None) -> dict:
+    """Save a chat transcript to raw/chats/ with frontmatter and collapsible sections.
 
     Args:
         session_id: Chat session ID.
         messages: List of {role, content, subagent_id?} message dicts.
         title: Optional LLM-generated title. If provided, used as heading.
+        context_path: Page/folder path the chat was associated with.
 
     Returns: {path, message_count}
     """
@@ -430,15 +441,24 @@ def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict],
     path = chats_dir / filename
 
     heading = title or f"Chat — {now.strftime('%Y-%m-%d %H:%M')}"
-    lines = [
-        f"# {heading}",
-        f"Session: {session_id}",
-        "",
-    ]
+    tags = _derive_chat_tags(context_path)
 
-    lines.extend(_render_messages(messages))
+    metadata = {
+        "title": heading,
+        "type": "chat",
+        "saved": now.strftime("%Y-%m-%d"),
+        "session_id": session_id,
+    }
+    if tags:
+        metadata["tags"] = tags
+    if context_path:
+        metadata["context_path"] = context_path
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    content_lines = [f"Session: {session_id}", ""]
+    content_lines.extend(_render_messages(messages))
+
+    from loom_mcp.lib.frontmatter import write_frontmatter
+    write_frontmatter(path, metadata, "\n".join(content_lines))
 
     return {
         "path": str(path.relative_to(loom_root)),

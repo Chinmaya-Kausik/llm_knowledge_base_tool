@@ -32,7 +32,16 @@ When you learn something worth persisting:
 3. Update the relevant project's `MEMORY.md` with a one-liner
 4. For global memories, update the root `MEMORY.md`
 
-Use loom MCP tools to find and modify content:
+## Knowledge during chats
+When you discover something during a conversation that would be useful beyond this session, write it to the appropriate place immediately — don't wait for `/compile`:
+- **Domain knowledge** (concepts, patterns, insights, resolved confusions) → wiki via `write_wiki_page`
+- **Operational context** (project preferences, decisions, conventions) → memory
+
+The distinction: memory = how to work here. Wiki = what things mean.
+
+`/compile` and other tools only interface with the wiki — they process ingested raw sources into wiki pages. Chats are the only place where new knowledge and memories are created from working on projects.
+
+## Tools
 - `search_by_tags` — find pages/memories by tag (e.g. `search_by_tags(tags=["my-project"], scope="memory")`)
 - `ripgrep_search` — full-text search across the loom
 - `read_wiki_page`, `write_wiki_page` — read/write wiki content
