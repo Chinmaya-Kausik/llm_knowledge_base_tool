@@ -1,0 +1,65 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 761 >>
+stream
+BT
+/F1 18 Tf
+50 720 Td
+(On the Efficiency of Attention Mechanisms (DRAFT)) Tj
+/F1 11 Tf
+50 690 Td
+(Author: Demo User, 2026) Tj
+50 674 Td
+() Tj
+50 658 Td
+(Abstract: We survey recent advances in efficient attention mechanisms) Tj
+50 642 Td
+(and benchmark their performance on standard NLP tasks.) Tj
+50 626 Td
+() Tj
+50 610 Td
+(This is a draft version compiled from paper.tex in this project.) Tj
+50 594 Td
+() Tj
+50 578 Td
+(1. Introduction) Tj
+50 562 Td
+(Self-attention has O\(n^2\) complexity in sequence length.) Tj
+50 546 Td
+(Several approaches have been proposed to reduce this cost.) Tj
+50 530 Td
+() Tj
+50 514 Td
+(2. Methods) Tj
+50 498 Td
+(We compare: standard attention, flash attention, linear attention,) Tj
+50 482 Td
+(and sparse attention variants.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001053 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1123
+%%EOF

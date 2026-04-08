@@ -1,0 +1,59 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 722 >>
+stream
+BT
+/F1 18 Tf
+50 720 Td
+(Attention Is All You Need) Tj
+/F1 11 Tf
+50 690 Td
+(Vaswani et al., 2017) Tj
+50 674 Td
+() Tj
+50 658 Td
+(Abstract: The dominant sequence transduction models are based on complex) Tj
+50 642 Td
+(recurrent or convolutional neural networks. We propose a new simple network) Tj
+50 626 Td
+(architecture, the Transformer, based solely on attention mechanisms.) Tj
+50 610 Td
+() Tj
+50 594 Td
+(Key contribution: Self-attention replaces recurrence entirely.) Tj
+50 578 Td
+(The model achieves 28.4 BLEU on EN-DE and 41.8 BLEU on EN-FR translation.) Tj
+50 562 Td
+() Tj
+50 546 Td
+(Architecture: encoder-decoder with multi-head attention layers,) Tj
+50 530 Td
+(positional encoding, and feed-forward networks.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001014 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1084
+%%EOF

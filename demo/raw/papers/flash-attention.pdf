@@ -1,0 +1,61 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 853 >>
+stream
+BT
+/F1 18 Tf
+50 720 Td
+(FlashAttention: Fast and Memory-Efficient Attention) Tj
+/F1 11 Tf
+50 690 Td
+(Dao et al., 2022) Tj
+50 674 Td
+() Tj
+50 658 Td
+(Abstract: Transformers are slow and memory-hungry on long sequences due to) Tj
+50 642 Td
+(the quadratic time and memory complexity of self-attention. We propose) Tj
+50 626 Td
+(FlashAttention, an IO-aware exact attention algorithm that uses tiling) Tj
+50 610 Td
+(to reduce memory reads/writes between GPU HBM and SRAM.) Tj
+50 594 Td
+() Tj
+50 578 Td
+(Key insight: Standard attention materializes the NxN attention matrix in HBM.) Tj
+50 562 Td
+(FlashAttention computes attention by blocks, keeping the working set in SRAM.) Tj
+50 546 Td
+() Tj
+50 530 Td
+(Results: 2-4x wall-clock speedup, enables longer context lengths,) Tj
+50 514 Td
+(reduces memory usage from quadratic to linear in sequence length.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001145 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1215
+%%EOF
