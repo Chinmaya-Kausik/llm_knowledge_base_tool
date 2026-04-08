@@ -53,6 +53,14 @@ Steps:
 9. Restart server — bootstrap re-creates .claude/mcp.json with correct paths
 10. Delete orphaned Claude Code memory dirs at ~/.claude/projects/
 
+Development workflow (after migration):
+- `main` branch = stable. Real loom's server runs from `main`.
+- `dev` branch = experimental. Develop here, test against demo loom.
+- Stable server loads `main` code at startup — switching to `dev` on disk doesn't affect it.
+- Test experimental: `git checkout dev`, then `LOOM_PORT=8421 LOOM_ROOT=.../loom/projects/loom/demo uv run --extra web python -m loom_mcp.web`
+- When validated: `git checkout main && git merge dev`, then restart stable server.
+- Stable server only gets new code on explicit merge + restart.
+
 For each migrated repo:
 - Repo's CLAUDE.md content → distributed to ABOUT.md (project description for Claude), wiki pages (domain knowledge), memory files (operational context)
 - Repo's README.md stays as-is (GitHub docs)
