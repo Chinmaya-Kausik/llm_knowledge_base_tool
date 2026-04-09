@@ -265,8 +265,9 @@ class TestContextEdgeCases:
             huge.write_text("x = 1\n" * 100000)  # ~600KB
             sessions["test-huge"] = {"page_path": "huge.py"}
             prompt = build_system_prompt("test-huge", loom, "page")
-            assert len(prompt) > 1000  # It includes content
-            assert "x = 1" in prompt
+            assert len(prompt) > 100
+            # Huge file should be noted as "read on demand" due to budget
+            assert "huge.py" in prompt
 
     def test_binary_file_doesnt_crash(self):
         """Binary files should be handled gracefully."""

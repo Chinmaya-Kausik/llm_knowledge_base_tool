@@ -156,6 +156,7 @@ def build_prompt(text: str, context: dict, session_id: str, loom_root: Path) -> 
 def _load_context_config(loom_root: Path) -> dict:
     """Load context config from loom-local config.yaml, with defaults."""
     defaults = {
+        "total_budget_chars": 12000,  # ~3000 tokens total for appended prompt
         "memory": {"enabled": True, "max_chars": 2000},
         "page_content": {"enabled": True, "max_chars": 8000},
         "folder_readme": {"enabled": True},
@@ -321,34 +322,128 @@ def _location_block(loom_root: Path, page_path: str | None, context_level: str, 
 
 
 def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str:
-    """Build system prompt from modular context blocks.
+    """Build system prompt from modular context blocks with adaptive budget.
+
+    Assembles blocks in priority order. If total exceeds budget, trims
+    lower-priority blocks: page content first, then parent ABOUT.md,
+    then memory.
 
     Levels:
-    - page: current file content + parent folder README
-    - folder: current folder README (lists children with summaries)
+    - page: current file content + parent folder ABOUT.md
+    - folder: current folder ABOUT.md (lists children with summaries)
     - global: full master index (titles + summaries for all pages)
     """
+    import logging
+    log = logging.getLogger("loom.chat")
+
     config = _load_context_config(loom_root)
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
+    budget = config.get("total_budget_chars", 12000)
 
-    parts = []
+    # 1. Permissions — always included, highest priority
+    perm = _permissions_block(loom_root)
+    used = len(perm)
 
-    # Static blocks
-    parts.append(_permissions_block(loom_root))
+    # 2. Memory — second priority
     mem = _memory_block(loom_root, page_path, config)
+    if mem and used + len(mem) <= budget:
+        pass  # fits
+    elif mem:
+        # Truncate memory to fit
+        remaining = max(0, budget - used - 100)
+        if remaining > 0:
+            mem = mem[:remaining] + "\n[... truncated ...]"
+        else:
+            mem = None
+
+    if mem:
+        used += len(mem)
+
+    # 3. Location — lowest priority, adaptive
+    remaining_budget = max(0, budget - used - 50)  # 50 chars for boundary marker
+    loc = _location_block_adaptive(loom_root, page_path, context_level, config, remaining_budget)
+    if loc:
+        used += len(loc)
+
+    # Assemble
+    parts = [perm]
     if mem:
         parts.append(mem)
-
-    # Dynamic boundary — Claude Code caches everything above this marker
     parts.append("__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__")
-
-    # Dynamic blocks
-    loc = _location_block(loom_root, page_path, context_level, config)
     if loc:
         parts.append(loc)
 
-    return "\n\n".join(parts)
+    total = "\n\n".join(parts)
+    log.info("[prompt] total=%d chars (~%d tokens), budget=%d, page_path=%s",
+             len(total), len(total) // 4, budget, page_path)
+    return total
+
+
+def _location_block_adaptive(loom_root: Path, page_path: str | None, context_level: str, config: dict, budget: int) -> str | None:
+    """Location block with adaptive content injection based on remaining budget."""
+    if not page_path:
+        return None
+
+    parts = []
+
+    if context_level == "page":
+        full_path = loom_root / page_path
+        if full_path.exists() and config.get("page_content", {}).get("enabled", True):
+            content = get_page_content(full_path)
+            if content:
+                if len(content) <= 2000:
+                    # Small file: inject full content
+                    parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
+                elif len(content) <= budget - 200:
+                    # Medium file: inject truncated to budget
+                    max_chars = min(len(content), budget - 200)
+                    parts.append(f"The user is currently viewing: `{page_path}`\n\n{content[:max_chars]}\n\n[... truncated ...]")
+                else:
+                    # Large file: just the path, Claude reads on demand
+                    parts.append(f"The user is currently viewing: `{page_path}` (large file — read on demand)")
+            else:
+                parts.append(f"The user is currently viewing: `{page_path}`")
+
+            # Parent folder ABOUT.md — only if budget allows
+            if config.get("folder_readme", {}).get("enabled", True):
+                current_size = sum(len(p) for p in parts)
+                if current_size < budget - 500:
+                    parent = full_path.parent
+                    if parent != loom_root:
+                        parent_about = parent / "ABOUT.md"
+                        if parent_about.exists():
+                            parent_content = get_page_content(parent)
+                            if parent_content:
+                                remaining = budget - current_size - 50
+                                if len(parent_content) <= remaining:
+                                    parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
+                                # else: skip parent, not enough budget
+
+    elif context_level == "folder":
+        full_path = loom_root / page_path
+        folder = full_path if full_path.is_dir() else full_path.parent
+        if folder.exists():
+            content = get_page_content(folder)
+            if content:
+                if len(content) > budget:
+                    content = content[:budget - 50] + "\n\n[... truncated ...]"
+                folder_rel = str(folder.relative_to(loom_root))
+                parts.append(f"The user is browsing folder: `{folder_rel}`\n\n{content}")
+
+    elif context_level == "global":
+        index_path = loom_root / "wiki" / "meta" / "index.md"
+        if index_path.exists():
+            try:
+                from loom_mcp.lib.frontmatter import read_frontmatter
+                _, index_content = read_frontmatter(index_path)
+                if len(index_content) > budget:
+                    index_content = index_content[:budget - 50] + "\n\n[... truncated ...]"
+                parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
+            except Exception:
+                pass
+
+    return "\n\n".join(parts) if parts else None
 
 
 def _map_tool_to_category(tool_name: str) -> str:

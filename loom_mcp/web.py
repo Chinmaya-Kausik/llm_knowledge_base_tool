@@ -202,6 +202,7 @@ search:
   default_context_lines: 3
 
 context:
+  total_budget_chars: 12000  # ~3000 tokens total for appended system prompt
   memory:
     enabled: true
     max_chars: 2000
