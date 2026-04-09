@@ -570,5 +570,37 @@
   "raw/chats/what-would-you-do-next-in-this-project_2026-04-07_0628.md": {
     "x": 440,
     "y": 1970
+  },
+  "projects/attention-efficiency-paper/draft-v1.pdf": {
+    "x": 440,
+    "y": 450
+  },
+  "projects/attention-efficiency-paper/paper.aux": {
+    "x": 880,
+    "y": 450
+  },
+  "projects/attention-efficiency-paper/paper.bbl": {
+    "x": 1320,
+    "y": 450
+  },
+  "projects/attention-efficiency-paper/paper.blg": {
+    "x": 0,
+    "y": 830
+  },
+  "projects/attention-efficiency-paper/paper.fdb_latexmk": {
+    "x": 440,
+    "y": 830
+  },
+  "projects/attention-efficiency-paper/paper.fls": {
+    "x": 880,
+    "y": 830
+  },
+  "projects/attention-efficiency-paper/paper.log": {
+    "x": 1320,
+    "y": 830
+  },
+  "projects/attention-efficiency-paper/paper.pdf": {
+    "x": 0,
+    "y": 1210
   }
 }
