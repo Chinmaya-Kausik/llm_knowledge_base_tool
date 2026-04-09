@@ -339,16 +339,22 @@ function wireCardButtons(card, hasChildren) {
     scheduleEdgeUpdate();
   });
 
-  // Double-click title: folders → drill into canvas (unless already inside), files → full page
-  card.querySelector('.doc-handle').addEventListener('dblclick', (e) => {
-    e.stopPropagation(); e.preventDefault();
-    if (e.metaKey || e.ctrlKey) { openExternal(path); return; }
-    const currentParent = currentLevel().parentPath;
-    if (card.dataset.isFolder === 'true' && currentParent !== path) {
-      drillInto(path);
-    } else {
-      expandCardFullPage(card);
+  // Double-click title (manual 200ms): folders → drill into canvas, files → full page
+  let _handleLastClick = 0;
+  card.querySelector('.doc-handle').addEventListener('click', (e) => {
+    if (card._wasDragged) return;
+    const now = Date.now();
+    if (now - _handleLastClick < 300) {
+      e.stopPropagation(); e.preventDefault();
+      if (e.metaKey || e.ctrlKey) { openExternal(path); return; }
+      const currentParent = currentLevel().parentPath;
+      if (card.dataset.isFolder === 'true' && currentParent !== path) {
+        drillInto(path);
+      } else {
+        expandCardFullPage(card);
+      }
     }
+    _handleLastClick = now;
   });
 
   const body = card.querySelector('.doc-body');
@@ -363,15 +369,20 @@ function wireCardButtons(card, hasChildren) {
     }
   });
 
-  // Double-click body → edit if expanded, fullpage if collapsed
-  body.addEventListener('dblclick', (e) => {
-    e.stopPropagation(); e.preventDefault();
-    if (card.dataset.editing === 'true') return;
-    if (card.dataset.expanded === 'true') {
-      enterCardEdit(card, path);
-    } else {
-      expandCardFullPage(card);
+  // Double-click body (manual 200ms) → edit if expanded, fullpage if collapsed
+  let _bodyLastClick = 0;
+  body.addEventListener('click', (e) => {
+    const now = Date.now();
+    if (now - _bodyLastClick < 300) {
+      e.stopPropagation(); e.preventDefault();
+      if (card.dataset.editing === 'true') { _bodyLastClick = now; return; }
+      if (card.dataset.expanded === 'true') {
+        enterCardEdit(card, path);
+      } else {
+        expandCardFullPage(card);
+      }
     }
+    _bodyLastClick = now;
   });
 
   // Collapse button cycles: expanded → summary → hidden → expanded
