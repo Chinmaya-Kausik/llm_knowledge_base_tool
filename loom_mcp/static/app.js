@@ -994,68 +994,71 @@ function expandCardFullPage(card, highlightQuery) {
   const contentEl = overlay.querySelector('.fullpage-content');
 
   if (path.endsWith('.tex')) {
-    // TeX file: open split view with editor left, PDF right
-    // Remove the regular fullpage overlay — we'll use split view instead
-    overlay.remove();
-    expandedCard = null;
+    // TeX file: start as normal fullpage code editor with Compile button
+    overlay.querySelector('.fullpage-toggle').style.display = 'none';
+
+    const compileBtn = document.createElement('button');
+    compileBtn.className = 'fullpage-chat';
+    compileBtn.textContent = 'Compile';
+    compileBtn.title = 'Compile to PDF (latexmk)';
+    overlay.querySelector('.fullpage-header').insertBefore(
+      compileBtn, overlay.querySelector('.fullpage-toggle')
+    );
+
+    createCodeEditor(contentEl, rawContent, path).then(view => {
+      overlay._cmView = view;
+      view.dom.addEventListener('keydown', (ev) => {
+        const m = ev.metaKey || ev.ctrlKey;
+        if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
+      });
+    });
 
     const pdfPath = path.replace(/\.tex$/, '.pdf');
-    let pdfPaneContent = null;
 
-    openSplitView(
-      {
-        title: title,
-        path: path,
-        render: (contentEl, headerEl) => {
-          createCodeEditor(contentEl, rawContent, path);
-        },
-      },
-      {
-        title: path.replace(/\.tex$/, '.pdf').split('/').pop(),
-        path: pdfPath,
-        render: (contentEl, headerEl) => {
-          pdfPaneContent = contentEl;
-
-          // Add compile button to right pane header
-          const compileBtn = document.createElement('button');
-          compileBtn.textContent = 'Compile';
-          compileBtn.title = 'Compile to PDF (latexmk)';
-          headerEl.querySelector('[style="flex:1"]').after(compileBtn);
-
-          compileBtn.onclick = async () => {
-            compileBtn.textContent = 'Compiling...';
-            compileBtn.disabled = true;
-            try {
-              const resp = await fetch('/api/compile-tex', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path }),
-              });
-              const data = await resp.json();
-              if (data.ok) {
-                await renderPdfInElement(contentEl, `/media/${data.pdf_path}?t=${Date.now()}`);
-                compileBtn.textContent = 'Compile';
-              } else {
-                contentEl.innerHTML = `<pre class="tex-error">${data.log || data.error}</pre>`;
-                compileBtn.textContent = 'Compile (failed)';
-              }
-            } catch (e) {
-              compileBtn.textContent = 'Compile (error)';
+    compileBtn.onclick = async () => {
+      compileBtn.textContent = 'Compiling...';
+      compileBtn.disabled = true;
+      try {
+        const resp = await fetch('/api/compile-tex', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          // Close fullpage, open split view
+          collapseFullPage();
+          const sv = openSplitView(
+            {
+              title: title,
+              path: path,
+              render: (el) => createCodeEditor(el, rawContent, path),
+            },
+            {
+              title: pdfPath.split('/').pop(),
+              path: pdfPath,
+              render: (el) => renderPdfInElement(el, `/media/${data.pdf_path}?t=${Date.now()}`),
             }
-            compileBtn.disabled = false;
-          };
-
-          // Check if PDF already exists
-          fetch(`/media/${pdfPath}`, { method: 'HEAD' }).then(r => {
-            if (r.ok) renderPdfInElement(contentEl, `/media/${pdfPath}`);
-            else contentEl.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center;">Click Compile to generate PDF</div>';
-          }).catch(() => {
-            contentEl.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center;">Click Compile to generate PDF</div>';
-          });
-        },
+          );
+          if (sv) sv._sourcePath = path;
+        } else {
+          compileBtn.textContent = 'Compile (failed)';
+          // Show error inline below editor
+          let errEl = overlay.querySelector('.tex-error');
+          if (!errEl) {
+            errEl = document.createElement('pre');
+            errEl.className = 'tex-error';
+            contentEl.parentNode.appendChild(errEl);
+          }
+          errEl.textContent = data.log || data.error;
+          compileBtn.disabled = false;
+        }
+      } catch (e) {
+        compileBtn.textContent = 'Compile (error)';
+        compileBtn.disabled = false;
       }
-    );
-    return; // Don't continue with regular fullpage setup
+    };
+    return;
   } else if (isCodeFile(path)) {
     // Render code files with CodeMirror
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
@@ -1254,8 +1257,21 @@ function openSplitView(leftConfig, rightConfig) {
 
 function closeSplitView() {
   if (splitOverlay) {
+    // If there's a source path, re-open as fullpage
+    const sourcePath = splitOverlay._sourcePath;
     splitOverlay.remove();
     splitOverlay = null;
+    if (sourcePath) {
+      // Re-open the source file in fullpage mode
+      const nd = nodeById(sourcePath);
+      if (nd) {
+        const fakeCard = document.createElement('div');
+        fakeCard.dataset.path = sourcePath;
+        fakeCard.dataset.isFolder = 'false';
+        fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
+        expandCardFullPage(fakeCard);
+      }
+    }
   }
 }
 
