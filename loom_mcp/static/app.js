@@ -993,7 +993,73 @@ function expandCardFullPage(card, highlightQuery) {
 
   const contentEl = overlay.querySelector('.fullpage-content');
 
-  if (isCodeFile(path)) {
+  if (path.endsWith('.tex')) {
+    // TeX file: code editor + compile button + PDF preview pane
+    overlay.querySelector('.fullpage-toggle').style.display = 'none';
+
+    // Add compile button to header
+    const compileBtn = document.createElement('button');
+    compileBtn.className = 'fullpage-chat';
+    compileBtn.textContent = 'Compile';
+    compileBtn.title = 'Compile to PDF (latexmk)';
+    overlay.querySelector('.fullpage-header').insertBefore(
+      compileBtn, overlay.querySelector('.fullpage-toggle')
+    );
+
+    // Split layout: editor left, PDF right
+    contentEl.style.display = 'flex';
+    contentEl.style.gap = '0';
+    const editorPane = document.createElement('div');
+    editorPane.className = 'tex-editor-pane';
+    editorPane.style.cssText = 'flex:1; overflow:auto; min-width:0;';
+    const pdfPane = document.createElement('div');
+    pdfPane.className = 'tex-pdf-pane';
+    pdfPane.style.cssText = 'flex:1; overflow:auto; min-width:0; border-left:1px solid var(--border); display:none;';
+    contentEl.appendChild(editorPane);
+    contentEl.appendChild(pdfPane);
+
+    createCodeEditor(editorPane, rawContent, path).then(view => {
+      overlay._cmView = view;
+      view.dom.addEventListener('keydown', (ev) => {
+        const m = ev.metaKey || ev.ctrlKey;
+        if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
+      });
+    });
+
+    // Check if PDF already exists
+    const pdfPath = path.replace(/\.tex$/, '.pdf');
+    fetch(`/media/${pdfPath}`, { method: 'HEAD' }).then(r => {
+      if (r.ok) {
+        pdfPane.style.display = '';
+        renderPdfInElement(pdfPane, `/media/${pdfPath}`);
+      }
+    }).catch(() => {});
+
+    compileBtn.onclick = async () => {
+      compileBtn.textContent = 'Compiling...';
+      compileBtn.disabled = true;
+      try {
+        const resp = await fetch('/api/compile-tex', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          pdfPane.style.display = '';
+          await renderPdfInElement(pdfPane, `/media/${data.pdf_path}?t=${Date.now()}`);
+          compileBtn.textContent = 'Compile';
+        } else {
+          pdfPane.style.display = '';
+          pdfPane.innerHTML = `<pre class="tex-error">${data.log || data.error}</pre>`;
+          compileBtn.textContent = 'Compile (failed)';
+        }
+      } catch (e) {
+        compileBtn.textContent = 'Compile (error)';
+      }
+      compileBtn.disabled = false;
+    };
+  } else if (isCodeFile(path)) {
     // Render code files with CodeMirror
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
     createCodeEditor(contentEl, rawContent, path).then(view => {

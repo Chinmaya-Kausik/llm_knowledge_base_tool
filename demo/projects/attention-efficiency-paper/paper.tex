@@ -6,12 +6,12 @@
 \maketitle
 \begin{abstract}
 We propose a hybrid attention mechanism that combines sparse attention patterns
-with multi-head projections, achieving O(n \sqrt{n}) complexity while maintaining
+with multi-head projections, achieving $O(n \sqrt{n})$ complexity while maintaining
 the expressiveness of full attention.
 \end{abstract}
 
 \section{Introduction}
-Self-attention has O(n^2) complexity, limiting its application to long sequences.
+Self-attention has $O(n^2)$ complexity, limiting its application to long sequences.
 We address this by introducing \textit{SparseMultiHead}, which...
 
 \section{Related Work}
@@ -20,7 +20,7 @@ BigBird, Longformer, and similar approaches restrict attention to local windows
 plus global tokens.
 
 \subsection{Linear Attention}
-Performers and Random Feature Attention approximate softmax attention in O(n) time
+Performers and Random Feature Attention approximate softmax attention in $O(n)$ time
 but lose expressiveness.
 
 \section{Method}

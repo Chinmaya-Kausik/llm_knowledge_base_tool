@@ -929,6 +929,56 @@ async def api_update_chat_title(request: Request):
 
 # --- File operations ---
 
+@app.post("/api/compile-tex")
+async def api_compile_tex(request: Request):
+    """Compile a .tex file to PDF using latexmk.
+
+    Expects: {path: "projects/paper/paper.tex"}
+    Returns: {ok, pdf_path} or {ok: false, error, log}
+    """
+    import subprocess
+
+    body = await request.json()
+    rel_path = body.get("path", "")
+    if not rel_path or not rel_path.endswith(".tex"):
+        return {"ok": False, "error": "Not a .tex file"}
+
+    full_path = (LOOM_ROOT / rel_path).resolve()
+    loom_resolved = LOOM_ROOT.resolve()
+    if not str(full_path).startswith(str(loom_resolved)):
+        return {"ok": False, "error": "Path outside loom"}
+    if not full_path.exists():
+        return {"ok": False, "error": "File not found"}
+
+    tex_dir = full_path.parent
+    try:
+        result = subprocess.run(
+            ["latexmk", "-pdf", "-interaction=nonstopmode", "-halt-on-error", full_path.name],
+            cwd=str(tex_dir),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        pdf_name = full_path.stem + ".pdf"
+        pdf_path = tex_dir / pdf_name
+
+        if pdf_path.exists():
+            pdf_rel = str(pdf_path.relative_to(LOOM_ROOT))
+            return {"ok": True, "pdf_path": pdf_rel}
+        else:
+            # Compilation failed — return last 50 lines of log
+            log_lines = result.stdout.split("\n")[-50:] if result.stdout else []
+            return {"ok": False, "error": "Compilation failed", "log": "\n".join(log_lines)}
+
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Compilation timed out (60s)"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "latexmk not found — install TeX Live"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/mkdir")
 async def api_mkdir(request: Request):
     """Create a new directory in the loom."""
