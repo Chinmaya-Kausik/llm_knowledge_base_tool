@@ -5429,10 +5429,14 @@ async function init() {
         zoomSelection.transition().duration(200).call(zoomBehavior.scaleBy, 0.7);
         return;
       }
+      // Ctrl+W close current pane (PDF in split view)
+      if (e.ctrlKey && e.key === 'w') {
+        if (splitOverlay) { e.preventDefault(); e.stopPropagation(); closeSplitView(); return; }
+      }
       // Cmd+[ go back
       if (mod && e.key === '[') {
         e.preventDefault(); e.stopPropagation();
-        if (splitOverlay) { closeSplitView(); return; }
+        if (splitOverlay) { splitOverlay.remove(); splitOverlay = null; return; }
         if (expandedCard) { collapseFullPage(); return; }
         // Files view: navigate breadcrumbs back
         if (filesTilePath.length > 0) {
