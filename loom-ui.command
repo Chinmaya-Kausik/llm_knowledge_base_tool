@@ -1,7 +1,10 @@
 #!/bin/bash
-# Double-click this file to launch the Loom Workspace UI.
+# Double-click this file to launch the Loom Workspace UI (stable, port 8420).
 
 cd "$(dirname "$0")"
+
+# Always run stable from main
+git checkout main 2>/dev/null || true
 
 # Read loom root from config, env var, or default
 if [ -z "$LOOM_ROOT" ] && [ -f ~/.loom-app-config.json ]; then
@@ -11,6 +14,7 @@ export LOOM_ROOT="${LOOM_ROOT:-$HOME/Documents/loom}"
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "Starting Loom UI..."
+echo "Branch: $(git branch --show-current)"
 echo "Loom root: $LOOM_ROOT"
 echo ""
 

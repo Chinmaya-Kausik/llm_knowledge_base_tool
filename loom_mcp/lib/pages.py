@@ -133,8 +133,21 @@ def walk_pages(loom_root: Path, include_hidden: bool = False, show_internals: bo
     pages: list[dict[str, Any]] = []
     page_ids: set[str] = set()
 
+    # Max depth for projects/ — don't recurse into repo internals
+    # projects/my-app/ (depth 2) shows top-level, projects/my-app/src/ (depth 3) shows children
+    PROJECT_MAX_DEPTH = 2
+
+    def _depth(path: Path) -> int:
+        """Count path components relative to loom root."""
+        return len(path.relative_to(loom_root).parts)
+
     def _walk(directory: Path, parent_id: str | None):
         if not directory.exists() or not directory.is_dir():
+            return
+
+        # Limit depth inside projects/
+        rel_str = str(directory.relative_to(loom_root))
+        if rel_str.startswith("projects/") and _depth(directory) > PROJECT_MAX_DEPTH:
             return
 
         try:
