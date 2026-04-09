@@ -1021,7 +1021,7 @@ body {
 .chat-msg-assistant h3 { font-size: 1.0em; margin: 8px 0 2px; }
 .chat-msg-assistant h4, .chat-msg-assistant h5, .chat-msg-assistant h6 { font-size: 0.95em; margin: 6px 0 2px; }
 .chat-msg-assistant code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
-.chat-msg-assistant pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; }
+.chat-msg-assistant pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow: auto; max-height: 300px; margin: 6px 0; }
 .chat-msg-assistant .wiki-link { color: var(--accent); cursor: pointer; border-bottom: 1px dotted var(--accent); }
 
 /* Thinking trace */
@@ -1164,7 +1164,7 @@ body {
 .chat-text { line-height: 1.55; }
 .chat-text p { margin: 4px 0; }
 .chat-text code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
-.chat-text pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow-x: auto; margin: 6px 0; }
+.chat-text pre { background: var(--bg); padding: 8px; border-radius: var(--radius); overflow: auto; max-height: 300px; margin: 6px 0; }
 .chat-text pre code { padding: 0; background: none; }
 .chat-text ul, .chat-text ol { padding-left: 18px; margin: 4px 0; }
 .chat-text a { color: var(--accent); }

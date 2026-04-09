@@ -1268,7 +1268,8 @@ async def upload_chat_image(request: Request):
 
     ts = int(time.time() * 1000)
     safe_name = filename or f"paste-{ts}"
-    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_name)
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in safe_name)
+    safe_name = safe_name.strip("_") or f"paste-{ts}"
     if not safe_name.endswith(f".{ext}"):
         safe_name = f"{safe_name}.{ext}"
 
