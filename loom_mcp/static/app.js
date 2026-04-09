@@ -1308,8 +1308,20 @@ function openSplitView(leftConfig, rightConfig) {
 
 function closeSplitView() {
   if (splitOverlay) {
+    const sourcePath = splitOverlay._sourcePath;
     splitOverlay.remove();
     splitOverlay = null;
+    // Return to fullpage editor if there's a source file
+    if (sourcePath) {
+      const nd = nodeById(sourcePath);
+      if (nd) {
+        const fakeCard = document.createElement('div');
+        fakeCard.dataset.path = sourcePath;
+        fakeCard.dataset.isFolder = 'false';
+        fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
+        expandCardFullPage(fakeCard);
+      }
+    }
   }
 }
 
@@ -5420,6 +5432,7 @@ async function init() {
       // Cmd+[ go back
       if (mod && e.key === '[') {
         e.preventDefault(); e.stopPropagation();
+        if (splitOverlay) { closeSplitView(); return; }
         if (expandedCard) { collapseFullPage(); return; }
         // Files view: navigate breadcrumbs back
         if (filesTilePath.length > 0) {
