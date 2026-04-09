@@ -523,7 +523,17 @@ body {
 }
 .keybind-reset:hover { color: var(--text); }
 
-/* TeX compilation */
+/* TeX compilation — split pane */
+.fullpage-content.tex-split {
+  display: flex; max-width: none; padding: 0; overflow: hidden;
+}
+.tex-editor-pane {
+  width: 50%; height: 100%; overflow: auto; border-right: 1px solid var(--border);
+}
+.tex-pdf-pane {
+  width: 50%; height: 100%; overflow: auto; background: var(--bg-surface);
+}
+.tex-pdf-pane .pdf-container { padding: 16px; }
 .tex-error { white-space: pre-wrap; font-size: 11px; color: var(--red, #f7768e); padding: 16px; overflow: auto; }
 
 /* View panel */

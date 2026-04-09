@@ -1007,13 +1007,12 @@ function expandCardFullPage(card, highlightQuery) {
     );
 
     // Split layout: editor left, PDF right
-    contentEl.style.cssText = 'display:flex; gap:0; height:100%;';
+    contentEl.classList.add('tex-split');
     const editorPane = document.createElement('div');
     editorPane.className = 'tex-editor-pane';
-    editorPane.style.cssText = 'width:50%; overflow:auto;';
     const pdfPane = document.createElement('div');
     pdfPane.className = 'tex-pdf-pane';
-    pdfPane.style.cssText = 'width:50%; overflow:auto; border-left:1px solid var(--border); display:none;';
+    pdfPane.style.display = 'none';
     contentEl.appendChild(editorPane);
     contentEl.appendChild(pdfPane);
 
