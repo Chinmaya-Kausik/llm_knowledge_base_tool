@@ -118,5 +118,29 @@ Rationale: simpler than code review, validates the multi-agent review pattern fi
 - Claude scans, proposes changes, user approves each
 - Single-project memories managed autonomously by Claude
 
+## 10. Adaptive Context Budget
+
+System prompt can grow large (page content + memory + CLAUDE.md + preset). Implement adaptive budgeting:
+
+- **Total token budget** for the appended system prompt (e.g., 4K tokens). Sum all blocks.
+- **Priority trimming** when over budget: drop page content first (just inject path), then truncate memory index, then truncate ABOUT.md content.
+- **Adaptive page injection**: inject full content for small files (<2K chars), first N lines + path for medium files, just path for large files.
+- **Parent ABOUT.md**: skip if page content already uses most of the budget.
+- **Monitoring**: log total injected tokens per session for tracking.
+
+Current state: page content capped at 8K chars (~2K tokens), memory capped at 2K chars, no total budget check.
+
+## 11. Chat Compaction Metadata
+
+When Claude internally compacts a conversation, store:
+- **Compaction summary** — the condensed description of older messages
+- **Compaction boundary** — which message index was the cutoff
+- Save as metadata in the chat transcript (frontmatter or inline marker)
+
+On "Continue" a saved chat:
+- Inject compaction summary + messages after the boundary (not the full transcript)
+- UI shows full history (unchanged), but Claude's context only has summary + recent
+- Claude can grep the full transcript if it needs to retrieve older details
+
 ## Known Issues
 - System prompt not updated when client is reused mid-session (chat.py _get_or_create_client). Context changes don't take effect until next session. Pre-existing bug.
