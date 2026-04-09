@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicovell3on/tauri-docs/refs/heads/v2/tooling/cli/schema.json",
-  "productName": "Vault",
+  "productName": "Loom",
   "version": "0.1.0",
   "identifier": "com.loom.workspace",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Vault",
+        "title": "Loom",
         "width": 1400,
         "height": 900,
         "resizable": true,
