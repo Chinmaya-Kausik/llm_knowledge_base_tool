@@ -25,7 +25,7 @@ fn read_loom_root() -> String {
         }
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    format!("{}/loom", home)
+    format!("{}/Documents/loom", home)
 }
 
 fn save_loom_root(root: &str) {
