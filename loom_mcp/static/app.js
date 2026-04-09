@@ -1418,17 +1418,33 @@ function setFilesMode(mode) {
   else renderFilesTiles();
 }
 
-function renderFilesTree() {
+async function renderFilesTree() {
   const container = document.getElementById('files-tree');
   container.innerHTML = '';
   if (!filesTreeData) return;
 
-  // Navigate to current path
+  // Navigate to current path, lazy-loading if needed
   let currentItems = filesTreeData.children || [];
+  let currentPath = '';
   for (const pathSegment of filesTilePath) {
+    currentPath = currentPath ? currentPath + '/' + pathSegment : pathSegment;
     const folder = currentItems.find(i => i.name === pathSegment && i.type === 'folder');
-    if (folder) currentItems = folder.children || [];
-    else break;
+    if (folder) {
+      if (!folder.children?.length) {
+        // Lazy-load children
+        try {
+          const showInternals = localStorage.getItem('loom-show-internals') === 'true';
+          const resp = await fetch(`/api/children/${currentPath}?show_internals=${showInternals}`);
+          const data = await resp.json();
+          folder.children = (data.children || []).map(c => ({
+            id: c.data.id, name: c.data.label, title: c.data.label,
+            type: c.data.is_folder ? 'folder' : 'file',
+            children: [], category: c.data.category,
+          }));
+        } catch {}
+      }
+      currentItems = folder.children || [];
+    } else break;
   }
 
   renderTreeItems(container, sortItems(currentItems), 0);
@@ -1504,17 +1520,32 @@ function renderTreeItems(container, items, depth) {
   }
 }
 
-function renderFilesTiles() {
+async function renderFilesTiles() {
   const container = document.getElementById('files-tiles');
   container.innerHTML = '';
   if (!filesTreeData) return;
 
-  // Navigate to current breadcrumb path
+  // Navigate to current breadcrumb path, lazy-loading if needed
   let currentItems = filesTreeData.children || [];
+  let currentPath = '';
   for (const pathSegment of filesTilePath) {
+    currentPath = currentPath ? currentPath + '/' + pathSegment : pathSegment;
     const folder = currentItems.find(i => i.name === pathSegment && i.type === 'folder');
-    if (folder) currentItems = folder.children || [];
-    else break;
+    if (folder) {
+      if (!folder.children?.length) {
+        try {
+          const showInternals = localStorage.getItem('loom-show-internals') === 'true';
+          const resp = await fetch(`/api/children/${currentPath}?show_internals=${showInternals}`);
+          const data = await resp.json();
+          folder.children = (data.children || []).map(c => ({
+            id: c.data.id, name: c.data.label, title: c.data.label,
+            type: c.data.is_folder ? 'folder' : 'file',
+            children: [], category: c.data.category,
+          }));
+        } catch {}
+      }
+      currentItems = folder.children || [];
+    } else break;
   }
 
   // Update breadcrumbs
