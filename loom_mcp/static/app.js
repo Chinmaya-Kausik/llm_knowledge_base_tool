@@ -253,7 +253,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
   const childCount = (nodeData.children || []).length;
   const catBadge = !isFolder ? `<span class="badge badge-cat-${category}">${category}</span>` : '';
   const typeBadge = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== category ? `<span class="badge badge-${nodeData.type}">${nodeData.type}</span>` : '';
-  const childBadge = childCount > 0 ? `<button class="btn-children" title="Drill into subpages">${childCount} sub</button>` : '';
+  const childBadge = isFolder ? `<button class="btn-children" title="Drill into subpages">${childCount > 0 ? childCount + ' sub' : '▶'}</button>` : '';
 
   // Body content: markdown gets full render, files get summary initially
   let bodyHTML;
@@ -287,7 +287,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
   card.addEventListener('pointerdown', () => bringToFront(card), true);
   wireCardDrag(card, options.pinned);
   wireCardBorderResize(card);
-  wireCardButtons(card, childCount > 0);
+  wireCardButtons(card, isFolder);
   wireWikiLinks(card);
   return card;
 }
@@ -344,7 +344,7 @@ function wireCardButtons(card, hasChildren) {
     e.stopPropagation(); e.preventDefault();
     if (e.metaKey || e.ctrlKey) { openExternal(path); return; }
     const currentParent = currentLevel().parentPath;
-    if (card.dataset.isFolder === 'true' && hasChildren && currentParent !== path) {
+    if (card.dataset.isFolder === 'true' && currentParent !== path) {
       drillInto(path);
     } else {
       expandCardFullPage(card);
