@@ -339,7 +339,10 @@ function wireCardButtons(card, hasChildren) {
     scheduleEdgeUpdate();
   });
 
-  // Double-click title (manual 200ms): folders → drill into canvas, files → full page
+  // Suppress native dblclick on cards (prevents d3-zoom from zooming in)
+  card.addEventListener('dblclick', (e) => { e.stopPropagation(); e.preventDefault(); });
+
+  // Double-click title (manual 300ms): folders → drill into canvas, files → full page
   let _handleLastClick = 0;
   card.querySelector('.doc-handle').addEventListener('click', (e) => {
     if (card._wasDragged) return;
