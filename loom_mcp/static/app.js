@@ -5429,8 +5429,8 @@ async function init() {
         zoomSelection.transition().duration(200).call(zoomBehavior.scaleBy, 0.7);
         return;
       }
-      // Ctrl+W close current pane (PDF in split view)
-      if (e.ctrlKey && e.key === 'w') {
+      // Cmd+W close current pane (PDF in split view)
+      if (mod && e.key === 'w') {
         if (splitOverlay) { e.preventDefault(); e.stopPropagation(); closeSplitView(); return; }
       }
       // Cmd+[ go back
