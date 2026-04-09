@@ -54,12 +54,14 @@ Steps:
 10. Delete orphaned Claude Code memory dirs at ~/.claude/projects/
 
 Development workflow (after migration):
-- `main` branch = stable. Real loom's server runs from `main`.
-- `dev` branch = experimental. Develop here, test against demo loom.
-- Stable server loads `main` code at startup — switching to `dev` on disk doesn't affect it.
-- Test experimental: `git checkout dev`, then `LOOM_PORT=8421 LOOM_ROOT=.../loom/projects/loom/demo uv run --extra web python -m loom_mcp.web`
+- `main` branch = stable. `dev` branch = experimental.
+- Two launcher files:
+  - `loom-ui.command` — `git checkout main` then start server on port 8420, serves real loom
+  - `loom-dev.command` — `git checkout dev` then start server on port 8421, serves demo loom
+- Each launcher checks out its branch before starting, so it always loads the right code.
+- Running stable server is unaffected by branch switches on disk (code already loaded in memory).
 - When validated: `git checkout main && git merge dev`, then restart stable server.
-- Stable server only gets new code on explicit merge + restart.
+- Both launchers can run simultaneously — first one loaded its code, second switches branch for itself.
 
 For each migrated repo:
 - Repo's CLAUDE.md content → distributed to ABOUT.md (project description for Claude), wiki pages (domain knowledge), memory files (operational context)
