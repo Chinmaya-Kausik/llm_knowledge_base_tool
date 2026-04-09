@@ -142,5 +142,43 @@ On "Continue" a saved chat:
 - UI shows full history (unchanged), but Claude's context only has summary + recent
 - Claude can grep the full transcript if it needs to retrieve older details
 
+## 12. Git Graph & Diff Visualization
+
+Multiple tabs/windows like VS Code — need git tracking with visual diffs:
+- **Git graph**: visual commit/branch graph (D3-based, reuse existing graph infra)
+- **Diff viewer**: side-by-side or unified diff view for commits, staged changes, working tree
+- **Multiple windows**: ability to have multiple loom windows open, each with multiple tabs
+- Panel-based: git graph and diffs as dockable panels (like chat/terminal panels)
+
+## 13. Smooth Software Updates
+
+Update loom code without losing chat state:
+- **Hot reload**: pull new code, restart server, browser detects reconnect and re-renders
+- **Chat persistence**: WebSocket reconnect on server restart — restore session from saved transcript
+- **Chat continuation**: resume saved chats like normal chats (inject compaction summary + recent messages) instead of full reload
+- **No truncation**: saved transcripts preserved across updates; compaction metadata (TODO #11) enables efficient continuation
+- Launcher scripts (`loom-ui.command`, `loom-dev.command`) handle branch checkout + restart
+
+## 14. Subagent Stuck Detection
+
+Subagents in non-main chats can get stuck indefinitely:
+- **Timeout**: detect when a subagent has been running too long (configurable, e.g. 5 min)
+- **Force-cancel**: backend timeout on `client.interrupt()` / `client.disconnect()` (partially done — 3s timeout added)
+- **UI indicator**: show stale/stuck badge on subagent activity blocks
+- **Auto-recovery**: if a subagent is stuck and user sends a new message, kill and restart the session
+
+## 15. In-App Bug Reporting
+
+Quick bug report shortcut that sidesteps everything:
+- **Trigger**: keyboard shortcut (e.g. Cmd+Shift+B) or button in settings/panel menu
+- **Captures**: recent console logs (ring buffer), last N WebSocket events per panel, backend request log, current panel state (generating, queued messages, subagent status)
+- **Output**: saves to `raw/bug-reports/{timestamp}-{annotation}.md` with structured sections
+- **Annotation**: prompt for a one-line description of what went wrong
+- **Backend endpoint**: `/api/bug-report` that dumps server-side state (active sessions, recent errors, last N chat events per session)
+- Minimal footprint — no dependencies, no UI framework, just a log dump
+
 ## Known Issues
 - System prompt not updated when client is reused mid-session (chat.py _get_or_create_client). Context changes don't take effect until next session. Pre-existing bug.
+- Message logged before LLM interaction: queued messages go from muted to bright text when dequeued (before LLM actually starts processing). Should only un-mute after LLM acknowledges.
+- Premature dequeue: queued message went bright before the current response finished (before `done` event). Needs event log capture to diagnose.
+- Code block overflow hides text: long code blocks in assistant messages overflow their container and obscure the text that follows. Likely needs `overflow-x: auto` or `max-height` with scroll on `pre`/`code` elements in chat.

@@ -83,14 +83,24 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
                 )
 
             elif msg_type == "stop":
-                # Cancel active generation and wait for cleanup
+                # Cancel active generation and wait for cleanup (with timeout
+                # so a stuck client.interrupt() doesn't block the WS loop)
                 if query_task and not query_task.done():
                     query_task.cancel()
+                    task_completed = False
                     try:
-                        await query_task
-                    except (asyncio.CancelledError, Exception):
+                        await asyncio.wait_for(asyncio.shield(query_task), timeout=5.0)
+                        task_completed = True
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                         pass
                     query_task = None
+                    # Force-send stopped only if the task didn't complete
+                    # (it sends its own stopped in the CancelledError handler)
+                    if not task_completed:
+                        try:
+                            await websocket.send_json({"type": "stopped"})
+                        except Exception:
+                            pass
 
             elif msg_type == "permission_response":
                 # Browser responded to a permission prompt
@@ -688,13 +698,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
                                 "input": getattr(block, 'input', {}),
                             })
                         elif block_cls == 'ThinkingBlock':
-                            thinking = getattr(block, 'thinking', '')
-                            if thinking:
-                                await websocket.send_json({
-                                    "type": "thinking",
-                                    "subagent_id": current_subagent_task_id,
-                                    "content": thinking,
-                                })
+                            # Already streamed via thinking_delta events — skip
+                            # to avoid duplicating content in the UI
+                            pass
 
                 elif isinstance(event, UserMessage):
                     for block in getattr(event, 'content', []):
@@ -768,18 +774,19 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
             pass
 
     except asyncio.CancelledError:
-        # Interrupt the client and disconnect so next query starts fresh
+        # Interrupt the client and disconnect so next query starts fresh.
+        # Use timeouts — client.interrupt()/disconnect() can hang with stuck subagents.
         try:
-            await client.interrupt()
-        except Exception:
+            await asyncio.wait_for(client.interrupt(), timeout=3.0)
+        except (asyncio.TimeoutError, Exception):
             pass
         # Disconnect client — interrupted state is unreliable for reuse
         session = sessions.get(session_id, {})
         old_client = session.pop("sdk_client", None)
         if old_client:
             try:
-                await old_client.disconnect()
-            except Exception:
+                await asyncio.wait_for(old_client.disconnect(), timeout=3.0)
+            except (asyncio.TimeoutError, Exception):
                 pass
         try:
             await websocket.send_json({"type": "stopped"})

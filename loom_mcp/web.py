@@ -1240,6 +1240,44 @@ async def websocket_terminal(websocket: WebSocket):
         print("[TERM] cleaned up", flush=True)
 
 
+# --- Image upload for chat ---
+
+@app.post("/api/chat/upload-image")
+async def upload_chat_image(request: Request):
+    """Save a pasted image and return its absolute path for Claude to read."""
+    import base64
+    import time
+
+    body = await request.json()
+    data_url = body.get("data_url", "")
+    filename = body.get("filename", "")
+
+    if not data_url:
+        raise HTTPException(status_code=400, detail="No image data")
+
+    # Parse data URL: data:image/png;base64,iVBOR...
+    try:
+        header, b64data = data_url.split(",", 1)
+        mime = header.split(":")[1].split(";")[0]  # e.g. image/png
+        ext = mime.split("/")[1].replace("jpeg", "jpg")
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid data URL format")
+
+    image_dir = LOOM_ROOT / "raw" / "media" / "chat-images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = int(time.time() * 1000)
+    safe_name = filename or f"paste-{ts}"
+    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_name)
+    if not safe_name.endswith(f".{ext}"):
+        safe_name = f"{safe_name}.{ext}"
+
+    file_path = image_dir / f"{ts}-{safe_name}"
+    file_path.write_bytes(base64.b64decode(b64data))
+
+    return {"path": str(file_path), "url": f"/media/raw/media/chat-images/{file_path.name}"}
+
+
 # --- Media serving (downloaded images) ---
 
 @app.get("/media/{filepath:path}")
@@ -1270,7 +1308,18 @@ async def no_cache_static(request: Request, call_next):
 
 @app.get("/")
 def index():
-    return FileResponse(str(STATIC_DIR / "index.html"))
+    """Serve index.html with cache-busting query strings on static assets."""
+    import re
+    html = (STATIC_DIR / "index.html").read_text()
+    # Inject mtime-based cache busters so browsers always load fresh JS/CSS
+    def _bust(m):
+        rel_path = m.group(2)  # e.g. "app.js" or "vendor/d3.min.js"
+        full = STATIC_DIR / rel_path
+        ts = int(full.stat().st_mtime) if full.exists() else 0
+        return f'{m.group(1)}="/static/{rel_path}?v={ts}"'
+    html = re.sub(r'(src|href)="/static/([^"?]+)"', _bust, html)
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(html)
 
 
 # --- Entrypoint ---

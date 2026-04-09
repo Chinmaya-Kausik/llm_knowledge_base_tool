@@ -2702,6 +2702,10 @@ function createFloatingPanel(options = {}) {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   });
+  const attachBar = document.createElement('div');
+  attachBar.className = 'chat-attachments';
+  attachBar.style.display = 'none';
+  inputArea.appendChild(attachBar);
   inputArea.appendChild(input);
   inputArea.appendChild(sendBtn);
   card.appendChild(inputArea);
@@ -2765,7 +2769,14 @@ function createFloatingPanel(options = {}) {
 
   // Send handler — uses panel directly, never touches activePanel/globals
   sendBtn.onclick = () => {
-    const text = input.value.trim();
+    let text = input.value.trim();
+    // Append image paths if any
+    if (panel._pendingImages && panel._pendingImages.length > 0) {
+      const imagePaths = panel._pendingImages.map(i => i.path);
+      text += (text ? '\n\n' : '') + imagePaths.map(p => `[Pasted image: ${p}]`).join('\n');
+      card.querySelectorAll('.chat-image-preview').forEach(el => el.remove());
+      panel._pendingImages.length = 0;
+    }
     if (!text) return;
 
     if (!panel.ws || panel.ws.readyState !== WebSocket.OPEN) {
@@ -2777,6 +2788,21 @@ function createFloatingPanel(options = {}) {
     const userEl = document.createElement('div');
     userEl.className = 'chat-msg chat-msg-user';
     userEl.textContent = text;
+    // Show sent images inline in user message
+    const sentImgs = panel._pendingImages ? [...panel._pendingImages] : [];
+    if (sentImgs.length > 0) {
+      const imgRow = document.createElement('div');
+      imgRow.className = 'chat-msg-images';
+      sentImgs.forEach(i => {
+        const img = document.createElement('img');
+        img.src = i.url;
+        img.alt = 'Image';
+        img.style.cursor = 'pointer';
+        img.onclick = () => showImageLightbox(i.url);
+        imgRow.appendChild(img);
+      });
+      userEl.appendChild(imgRow);
+    }
     messagesEl.appendChild(userEl);
     panel.messages.push({ role: 'user', content: text });
     input.value = '';
@@ -2819,6 +2845,10 @@ function createFloatingPanel(options = {}) {
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
   };
+
+  // Image paste support for floating panel
+  panel._pendingImages = [];
+  setupImagePaste(input, () => attachBar, () => panel._pendingImages);
 
   // Draggable header with dead zone to distinguish from click
   let dragReady = false, dragging = false, startX, startY, dx, dy;
@@ -2897,6 +2927,8 @@ function connectPanelChat(panel, messagesEl) {
       timerInterval: chatTimerInterval, msgContainer: chatMessagesContainer,
       pendingAgentPrompt: pendingAgentPrompt, editedFiles: sessionEditedFiles,
       lastResultUsage: lastResultUsage, lastResultCost: lastResultCost,
+      messageQueue: messageQueue, wasUserInterrupt: wasUserInterrupt,
+      contextLevel: chatContextLevel, isTemporary: chatIsTemporary,
     };
 
     // Load this panel's state into globals
@@ -2909,6 +2941,10 @@ function connectPanelChat(panel, messagesEl) {
     chatTimerInterval = panel.timerInterval; chatMessagesContainer = panel.messagesContainer;
     pendingAgentPrompt = panel.pendingAgentPrompt; sessionEditedFiles = panel.editedFiles;
     lastResultUsage = panel.lastResultUsage; lastResultCost = panel.lastResultCost;
+    // Don't swap messageQueue — floating panel queue is panel._messageQueue, drained by processQueue.
+    // Just null it so handleChatEvent's main-panel queue drain doesn't fire.
+    messageQueue = []; wasUserInterrupt = panel.wasUserInterrupt || false;
+    chatContextLevel = panel.contextLevel; chatIsTemporary = panel.isTemporary;
 
     handleChatEvent(msg);
 
@@ -2921,19 +2957,16 @@ function connectPanelChat(panel, messagesEl) {
         const queued = panel._messageQueue.splice(0);
         const combined = queued.map(q => q.text).join('\n\n');
         queued.forEach(q => { if (q.el) q.el.classList.remove('chat-msg-queued'); });
-        // Need to restore globals briefly to send
-        setTimeout(() => {
-          if (panel.ws?.readyState === WebSocket.OPEN) {
-            panel.ws.send(JSON.stringify({
-              type: 'message', text: combined,
-              context_level: panel.contextLevel,
-              context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
-            }));
-            panel.generating = true;
-            panel.startTime = Date.now();
-            panel.tokenCount = 0;
-          }
-        }, 100);
+        if (panel.ws?.readyState === WebSocket.OPEN) {
+          panel.ws.send(JSON.stringify({
+            type: 'message', text: combined,
+            context_level: panel.contextLevel,
+            context: { page_path: panel.contextPath || currentLevel().parentPath || '' },
+          }));
+          panel.generating = true;
+          panel.startTime = Date.now();
+          panel.tokenCount = 0;
+        }
       }
     }
 
@@ -2946,6 +2979,9 @@ function connectPanelChat(panel, messagesEl) {
     panel.tokenCount = chatTokenCount; panel.startTime = chatStartTime;
     panel.timerInterval = chatTimerInterval; panel.editedFiles = sessionEditedFiles;
     panel.lastResultUsage = lastResultUsage; panel.lastResultCost = lastResultCost;
+    // Don't save messageQueue back — floating panel queue is panel._messageQueue, managed separately.
+    panel.wasUserInterrupt = wasUserInterrupt;
+    panel.contextLevel = chatContextLevel; panel.isTemporary = chatIsTemporary;
 
     // Restore main panel's globals
     chatWs = saved.ws; chatSessionId = saved.sessionId;
@@ -2957,6 +2993,8 @@ function connectPanelChat(panel, messagesEl) {
     chatTimerInterval = saved.timerInterval; chatMessagesContainer = saved.msgContainer;
     pendingAgentPrompt = saved.pendingAgentPrompt; sessionEditedFiles = saved.editedFiles;
     lastResultUsage = saved.lastResultUsage; lastResultCost = saved.lastResultCost;
+    messageQueue = saved.messageQueue; wasUserInterrupt = saved.wasUserInterrupt;
+    chatContextLevel = saved.contextLevel; chatIsTemporary = saved.isTemporary;
 
     processing = false;
     if (eventQueue.length > 0) setTimeout(processQueue, 0);
@@ -3277,6 +3315,9 @@ function initChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
   };
 
+  // Image paste support
+  setupImagePaste(input, () => document.getElementById('chat-attachments'), () => mainPendingImages);
+
   // Context and model are now in the universal panel menu (⋯)
 
   // Chat panel resize handles
@@ -3521,13 +3562,40 @@ function sendChatMessage() {
     exitCheckpointMode();
     if (!fullText) return;
     isRedirect = true;
-  } else if (!text && !pendingSelection?.text) {
+  } else if (!text && !pendingSelection?.text && mainPendingImages.length === 0) {
     return;
+  }
+
+  // Append image paths to prompt so Claude can read them
+  const sentImages = [];
+  if (mainPendingImages.length > 0) {
+    const imagePaths = mainPendingImages.map(i => i.path);
+    fullText += '\n\n' + imagePaths.map(p => `[Pasted image: ${p}]`).join('\n');
+    sentImages.push(...mainPendingImages);
+    // Clear attachment bar
+    const bar = document.getElementById('chat-attachments');
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+    mainPendingImages.length = 0;
   }
 
   chatMessages.push({ role: 'user', content: fullText });
   currentResponseText = '';
-  appendChatMessage('user', text || '', isRedirect ? 'redirect' : null);
+  const userMsgEl = appendChatMessage('user', text || '', isRedirect ? 'redirect' : null);
+  // Show sent images inline in the message
+  if (sentImages.length > 0) {
+    const imgRow = document.createElement('div');
+    imgRow.className = 'chat-msg-images';
+    sentImages.forEach(i => {
+      const img = document.createElement('img');
+      img.src = i.url;
+      img.alt = 'Image';
+      img.style.cursor = 'pointer';
+      img.onclick = () => showImageLightbox(i.url);
+      imgRow.appendChild(img);
+    });
+    userMsgEl.appendChild(imgRow);
+  }
   input.value = '';
 
   const level = currentLevel();
@@ -4325,9 +4393,14 @@ function handleChatEvent(msg) {
       }
       chatGenerating = false;
       clearInterval(chatTimerInterval);
-      document.getElementById('chat-send').style.display = '';
-      document.getElementById('chat-stop').style.display = 'none';
-      document.getElementById('chat-redirect').style.display = 'none';
+      // Only toggle main panel buttons when processing main panel events
+      const isMainPanel = chatMessagesContainer === chatPanels.get('main')?.messagesContainer
+        || chatMessagesContainer === null;
+      if (isMainPanel) {
+        document.getElementById('chat-send').style.display = '';
+        document.getElementById('chat-stop').style.display = 'none';
+        document.getElementById('chat-redirect').style.display = 'none';
+      }
 
       // Show interrupt prompt if user pressed Escape
       if (wasStopped && wasUserInterrupt) {
@@ -4340,7 +4413,9 @@ function handleChatEvent(msg) {
         } else {
           messages.appendChild(interruptEl);
         }
-        document.getElementById('chat-input').focus();
+        // Focus the right input — floating panel or main
+        const panelInput = chatMessagesContainer?.closest('.chat-panel')?.querySelector('textarea');
+        (panelInput || document.getElementById('chat-input')).focus();
       }
       // Show file edit notification if agent modified files
       if (sessionEditedFiles.size > 0 && !wasStopped) {
@@ -4388,11 +4463,14 @@ function handleChatEvent(msg) {
       maybeGenerateChatTitle(activePanel);
 
       // Process queued messages — combine all into one
+      // Sync globals to panel first so sendQueuedMessage's syncFromPanel
+      // sees chatGenerating=false (we just set it above on the global)
       if (messageQueue.length > 0) {
+        syncToPanel(activePanel);
         const all = messageQueue.splice(0);
         const combined = all.map(q => q.text).join('\n\n');
         all.forEach(q => { if (q.el) q.el.classList.remove('chat-msg-queued'); });
-        setTimeout(() => sendQueuedMessage(combined), 100);
+        sendQueuedMessage(combined);
       }
       break;
     }
@@ -4812,6 +4890,85 @@ function renderLatex(el) {
     } catch {}
   }
 }
+
+// ========================================
+// Image Paste Support
+// ========================================
+
+function setupImagePaste(inputEl, getAttachmentBar, getPendingImages) {
+  // getAttachmentBar returns the DOM element for the attachment preview area
+  // getPendingImages returns the array to push images onto (panel-specific)
+  // Listen on the container so image paste works even if textarea doesn't
+  // propagate clipboard image items on all platforms
+  const listenEl = inputEl.closest('#chat-input-area, .fcp-input-area') || inputEl;
+  listenEl.addEventListener('paste', async (e) => {
+    const items = [...(e.clipboardData?.items || [])];
+    const imageItem = items.find(i => i.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+
+      try {
+        const resp = await fetch('/api/chat/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data_url: dataUrl, filename: file.name || '' }),
+        });
+        if (!resp.ok) throw new Error('Upload failed');
+        const { path, url } = await resp.json();
+
+        const bar = getAttachmentBar();
+        bar.style.display = 'flex';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'chat-attachment-thumb';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Pasted image';
+        img.style.cursor = 'pointer';
+        img.onclick = (e) => { e.stopPropagation(); showImageLightbox(url); };
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'chat-attachment-remove';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => {
+          thumb.remove();
+          const arr = getPendingImages();
+          const idx = arr.findIndex(i => i.path === path);
+          if (idx >= 0) arr.splice(idx, 1);
+          if (arr.length === 0) bar.style.display = 'none';
+        };
+        thumb.appendChild(img);
+        thumb.appendChild(removeBtn);
+        bar.appendChild(thumb);
+
+        getPendingImages().push({ path, url });
+      } catch (err) {
+        console.error('Image upload failed:', err);
+        console.error('Image upload failed:', err);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function showImageLightbox(src) {
+  const overlay = document.createElement('div');
+  overlay.className = 'image-lightbox';
+  const img = document.createElement('img');
+  img.src = src;
+  overlay.appendChild(img);
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+// Global pending images for main panel
+let mainPendingImages = [];
 
 function appendChatMessage(role, text, tag) {
   const messages = chatMessagesContainer || document.getElementById('chat-messages');
@@ -5372,6 +5529,7 @@ async function init() {
           return;
         }
       } else if (focusedPanel?.generating && focusedPanel.ws?.readyState === WebSocket.OPEN) {
+        focusedPanel.wasUserInterrupt = true;
         focusedPanel.ws.send(JSON.stringify({ type: 'stop' }));
         return;
       }
@@ -5511,4 +5669,4 @@ async function init() {
 
 window.navigateToLevel = navigateToLevel;
 
-init();
+init().catch(e => console.error('[init] FATAL:', e));
