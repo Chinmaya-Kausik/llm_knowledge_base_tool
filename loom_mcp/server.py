@@ -29,7 +29,7 @@ mcp = FastMCP("loom", instructions="Personal knowledge base tools. All tools are
 def _bootstrap_loom(loom_root: Path) -> None:
     """Create the loom directory structure if it doesn't exist."""
     for d in ["raw/inbox", "raw/articles", "raw/papers", "raw/repos", "raw/media",
-              "wiki/concepts", "wiki/summaries", "wiki/indexes", "wiki/answers", "wiki/meta",
+              "wiki/pages", "wiki/meta", "wiki/meta/indexes",
               "wiki/meta/memory",
               "outputs/slides", "outputs/reports", "outputs/visualizations"]:
         (loom_root / d).mkdir(parents=True, exist_ok=True)
@@ -152,7 +152,7 @@ def write_wiki_page(path: str, frontmatter_json: str, content: str) -> str:
     """Write a wiki page with frontmatter.
 
     Args:
-        path: Relative path (e.g., "wiki/concepts/transformers.md")
+        path: Relative path (e.g., "wiki/pages/transformers.md")
         frontmatter_json: JSON string of frontmatter dict
         content: Markdown content body
 
@@ -357,14 +357,14 @@ def ripgrep_search(query: str, scope: str = "all", context_lines: int = 3, file_
 
 @mcp.tool()
 def read_index(topic: str) -> str:
-    """Read a topic index file from wiki/indexes/."""
+    """Read a topic index file from wiki/meta/indexes/."""
     from loom_mcp.tools.search import read_index as _read_index
     return _read_index(LOOM_ROOT, topic)
 
 
 @mcp.tool()
 def write_index(topic: str, content: str) -> str:
-    """Write or update a topic index file at wiki/indexes/{topic}.md.
+    """Write or update a topic index file at wiki/meta/indexes/{topic}.md.
 
     Use this to maintain index files with brief summaries of all pages
     in a topic cluster. This is what makes Q&A work without RAG.

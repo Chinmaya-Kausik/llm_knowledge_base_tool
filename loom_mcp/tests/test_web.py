@@ -17,8 +17,7 @@ def loom_app(tmp_path):
     """Create a test loom with sample data and return a TestClient."""
     root = tmp_path / "loom"
     (root / "raw" / "inbox").mkdir(parents=True)
-    (root / "wiki" / "concepts").mkdir(parents=True)
-    (root / "wiki" / "summaries").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
     (root / "wiki" / "meta").mkdir(parents=True)
 
     write_frontmatter(
@@ -30,8 +29,8 @@ def loom_app(tmp_path):
 
     save_registry(root / "wiki" / "meta" / "page-registry.json", {
         "pages": [
-            {"title": "Alpha", "path": "wiki/concepts/alpha.md", "aliases": ["A"]},
-            {"title": "Beta", "path": "wiki/concepts/beta.md", "aliases": []},
+            {"title": "Alpha", "path": "wiki/pages/alpha.md", "aliases": ["A"]},
+            {"title": "Beta", "path": "wiki/pages/beta.md", "aliases": []},
         ]
     })
 
@@ -42,7 +41,7 @@ def loom_app(tmp_path):
         "content_hash": src_hash, "compiled": True,
     }, src_content)
 
-    write_frontmatter(root / "wiki" / "concepts" / "alpha.md", {
+    write_frontmatter(root / "wiki" / "pages" / "alpha.md", {
         "title": "Alpha", "type": "concept", "status": "compiled",
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "source_hash": src_hash, "compiler_model": "claude",
@@ -51,7 +50,7 @@ def loom_app(tmp_path):
         "aliases": ["A"], "confidence": "high",
     }, "# Alpha\n\nLinks to [[beta]].\n")
 
-    write_frontmatter(root / "wiki" / "concepts" / "beta.md", {
+    write_frontmatter(root / "wiki" / "pages" / "beta.md", {
         "title": "Beta", "type": "concept", "status": "compiled",
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "source_hash": "xyz", "compiler_model": "claude",
@@ -94,14 +93,14 @@ def test_registry(loom_app):
 
 def test_page_read(loom_app):
     client, root = loom_app
-    r = client.get("/api/page/wiki/concepts/alpha.md")
+    r = client.get("/api/page/wiki/pages/alpha.md")
     assert r.status_code == 200
     assert r.json()["frontmatter"]["title"] == "Alpha"
 
 
 def test_page_not_found(loom_app):
     client, root = loom_app
-    assert client.get("/api/page/wiki/concepts/missing.md").status_code == 404
+    assert client.get("/api/page/wiki/pages/missing.md").status_code == 404
 
 
 def test_tree(loom_app):
@@ -169,7 +168,7 @@ def test_layout_roundtrip(loom_app):
     # Initially empty
     assert client.get("/api/layout").json() == {}
     # Save layout
-    layout = {"wiki/concepts/alpha.md": {"x": 100, "y": 200}}
+    layout = {"wiki/pages/alpha.md": {"x": 100, "y": 200}}
     r = client.put("/api/layout", json=layout)
     assert r.status_code == 200
     # Read back
@@ -179,21 +178,21 @@ def test_layout_roundtrip(loom_app):
 def test_page_edit(loom_app):
     client, root = loom_app
     # Read current
-    page = client.get("/api/page/wiki/concepts/alpha.md").json()
+    page = client.get("/api/page/wiki/pages/alpha.md").json()
     fm = page["frontmatter"]
     # Edit content
-    r = client.put("/api/page/wiki/concepts/alpha.md", json={
+    r = client.put("/api/page/wiki/pages/alpha.md", json={
         "frontmatter": fm, "content": "# Alpha\n\nEdited content.\n"
     })
     assert r.status_code == 200
     # Verify
-    updated = client.get("/api/page/wiki/concepts/alpha.md").json()
+    updated = client.get("/api/page/wiki/pages/alpha.md").json()
     assert "Edited content" in updated["content"]
 
 
 def test_page_edit_not_found(loom_app):
     client, root = loom_app
-    r = client.put("/api/page/wiki/concepts/missing.md", json={
+    r = client.put("/api/page/wiki/pages/missing.md", json={
         "frontmatter": {}, "content": "test"
     })
     assert r.status_code == 404

@@ -103,7 +103,7 @@ def write_wiki_page(
     Auto-updates page-registry.json if it's a new page.
 
     Args:
-        path: Relative path from loom root (e.g., "wiki/concepts/transformers.md").
+        path: Relative path from loom root (e.g., "wiki/pages/transformers.md").
         page_frontmatter: Complete frontmatter dict.
         content: Markdown content body.
 

@@ -21,7 +21,7 @@ def loom_with_nesting(tmp_path):
     wiki.mkdir()
     write_frontmatter(wiki / "ABOUT.md", {"title": "Knowledge Base"}, "# Wiki\n")
 
-    concepts = wiki / "concepts"
+    concepts = wiki / "pages"
     concepts.mkdir()
 
     # Transformers folder-page
@@ -95,7 +95,7 @@ def test_top_nodes(loom_with_nesting):
     top_labels = {n["data"]["label"] for n in data["top_nodes"]}
     # Top level should be wiki/ (and maybe ABOUT.md)
     assert "wiki" in top_labels
-    # transformers is nested inside wiki/concepts/, not top-level
+    # transformers is nested inside wiki/pages/, not top-level
     assert "transformers" not in top_labels
 
 

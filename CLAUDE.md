@@ -34,7 +34,9 @@ CLAUDE.md              ← Project context loaded by Agent SDK subprocess
 MEMORY.md              ← Global memory index (one-liners, injected at session start)
 config.yaml            ← Context pipeline config (memory caps, page content limits)
 wiki/                  ← Compiled knowledge
+  pages/               ← All wiki pages (flat, type in frontmatter)
   meta/
+    indexes/           ← Per-topic catalogs (LLM-maintained)
     memory/            ← Memory files (timestamped, tagged by project)
     conventions.md     ← Editable project conventions
     index.md           ← Master page catalog

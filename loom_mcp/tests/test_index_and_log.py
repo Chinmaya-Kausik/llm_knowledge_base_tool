@@ -11,8 +11,7 @@ from loom_mcp.tools.compile import append_log, update_master_index
 
 def _make_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
-    (root / "wiki" / "concepts").mkdir(parents=True)
-    (root / "wiki" / "answers").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
     (root / "wiki" / "meta").mkdir(parents=True)
     save_registry(root / "wiki" / "meta" / "page-registry.json", {"pages": []})
     write_frontmatter(
@@ -107,11 +106,11 @@ def test_master_index_empty():
 def test_master_index_with_pages():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_page(loom, "wiki/concepts/transformers.md", "Transformers", "concept",
+        _add_page(loom, "wiki/pages/transformers.md", "Transformers", "concept",
                   tags=["ml"], content="The Transformer architecture uses attention.")
-        _add_page(loom, "wiki/concepts/bert.md", "BERT", "concept",
+        _add_page(loom, "wiki/pages/bert.md", "BERT", "concept",
                   tags=["ml", "nlp"], content="BERT is a pre-trained language model.")
-        _add_page(loom, "wiki/answers/q1.md", "What is attention?", "answer",
+        _add_page(loom, "wiki/pages/q1.md", "What is attention?", "answer",
                   content="Attention allows models to focus on relevant parts.")
 
         result = update_master_index(loom)
@@ -131,7 +130,7 @@ def test_master_index_with_pages():
 def test_master_index_includes_summaries():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_page(loom, "wiki/concepts/test.md", "Test Concept", "concept",
+        _add_page(loom, "wiki/pages/test.md", "Test Concept", "concept",
                   content="This is the first paragraph of the test concept.\n\nSecond paragraph.")
 
         update_master_index(loom)
@@ -142,7 +141,7 @@ def test_master_index_includes_summaries():
 def test_master_index_includes_tags():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_page(loom, "wiki/concepts/a.md", "Alpha", "concept", tags=["ml", "nlp"])
+        _add_page(loom, "wiki/pages/a.md", "Alpha", "concept", tags=["ml", "nlp"])
 
         update_master_index(loom)
         _, content = read_frontmatter(loom / "wiki" / "meta" / "index.md")
@@ -153,13 +152,13 @@ def test_master_index_includes_tags():
 def test_master_index_preserves_created():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_page(loom, "wiki/concepts/a.md", "A", "concept")
+        _add_page(loom, "wiki/pages/a.md", "A", "concept")
         update_master_index(loom)
 
         meta1, _ = read_frontmatter(loom / "wiki" / "meta" / "index.md")
         created1 = meta1["created"]
 
-        _add_page(loom, "wiki/concepts/b.md", "B", "concept")
+        _add_page(loom, "wiki/pages/b.md", "B", "concept")
         update_master_index(loom)
 
         meta2, _ = read_frontmatter(loom / "wiki" / "meta" / "index.md")

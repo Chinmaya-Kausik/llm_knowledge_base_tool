@@ -19,8 +19,8 @@ except FileNotFoundError:
 def _make_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
     (root / "raw" / "inbox").mkdir(parents=True)
-    (root / "wiki" / "concepts").mkdir(parents=True)
-    (root / "wiki" / "indexes").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
+    (root / "wiki" / "meta" / "indexes").mkdir(parents=True)
     return root
 
 
@@ -28,7 +28,7 @@ def _make_loom(tmp: str) -> Path:
 def test_ripgrep_search_finds_match():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        (loom / "wiki" / "concepts" / "test.md").write_text("---\ntitle: Test\n---\nTransformers use attention.\n")
+        (loom / "wiki" / "pages" / "test.md").write_text("---\ntitle: Test\n---\nTransformers use attention.\n")
         results = ripgrep_search(loom, "attention", scope="wiki")
         assert len(results) >= 1
         assert any("attention" in r["context"] for r in results)
@@ -39,7 +39,7 @@ def test_ripgrep_search_scope_filtering():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         (loom / "raw" / "inbox" / "note.md").write_text("---\ntitle: Note\n---\nUniqueRawTerm.\n")
-        (loom / "wiki" / "concepts" / "page.md").write_text("---\ntitle: Page\n---\nSomething else.\n")
+        (loom / "wiki" / "pages" / "page.md").write_text("---\ntitle: Page\n---\nSomething else.\n")
         results = ripgrep_search(loom, "UniqueRawTerm", scope="wiki")
         assert len(results) == 0
         results = ripgrep_search(loom, "UniqueRawTerm", scope="raw")
@@ -50,7 +50,7 @@ def test_ripgrep_search_scope_filtering():
 def test_ripgrep_search_no_results():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        (loom / "wiki" / "concepts" / "test.md").write_text("---\ntitle: Test\n---\nHello.\n")
+        (loom / "wiki" / "pages" / "test.md").write_text("---\ntitle: Test\n---\nHello.\n")
         results = ripgrep_search(loom, "zzz_nonexistent_zzz", scope="wiki")
         assert len(results) == 0
 
@@ -59,7 +59,7 @@ def test_read_index_found():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         write_frontmatter(
-            loom / "wiki" / "indexes" / "machine-learning.md",
+            loom / "wiki" / "meta" / "indexes" / "machine-learning.md",
             {"title": "Machine Learning Index", "type": "index"},
             "# Machine Learning\n\n- [[Transformers]]\n- [[BERT]]\n",
         )

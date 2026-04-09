@@ -38,21 +38,21 @@ def test_parse_preserves_raw():
 
 
 def test_resolve_link_by_title():
-    registry = {"pages": [{"title": "Transformers", "path": "concepts/transformers.md", "aliases": []}]}
+    registry = {"pages": [{"title": "Transformers", "path": "pages/transformers.md", "aliases": []}]}
     result = resolve_link("Transformers", registry, Path("/wiki"))
-    assert result == Path("/wiki/concepts/transformers.md")
+    assert result == Path("/wiki/pages/transformers.md")
 
 
 def test_resolve_link_by_alias():
-    registry = {"pages": [{"title": "Transformers", "path": "concepts/transformers.md", "aliases": ["Vaswani architecture"]}]}
+    registry = {"pages": [{"title": "Transformers", "path": "pages/transformers.md", "aliases": ["Vaswani architecture"]}]}
     result = resolve_link("Vaswani architecture", registry, Path("/wiki"))
-    assert result == Path("/wiki/concepts/transformers.md")
+    assert result == Path("/wiki/pages/transformers.md")
 
 
 def test_resolve_link_case_insensitive():
-    registry = {"pages": [{"title": "BERT", "path": "concepts/bert.md", "aliases": []}]}
+    registry = {"pages": [{"title": "BERT", "path": "pages/bert.md", "aliases": []}]}
     result = resolve_link("bert", registry, Path("/wiki"))
-    assert result == Path("/wiki/concepts/bert.md")
+    assert result == Path("/wiki/pages/bert.md")
 
 
 def test_resolve_link_not_found():

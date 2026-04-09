@@ -41,7 +41,7 @@ def bootstrap_loom(loom_root: Path) -> None:
     """Create the loom directory structure if it doesn't exist."""
     dirs = [
         "raw/inbox", "raw/articles", "raw/papers", "raw/repos", "raw/media",
-        "wiki/concepts", "wiki/summaries", "wiki/indexes", "wiki/answers", "wiki/meta",
+        "wiki/pages", "wiki/meta", "wiki/meta/indexes",
         "wiki/meta/memory",
         "outputs/slides", "outputs/reports", "outputs/visualizations",
     ]
@@ -165,7 +165,7 @@ _LOOM_CONVENTIONS_CONTENT = """\
 - Canonical terms live in the glossary. Consult it during compilation.
 
 ## Compilation
-- Summaries go in `wiki/summaries/`, concept articles in `wiki/concepts/`
+- All wiki pages go in `wiki/pages/` (flat, no subdirectories). Type is in frontmatter, not directory.
 - Set confidence (high/medium/low) based on source quality
 - Always link back to originating sources in `sources` frontmatter field
 - Never generate `[[links]]` to pages not in the page registry

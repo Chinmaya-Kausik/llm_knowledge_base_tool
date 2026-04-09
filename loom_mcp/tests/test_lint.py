@@ -20,7 +20,7 @@ from loom_mcp.tools.lint import (
 def _make_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
     (root / "raw" / "inbox").mkdir(parents=True)
-    (root / "wiki" / "concepts").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
     (root / "wiki" / "meta").mkdir(parents=True)
     save_registry(root / "wiki" / "meta" / "page-registry.json", {"pages": []})
     write_frontmatter(
@@ -56,8 +56,8 @@ def _add_wiki_page(loom: Path, rel_path: str, title: str, content: str,
 def test_validate_links_no_broken():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Links to [[B]].")
-        _add_wiki_page(loom, "wiki/concepts/b.md", "B", "No links.")
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Links to [[B]].")
+        _add_wiki_page(loom, "wiki/pages/b.md", "B", "No links.")
         broken = validate_links(loom)
         assert len(broken) == 0
 
@@ -65,7 +65,7 @@ def test_validate_links_no_broken():
 def test_validate_links_broken():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Links to [[NonExistent]].")
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Links to [[NonExistent]].")
         broken = validate_links(loom)
         assert len(broken) == 1
         assert broken[0]["link"] == "NonExistent"
@@ -75,9 +75,9 @@ def test_validate_links_broken():
 def test_validate_links_alias_resolution():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/transformer.md", "Transformers",
+        _add_wiki_page(loom, "wiki/pages/transformer.md", "Transformers",
                        "Content.", aliases=["Vaswani architecture"])
-        _add_wiki_page(loom, "wiki/concepts/bert.md", "BERT",
+        _add_wiki_page(loom, "wiki/pages/bert.md", "BERT",
                        "Based on [[Vaswani architecture]].")
         broken = validate_links(loom)
         assert len(broken) == 0
@@ -96,7 +96,7 @@ def test_find_stale_pages_none():
              "content_hash": src_hash, "compiled": True},
             src_content,
         )
-        _add_wiki_page(loom, "wiki/concepts/derived.md", "Derived", "Derived content.",
+        _add_wiki_page(loom, "wiki/pages/derived.md", "Derived", "Derived content.",
                        sources=[{"path": "raw/inbox/src.md", "hash": src_hash}])
         stale = find_stale_pages(loom)
         assert len(stale) == 0
@@ -111,7 +111,7 @@ def test_find_stale_pages_hash_mismatch():
              "content_hash": "old", "compiled": True},
             "Updated source content",
         )
-        _add_wiki_page(loom, "wiki/concepts/derived.md", "Derived", "Content.",
+        _add_wiki_page(loom, "wiki/pages/derived.md", "Derived", "Content.",
                        sources=[{"path": "raw/inbox/src.md", "hash": "old_hash"}])
         stale = find_stale_pages(loom)
         assert len(stale) == 1
@@ -120,7 +120,7 @@ def test_find_stale_pages_hash_mismatch():
 def test_find_stale_pages_missing_source():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/derived.md", "Derived", "Content.",
+        _add_wiki_page(loom, "wiki/pages/derived.md", "Derived", "Content.",
                        sources=[{"path": "raw/inbox/deleted.md", "hash": "abc"}])
         stale = find_stale_pages(loom)
         assert len(stale) == 1
@@ -132,16 +132,16 @@ def test_find_stale_pages_missing_source():
 def test_find_orphan_pages():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Links to [[B]].")
-        _add_wiki_page(loom, "wiki/concepts/b.md", "B", "No links out.")
-        _add_wiki_page(loom, "wiki/concepts/c.md", "C", "Orphan, no links in.")
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Links to [[B]].")
+        _add_wiki_page(loom, "wiki/pages/b.md", "B", "No links out.")
+        _add_wiki_page(loom, "wiki/pages/c.md", "C", "Orphan, no links in.")
 
         orphans = find_orphan_pages(loom)
         # A is orphan (nobody links to A), C is orphan
         # B is not orphan (A links to B)
-        assert "wiki/concepts/b.md" not in orphans
-        assert "wiki/concepts/a.md" in orphans
-        assert "wiki/concepts/c.md" in orphans
+        assert "wiki/pages/b.md" not in orphans
+        assert "wiki/pages/a.md" in orphans
+        assert "wiki/pages/c.md" in orphans
 
 
 # --- find_missing_concepts ---
@@ -149,9 +149,9 @@ def test_find_orphan_pages():
 def test_find_missing_concepts():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Content.",
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Content.",
                        related=["[[B]]", "[[Missing Concept]]"])
-        _add_wiki_page(loom, "wiki/concepts/b.md", "B", "Content.")
+        _add_wiki_page(loom, "wiki/pages/b.md", "B", "Content.")
 
         missing = find_missing_concepts(loom)
         assert "Missing Concept" in missing
@@ -163,18 +163,18 @@ def test_find_missing_concepts():
 def test_check_terminology_known_terms():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Content.",
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Content.",
                        tags=["machine-learning"])
-        unknown = check_terminology(loom, "wiki/concepts/a.md")
+        unknown = check_terminology(loom, "wiki/pages/a.md")
         assert len(unknown) == 0
 
 
 def test_check_terminology_unknown_terms():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Content.",
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Content.",
                        tags=["quantum-computing"])
-        unknown = check_terminology(loom, "wiki/concepts/a.md")
+        unknown = check_terminology(loom, "wiki/pages/a.md")
         assert "quantum computing" in unknown
 
 
@@ -183,7 +183,7 @@ def test_check_terminology_unknown_terms():
 def test_generate_health_report():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
-        _add_wiki_page(loom, "wiki/concepts/a.md", "A", "Links to [[Missing]].")
+        _add_wiki_page(loom, "wiki/pages/a.md", "A", "Links to [[Missing]].")
 
         result = generate_health_report(loom)
         assert result["broken_links"] == 1

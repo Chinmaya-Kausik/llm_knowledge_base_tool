@@ -31,8 +31,8 @@ def make_chat_with_tools():
         {"role": "thinking", "content": "I should search the wiki", "subagent_id": None},
         {"role": "assistant", "content": "Let me search for that."},
         {"role": "tool", "content": "Grep: transformer in wiki/", "subagent_id": None},
-        {"role": "tool_result", "content": "wiki/concepts/transformers/ABOUT.md:1:# Transformer Architecture", "subagent_id": None},
-        {"role": "tool", "content": "Read: wiki/concepts/transformers/ABOUT.md", "subagent_id": None},
+        {"role": "tool_result", "content": "wiki/pages/transformers/ABOUT.md:1:# Transformer Architecture", "subagent_id": None},
+        {"role": "tool", "content": "Read: wiki/pages/transformers/ABOUT.md", "subagent_id": None},
         {"role": "tool_result", "content": "The Transformer is a neural network architecture...", "subagent_id": None},
         {"role": "assistant", "content": "I found a page about Transformer Architecture. It describes..."},
     ]
@@ -49,9 +49,9 @@ def make_chat_with_subagents():
         {"role": "thinking", "content": "I'll search for machine learning", "subagent_id": "agent-a"},
         {"role": "tool", "content": "Grep: machine learning in wiki/", "subagent_id": "agent-a"},
         {"role": "tool_result", "content": "Found 5 results in wiki/", "subagent_id": "agent-a"},
-        {"role": "tool", "content": "Read: wiki/concepts/gradient-descent/ABOUT.md", "subagent_id": "agent-a"},
+        {"role": "tool", "content": "Read: wiki/pages/gradient-descent/ABOUT.md", "subagent_id": "agent-a"},
         {"role": "tool_result", "content": "Gradient descent content...", "subagent_id": "agent-a"},
-        {"role": "tool", "content": "Read: wiki/concepts/backpropagation/ABOUT.md", "subagent_id": "agent-a"},
+        {"role": "tool", "content": "Read: wiki/pages/backpropagation/ABOUT.md", "subagent_id": "agent-a"},
         {"role": "tool_result", "content": "Backpropagation content...", "subagent_id": "agent-a"},
         # Subagent B's progress (started in parallel)
         {"role": "tool", "content": "Agent: Search projects for code", "subagent_id": None},

@@ -24,7 +24,7 @@ def loom_client(tmp_path):
 
     for d in [
         "raw/inbox", "raw/chats",
-        "wiki/meta", "wiki/concepts/alpha",
+        "wiki/meta", "wiki/pages/alpha",
         "projects/demo",
     ]:
         (root / d).mkdir(parents=True, exist_ok=True)
@@ -36,13 +36,13 @@ def loom_client(tmp_path):
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
     }, "# Glossary\n\n## attention\n\nFocusing on relevant parts of input.\n")
 
-    write_frontmatter(root / "wiki" / "concepts" / "alpha" / "ABOUT.md", {
+    write_frontmatter(root / "wiki" / "pages" / "alpha" / "ABOUT.md", {
         "title": "Alpha Concept", "type": "concept", "status": "compiled",
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "tags": ["ml"], "related": [], "aliases": [], "confidence": "high", "sources": [],
     }, "# Alpha\n\nThis is the alpha concept. It mentions attention and transformers.\n")
 
-    (root / "wiki" / "concepts" / "alpha" / "code.py").write_text(
+    (root / "wiki" / "pages" / "alpha" / "code.py").write_text(
         "def alpha():\n    return 'attention'\n"
     )
 
@@ -137,12 +137,12 @@ class TestSearchAPI:
 class TestBulkPages:
     def test_bulk_pages_returns_content(self, loom_client):
         client, root = loom_client
-        ids = ["wiki/concepts/alpha", "projects/demo"]
+        ids = ["wiki/pages/alpha", "projects/demo"]
         r = client.post("/api/pages/bulk", json=ids)
         assert r.status_code == 200
         data = r.json()
-        assert "wiki/concepts/alpha" in data
-        assert data["wiki/concepts/alpha"]["content"] is not None
+        assert "wiki/pages/alpha" in data
+        assert data["wiki/pages/alpha"]["content"] is not None
 
     def test_bulk_pages_missing_ids(self, loom_client):
         client, root = loom_client
@@ -235,7 +235,7 @@ class TestPlanSecurity:
     def test_put_plan_outside_plans_dir(self, loom_client):
         client, root = loom_client
         r = client.put("/api/plan", json={
-            "path": "wiki/concepts/alpha/ABOUT.md",
+            "path": "wiki/pages/alpha/ABOUT.md",
             "content": "overwrite",
         })
         assert r.json()["ok"] is False
@@ -265,7 +265,7 @@ class TestOpenExternal:
         client, root = loom_client
         with patch("subprocess.Popen") as mock_popen:
             r = client.post("/api/open-external", json={
-                "path": "wiki/concepts/alpha/code.py"
+                "path": "wiki/pages/alpha/code.py"
             })
             assert r.json()["ok"] is True
             mock_popen.assert_called_once()
@@ -290,7 +290,7 @@ class TestTerminalEndpoint:
 class TestMediaServing:
     def test_media_serves_existing_file(self, loom_client):
         client, root = loom_client
-        r = client.get("/media/wiki/concepts/alpha/code.py")
+        r = client.get("/media/wiki/pages/alpha/code.py")
         assert r.status_code == 200
         assert "def alpha" in r.text
 

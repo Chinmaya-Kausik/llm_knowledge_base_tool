@@ -132,14 +132,14 @@ def filename_search(loom_root: Path, query: str, scope: str = "all") -> list[dic
 
 
 def read_index(loom_root: Path, topic: str) -> str:
-    """Read a topic index file from wiki/indexes/.
+    """Read a topic index file from wiki/meta/indexes/.
 
     Args:
         topic: The topic name (used to find the index file).
 
     Returns: The index file content, or an error message if not found.
     """
-    indexes_dir = loom_root / "wiki" / "indexes"
+    indexes_dir = loom_root / "wiki" / "meta" / "indexes"
     if not indexes_dir.exists():
         return f"No indexes directory found."
 
@@ -160,7 +160,7 @@ def read_index(loom_root: Path, topic: str) -> str:
 
 
 def write_index(loom_root: Path, topic: str, content: str) -> dict:
-    """Write or update a topic index file at wiki/indexes/{topic}.md.
+    """Write or update a topic index file at wiki/meta/indexes/{topic}.md.
 
     The LLM uses this to maintain index files with brief summaries of all
     pages in a topic cluster — the key to making Q&A work without RAG.
@@ -171,7 +171,7 @@ def write_index(loom_root: Path, topic: str, content: str) -> dict:
 
     Returns: {path, topic, created}
     """
-    indexes_dir = loom_root / "wiki" / "indexes"
+    indexes_dir = loom_root / "wiki" / "meta" / "indexes"
     indexes_dir.mkdir(parents=True, exist_ok=True)
 
     slug = re.sub(r"[^\w\s-]", "", topic.lower())

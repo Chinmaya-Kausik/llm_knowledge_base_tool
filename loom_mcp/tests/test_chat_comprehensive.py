@@ -34,7 +34,7 @@ def _make_loom(tmp: str) -> Path:
     }, "# Master Index\n\n- **Attention** — core ML concept\n- **BERT** — language model\n- **My App** — project\n")
 
     # A concept folder
-    attn = wiki / "concepts" / "attention"
+    attn = wiki / "pages" / "attention"
     attn.mkdir(parents=True)
     write_frontmatter(attn / "ABOUT.md", {
         "title": "Attention Mechanisms", "type": "concept",
@@ -44,7 +44,7 @@ def _make_loom(tmp: str) -> Path:
     (attn / "query.py").write_text("def compute_query(x):\n    return x @ W_q\n")
 
     # A standalone markdown file
-    bert = wiki / "concepts" / "bert"
+    bert = wiki / "pages" / "bert"
     bert.mkdir(parents=True)
     write_frontmatter(bert / "ABOUT.md", {
         "title": "BERT", "type": "concept",
@@ -73,10 +73,10 @@ class TestBuildPrompt:
     def test_with_selection_context(self):
         prompt = build_prompt("Explain this", {
             "selection": "return x @ W_q",
-            "selection_file": "wiki/concepts/attention/query.py",
+            "selection_file": "wiki/pages/attention/query.py",
         }, "s1", Path("/tmp"))
         assert "return x @ W_q" in prompt
-        assert "wiki/concepts/attention/query.py" in prompt
+        assert "wiki/pages/attention/query.py" in prompt
         assert "Explain this" in prompt
 
     def test_selection_none_ignored(self):
@@ -101,7 +101,7 @@ class TestBuildSystemPrompt:
     def test_page_level_with_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-page-file"] = {"page_path": "wiki/concepts/attention/query.py"}
+            sessions["test-page-file"] = {"page_path": "wiki/pages/attention/query.py"}
             prompt = build_system_prompt("test-page-file", loom, "page")
             assert "compute_query" in prompt
             # Should also include parent README
@@ -110,7 +110,7 @@ class TestBuildSystemPrompt:
     def test_page_level_with_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-page-folder"] = {"page_path": "wiki/concepts/attention"}
+            sessions["test-page-folder"] = {"page_path": "wiki/pages/attention"}
             prompt = build_system_prompt("test-page-folder", loom, "page")
             assert "Attention" in prompt
 
@@ -126,7 +126,7 @@ class TestBuildSystemPrompt:
     def test_folder_level(self):
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-folder"] = {"page_path": "wiki/concepts/attention"}
+            sessions["test-folder"] = {"page_path": "wiki/pages/attention"}
             prompt = build_system_prompt("test-folder", loom, "folder")
             assert "Attention" in prompt
             assert "browsing folder" in prompt.lower()
@@ -135,7 +135,7 @@ class TestBuildSystemPrompt:
         """When page_path is a file, folder level should use its parent."""
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-folder-file"] = {"page_path": "wiki/concepts/attention/query.py"}
+            sessions["test-folder-file"] = {"page_path": "wiki/pages/attention/query.py"}
             prompt = build_system_prompt("test-folder-file", loom, "folder")
             # Should show the attention folder README, not the py file
             assert "Attention" in prompt
@@ -143,7 +143,7 @@ class TestBuildSystemPrompt:
     def test_global_level(self):
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-global"] = {"page_path": "wiki/concepts/attention"}
+            sessions["test-global"] = {"page_path": "wiki/pages/attention"}
             prompt = build_system_prompt("test-global", loom, "global")
             assert "Master Index" in prompt
             assert "Attention" in prompt
@@ -182,7 +182,7 @@ class TestBuildSystemPrompt:
     def test_context_level_invalid_defaults_gracefully(self):
         with tempfile.TemporaryDirectory() as tmp:
             loom = _make_loom(tmp)
-            sessions["test-invalid"] = {"page_path": "wiki/concepts/attention"}
+            sessions["test-invalid"] = {"page_path": "wiki/pages/attention"}
             prompt = build_system_prompt("test-invalid", loom, "invalid_level")
             assert "knowledge base" in prompt.lower()
 
@@ -194,8 +194,8 @@ class TestBuildSystemPrompt:
 class TestSessionManagement:
     def test_session_stores_page_path(self):
         sessions.clear()
-        sessions["s1"] = {"page_path": "wiki/concepts/attention"}
-        assert sessions["s1"]["page_path"] == "wiki/concepts/attention"
+        sessions["s1"] = {"page_path": "wiki/pages/attention"}
+        assert sessions["s1"]["page_path"] == "wiki/pages/attention"
 
     def test_session_page_path_update(self):
         sessions["s2"] = {"page_path": "old/path"}

@@ -15,7 +15,7 @@ def test_load_missing_file():
 def test_save_and_load_roundtrip():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "registry.json"
-        registry = {"pages": [{"title": "Test", "path": "concepts/test.md", "aliases": []}]}
+        registry = {"pages": [{"title": "Test", "path": "pages/test.md", "aliases": []}]}
         save_registry(path, registry)
         loaded = load_registry(path)
         assert loaded == registry
@@ -23,15 +23,15 @@ def test_save_and_load_roundtrip():
 
 def test_add_page_new():
     registry = {"pages": []}
-    registry = add_page(registry, "Foo", "concepts/foo.md", ["Bar"])
+    registry = add_page(registry, "Foo", "pages/foo.md", ["Bar"])
     assert len(registry["pages"]) == 1
     assert registry["pages"][0]["title"] == "Foo"
     assert registry["pages"][0]["aliases"] == ["Bar"]
 
 
 def test_add_page_update_existing():
-    registry = {"pages": [{"title": "Old", "path": "concepts/foo.md", "aliases": []}]}
-    registry = add_page(registry, "New", "concepts/foo.md", ["Alias"])
+    registry = {"pages": [{"title": "Old", "path": "pages/foo.md", "aliases": []}]}
+    registry = add_page(registry, "New", "pages/foo.md", ["Alias"])
     assert len(registry["pages"]) == 1
     assert registry["pages"][0]["title"] == "New"
 

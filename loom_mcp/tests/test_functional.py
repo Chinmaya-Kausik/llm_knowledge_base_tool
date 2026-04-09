@@ -47,7 +47,7 @@ def _make_loom(tmp_path: Path) -> Path:
     # Standard directories
     for d in [
         "raw/inbox", "raw/chats",
-        "wiki/meta", "wiki/concepts",
+        "wiki/meta", "wiki/pages",
         "projects/demo",
     ]:
         (root / d).mkdir(parents=True, exist_ok=True)
@@ -78,7 +78,7 @@ def _make_loom(tmp_path: Path) -> Path:
     )
 
     # A concept folder page
-    transformers = root / "wiki" / "concepts" / "transformers"
+    transformers = root / "wiki" / "pages" / "transformers"
     transformers.mkdir(parents=True)
     write_frontmatter(
         transformers / "ABOUT.md",
@@ -414,7 +414,7 @@ class TestChatSaveCompleteness:
             {"role": "tool_result", "content": "Found 3 matches in attention.py"},
             {"role": "assistant", "content": "I found references to transformers in the loom."},
             {"role": "user", "content": "Can you read one of those files?"},
-            {"role": "tool", "content": "Read: wiki/concepts/transformers/attention.py"},
+            {"role": "tool", "content": "Read: wiki/pages/transformers/attention.py"},
             {"role": "tool_result", "content": "def self_attention(Q, K, V): ..."},
             {"role": "assistant", "content": "The file implements self-attention with Q, K, V matrices."},
         ]
@@ -594,7 +594,7 @@ class TestPageRead:
         """GET /api/page/{path} returns frontmatter and content."""
         client, root = loom_client
 
-        resp = client.get("/api/page/wiki/concepts/transformers/ABOUT.md")
+        resp = client.get("/api/page/wiki/pages/transformers/ABOUT.md")
         assert resp.status_code == 200
         data = resp.json()
 
@@ -607,7 +607,7 @@ class TestPageRead:
         """Content returned by page read should NOT contain YAML frontmatter markers."""
         client, root = loom_client
 
-        resp = client.get("/api/page/wiki/concepts/transformers/ABOUT.md")
+        resp = client.get("/api/page/wiki/pages/transformers/ABOUT.md")
         data = resp.json()
         content = data["content"]
 
@@ -630,7 +630,7 @@ class TestPageRead:
         """Reading a code file (non-markdown) should also work."""
         client, root = loom_client
 
-        resp = client.get("/api/page/wiki/concepts/transformers/attention.py")
+        resp = client.get("/api/page/wiki/pages/transformers/attention.py")
         assert resp.status_code == 200
         data = resp.json()
         assert "self_attention" in data["content"]
@@ -651,7 +651,7 @@ class TestWebSocketProtocol:
             ws.send_json({
                 "type": "init",
                 "session_id": "proto-init",
-                "page_path": "wiki/concepts/transformers",
+                "page_path": "wiki/pages/transformers",
             })
             resp = ws.receive_json()
             assert resp["type"] == "init"

@@ -21,7 +21,7 @@ from loom_mcp.tools.compile import (
 def _make_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
     (root / "raw" / "inbox").mkdir(parents=True)
-    (root / "wiki" / "concepts").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
     (root / "wiki" / "meta").mkdir(parents=True)
     (root / "wiki" / "meta" / "page-registry.json").write_text('{"pages": []}')
     write_frontmatter(
@@ -128,10 +128,10 @@ def test_write_wiki_page_creates_file_and_updates_registry():
             "tags": ["ml"], "related": [], "aliases": ["Vaswani"],
             "confidence": "high",
         }
-        result = write_wiki_page(loom, "wiki/concepts/transformers.md", fm, "# Transformers\n\nContent.")
+        result = write_wiki_page(loom, "wiki/pages/transformers.md", fm, "# Transformers\n\nContent.")
         assert result["is_new"] is True
         assert result["title"] == "Transformers"
-        assert (loom / "wiki" / "concepts" / "transformers.md").exists()
+        assert (loom / "wiki" / "pages" / "transformers.md").exists()
 
         # Registry updated
         registry = json.loads((loom / "wiki" / "meta" / "page-registry.json").read_text())
@@ -148,9 +148,9 @@ def test_write_wiki_page_update_existing():
               "source_hash": "a", "compiler_model": "claude", "compiler_prompt_version": "v1",
               "sources": [], "tags": [], "related": [], "aliases": [], "confidence": "high"}
 
-        write_wiki_page(loom, "wiki/concepts/test.md", fm, "V1")
+        write_wiki_page(loom, "wiki/pages/test.md", fm, "V1")
         fm["source_hash"] = "b"
-        result = write_wiki_page(loom, "wiki/concepts/test.md", fm, "V2")
+        result = write_wiki_page(loom, "wiki/pages/test.md", fm, "V2")
         assert result["is_new"] is False
 
         registry = json.loads((loom / "wiki" / "meta" / "page-registry.json").read_text())

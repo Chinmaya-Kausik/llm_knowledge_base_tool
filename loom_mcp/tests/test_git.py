@@ -10,7 +10,7 @@ from loom_mcp.tools.git import auto_commit, get_recent_changes
 
 def _make_git_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
-    (root / "wiki" / "concepts").mkdir(parents=True)
+    (root / "wiki" / "pages").mkdir(parents=True)
     (root / "wiki" / "meta").mkdir(parents=True)
     subprocess.run(["git", "init"], cwd=str(root), capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=str(root), capture_output=True)
@@ -33,7 +33,7 @@ def test_auto_commit_with_changes():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_git_loom(tmp)
         write_frontmatter(
-            loom / "wiki" / "concepts" / "test.md",
+            loom / "wiki" / "pages" / "test.md",
             {"title": "Test"},
             "Content.",
         )
@@ -48,7 +48,7 @@ def test_auto_commit_only_stages_wiki():
         loom = _make_git_loom(tmp)
         # Create file outside wiki/
         (loom / "other.txt").write_text("Not wiki.")
-        write_frontmatter(loom / "wiki" / "concepts" / "a.md", {"title": "A"}, "Wiki content.")
+        write_frontmatter(loom / "wiki" / "pages" / "a.md", {"title": "A"}, "Wiki content.")
 
         auto_commit(loom, "Wiki only")
 
@@ -71,7 +71,7 @@ def test_get_recent_changes():
 def test_get_recent_changes_after_commit():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_git_loom(tmp)
-        write_frontmatter(loom / "wiki" / "concepts" / "a.md", {"title": "A"}, "Content.")
+        write_frontmatter(loom / "wiki" / "pages" / "a.md", {"title": "A"}, "Content.")
         auto_commit(loom, "Add A")
 
         changes = get_recent_changes(loom, n=5)

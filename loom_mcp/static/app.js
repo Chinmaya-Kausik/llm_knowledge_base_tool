@@ -2151,7 +2151,7 @@ function createPanelHeader(panelId, label = 'Chat') {
       closeMenu = false;
     } else if (action === 'browse') {
       // Show a prompt for custom path (simple for now, tree picker later)
-      const path = prompt('Enter loom path for context (e.g., wiki/concepts/attention):');
+      const path = prompt('Enter loom path for context (e.g., wiki/pages/attention):');
       if (path) {
         panel.contextPath = path;
         panel.contextLevel = 'page'; // Will use the custom path

@@ -9,7 +9,7 @@ from loom_mcp.tools.search import read_index, write_index
 
 def _make_loom(tmp: str) -> Path:
     root = Path(tmp) / "loom"
-    (root / "wiki" / "indexes").mkdir(parents=True)
+    (root / "wiki" / "meta" / "indexes").mkdir(parents=True)
     return root
 
 
@@ -34,11 +34,11 @@ def test_write_index_update_preserves_created():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         write_index(loom, "NLP", "Version 1")
-        meta1, _ = read_frontmatter(loom / "wiki" / "indexes" / "nlp.md")
+        meta1, _ = read_frontmatter(loom / "wiki" / "meta" / "indexes" / "nlp.md")
         created1 = meta1["created"]
 
         write_index(loom, "NLP", "Version 2")
-        meta2, content2 = read_frontmatter(loom / "wiki" / "indexes" / "nlp.md")
+        meta2, content2 = read_frontmatter(loom / "wiki" / "meta" / "indexes" / "nlp.md")
         assert meta2["created"] == created1
         assert "Version 2" in content2
 
@@ -55,7 +55,7 @@ def test_write_index_frontmatter():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         write_index(loom, "Deep Learning", "Content here")
-        meta, _ = read_frontmatter(loom / "wiki" / "indexes" / "deep-learning.md")
+        meta, _ = read_frontmatter(loom / "wiki" / "meta" / "indexes" / "deep-learning.md")
         assert meta["type"] == "index"
         assert meta["status"] == "compiled"
         assert "Deep Learning" in meta["title"]

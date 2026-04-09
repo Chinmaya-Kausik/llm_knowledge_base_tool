@@ -97,7 +97,7 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 ### Bootstrap
 
 On startup (`lifespan`), `bootstrap_loom()` creates (if missing):
-- Directory structure: `raw/{inbox,articles,papers,repos,media}`, `wiki/{concepts,summaries,indexes,answers,meta,meta/memory}`, `outputs/{slides,reports,visualizations}`
+- Directory structure: `raw/{inbox,articles,papers,repos,media}`, `wiki/{pages,meta,meta/indexes,meta/memory}`, `outputs/{slides,reports,visualizations}`
 - `page-registry.json` and `glossary.md`
 - `.claude/mcp.json` — registers the MCP server so the Agent SDK subprocess can find loom tools
 - `.claude/settings.json` — copies hooks (e.g., mdformat after wiki page writes) from the repo
