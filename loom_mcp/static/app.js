@@ -1215,16 +1215,17 @@ function openSplitView(leftConfig, rightConfig) {
   function makePane(config, side) {
     const pane = document.createElement('div');
     pane.className = `split-pane ${side}`;
+    const btnLabel = side === 'left' ? '← Back' : '✕ Close';
+    const btnTitle = side === 'left' ? 'Return to canvas' : 'Close this pane';
     pane.innerHTML = `
       <div class="split-pane-header">
-        <button class="split-back" title="Close split view">← Back</button>
+        <button class="split-back" title="${btnTitle}">${btnLabel}</button>
         <span class="split-title">${config.title}</span>
         <span class="split-path">${config.path || ''}</span>
         <span style="flex:1"></span>
       </div>
       <div class="split-pane-content"></div>
     `;
-    pane.querySelector('.split-back').onclick = closeSplitView;
     // Store header for adding buttons
     pane._header = pane.querySelector('.split-pane-header');
     pane._content = pane.querySelector('.split-pane-content');
@@ -1237,6 +1238,28 @@ function openSplitView(leftConfig, rightConfig) {
   overlay.appendChild(rightPane);
   document.getElementById('canvas-container').appendChild(overlay);
   splitOverlay = overlay;
+
+  // Left back: close everything, return to canvas
+  leftPane.querySelector('.split-back').onclick = () => {
+    splitOverlay = null;
+    overlay.remove();
+  };
+  // Right close: close PDF pane, return to fullpage editor
+  rightPane.querySelector('.split-back').onclick = () => {
+    const sourcePath = overlay._sourcePath;
+    splitOverlay = null;
+    overlay.remove();
+    if (sourcePath) {
+      const nd = nodeById(sourcePath);
+      if (nd) {
+        const fakeCard = document.createElement('div');
+        fakeCard.dataset.path = sourcePath;
+        fakeCard.dataset.isFolder = 'false';
+        fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
+        expandCardFullPage(fakeCard);
+      }
+    }
+  };
 
   // Store pane refs on overlay for external access
   overlay._leftPane = leftPane;
@@ -1257,21 +1280,8 @@ function openSplitView(leftConfig, rightConfig) {
 
 function closeSplitView() {
   if (splitOverlay) {
-    // If there's a source path, re-open as fullpage
-    const sourcePath = splitOverlay._sourcePath;
     splitOverlay.remove();
     splitOverlay = null;
-    if (sourcePath) {
-      // Re-open the source file in fullpage mode
-      const nd = nodeById(sourcePath);
-      if (nd) {
-        const fakeCard = document.createElement('div');
-        fakeCard.dataset.path = sourcePath;
-        fakeCard.dataset.isFolder = 'false';
-        fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
-        expandCardFullPage(fakeCard);
-      }
-    }
   }
 }
 
