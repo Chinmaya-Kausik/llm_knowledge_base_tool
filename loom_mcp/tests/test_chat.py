@@ -6,7 +6,7 @@ from pathlib import Path
 from loom_mcp.lib.frontmatter import write_frontmatter
 from loom_mcp.chat import (
     build_prompt, build_system_prompt, sessions,
-    _permissions_block, _memory_block, _location_block, _load_context_config,
+    _permissions_block, _memory_block, _location_block_adaptive, _load_context_config,
 )
 
 
@@ -189,23 +189,23 @@ def test_memory_block_no_memory():
         assert result is None
 
 
-def test_location_block_page():
+def test_location_block_adaptive_page():
     """Location block injects page content + parent README."""
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         config = {"page_content": {"enabled": True, "max_chars": 8000}, "folder_readme": {"enabled": True}}
-        result = _location_block(loom, "wiki/attention/query.py", "page", config)
+        result = _location_block_adaptive(loom, "wiki/attention/query.py", "page", config, 12000)
         assert result is not None
         assert "compute_query" in result
         assert "Attention" in result
 
 
-def test_location_block_page_disabled():
+def test_location_block_adaptive_page_disabled():
     """Location block respects page_content.enabled."""
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         config = {"page_content": {"enabled": False}, "folder_readme": {"enabled": True}}
-        result = _location_block(loom, "wiki/attention/query.py", "page", config)
+        result = _location_block_adaptive(loom, "wiki/attention/query.py", "page", config, 12000)
         # No page content, but folder README might still appear
         assert result is None or "compute_query" not in result
 
@@ -248,3 +248,96 @@ def test_system_prompt_preset_format():
         # Should be a string (the append value for preset format)
         assert isinstance(prompt, str)
         assert len(prompt) > 0
+
+
+# --- adaptive budget tests ---
+
+def test_adaptive_budget_small_file():
+    """Small files get full content injected."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loom = _make_loom(tmp)
+        config = {"page_content": {"enabled": True}, "folder_readme": {"enabled": True}}
+        result = _location_block_adaptive(loom, "wiki/attention/query.py", "page", config, 12000)
+        assert result is not None
+        assert "compute_query" in result  # Full content present
+
+
+def test_adaptive_budget_large_file_over_budget():
+    """Large files exceeding budget get 'read on demand' treatment."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loom = _make_loom(tmp)
+        # Create a file larger than the budget
+        large = loom / "big.py"
+        large.write_text("x = 1\n" * 5000)
+        config = {"page_content": {"enabled": True}, "folder_readme": {"enabled": True}}
+        # Tiny budget
+        result = _location_block_adaptive(loom, "big.py", "page", config, 500)
+        assert result is not None
+        assert "read on demand" in result
+        assert "x = 1" not in result
+
+
+def test_adaptive_budget_parent_skipped_when_tight():
+    """Parent ABOUT.md skipped when budget is tight after page content."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loom = _make_loom(tmp)
+        config = {"page_content": {"enabled": True}, "folder_readme": {"enabled": True}}
+        # Budget just enough for the file content, not the parent
+        result = _location_block_adaptive(loom, "wiki/attention/query.py", "page", config, 300)
+        assert result is not None
+        # Should have file path but parent may be omitted
+        assert "query.py" in result
+
+
+def test_adaptive_budget_config_total():
+    """Total budget from config controls prompt size."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loom = _make_loom(tmp)
+        (loom / "config.yaml").write_text("context:\n  total_budget_chars: 500\n")
+        config = _load_context_config(loom)
+        assert config["total_budget_chars"] == 500
+
+
+def test_adaptive_budget_global_truncated():
+    """Global master index truncated when over budget."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loom = _make_loom(tmp)
+        # Create a large master index
+        meta = loom / "wiki" / "meta"
+        write_frontmatter(meta / "index.md", {"title": "Index"}, "x" * 5000)
+        config = {"page_content": {"enabled": True}, "folder_readme": {"enabled": True}}
+        result = _location_block_adaptive(loom, "wiki/attention", "global", config, 500)
+        assert result is not None
+        assert "truncated" in result
+
+
+# --- precompact metadata tests ---
+
+def test_precompact_files_in_transcript():
+    """Precompact file paths saved in transcript frontmatter."""
+    with tempfile.TemporaryDirectory() as tmp:
+        from loom_mcp.tools.compile import save_chat_transcript
+        from loom_mcp.lib.frontmatter import read_frontmatter
+        root = Path(tmp)
+        result = save_chat_transcript(root, "s1", [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+        ], precompact_files=["raw/chats/s1_precompact_1.md", "raw/chats/s1_precompact_2.md"])
+        saved = root / result["path"]
+        meta, _ = read_frontmatter(saved)
+        assert meta.get("precompact_files") == ["raw/chats/s1_precompact_1.md", "raw/chats/s1_precompact_2.md"]
+
+
+def test_no_precompact_files_when_empty():
+    """No precompact_files field when list is empty."""
+    with tempfile.TemporaryDirectory() as tmp:
+        from loom_mcp.tools.compile import save_chat_transcript
+        from loom_mcp.lib.frontmatter import read_frontmatter
+        root = Path(tmp)
+        result = save_chat_transcript(root, "s1", [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+        ], precompact_files=[])
+        saved = root / result["path"]
+        meta, _ = read_frontmatter(saved)
+        assert "precompact_files" not in meta

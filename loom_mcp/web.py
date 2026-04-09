@@ -829,6 +829,69 @@ async def api_save_chat(request: Request):
     return {"ok": True, **result}
 
 
+@app.post("/api/chat/summarize-precompact")
+async def api_summarize_precompact(request: Request):
+    """Serially summarize pre-compaction snapshots for chat continuation.
+
+    Expects: {precompact_files: ["raw/chats/abc_precompact_1.md", ...]}
+    Returns: {ok, summary} — a combined summary of all pre-compaction chunks.
+    """
+    body = await request.json()
+    precompact_files = body.get("precompact_files", [])
+    if not precompact_files:
+        return {"ok": True, "summary": ""}
+
+    from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+
+    combined_summary = ""
+    for i, rel_path in enumerate(precompact_files):
+        full_path = (LOOM_ROOT / rel_path).resolve()
+        if not full_path.exists():
+            continue
+
+        try:
+            chunk_content = full_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        # Truncate chunk if extremely long (shouldn't happen, but safety)
+        if len(chunk_content) > 100000:
+            chunk_content = chunk_content[:100000] + "\n\n[... truncated ...]"
+
+        context = ""
+        if combined_summary:
+            context = f"Summary of earlier conversation:\n{combined_summary}\n\n"
+
+        prompt = f"""{context}Summarize the following conversation chunk into a concise summary (2-4 paragraphs). Preserve key decisions, technical details, file paths, and action items. This summary will be used to restore context when continuing the conversation.
+
+Conversation chunk {i + 1}:
+{chunk_content}
+
+Write ONLY the summary, nothing else."""
+
+        try:
+            summary_text = ""
+            async for event in query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    cwd=str(LOOM_ROOT),
+                    permission_mode="auto",
+                    model="sonnet",
+                    max_turns=1,
+                ),
+            ):
+                if isinstance(event, ResultMessage):
+                    summary_text = getattr(event, "result", "") or ""
+
+            if summary_text:
+                combined_summary = (combined_summary + "\n\n" + summary_text).strip() if combined_summary else summary_text
+
+        except Exception as e:
+            return {"ok": False, "error": f"Failed to summarize chunk {i + 1}: {str(e)}"}
+
+    return {"ok": True, "summary": combined_summary}
+
+
 @app.post("/api/chat/generate-title")
 async def api_generate_chat_title(request: Request):
     """Generate a title and filename slug for a chat using Haiku.

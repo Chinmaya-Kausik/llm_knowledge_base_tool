@@ -171,7 +171,10 @@ def _load_context_config(loom_root: Path) -> dict:
         ctx = data.get("context", {})
         for key in defaults:
             if key in ctx:
-                defaults[key].update(ctx[key])
+                if isinstance(defaults[key], dict):
+                    defaults[key].update(ctx[key])
+                else:
+                    defaults[key] = ctx[key]
         return defaults
     except Exception:
         return defaults

@@ -4598,12 +4598,39 @@ function buildDetailsElement(html) {
   }
 }
 
-function continueSavedChat(path, content) {
+async function continueSavedChat(path, content) {
   if (!content.trim()) return;
 
   // Extract title from first line (# Title)
   const titleMatch = content.match(/^# (.+)/m);
   const label = titleMatch ? titleMatch[1] : path.split('/').pop();
+
+  // Check for precompact files in frontmatter
+  let precompactSummary = null;
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (frontmatterMatch) {
+    const fmText = frontmatterMatch[1];
+    const pcMatch = fmText.match(/precompact_files:\s*\n((?:\s*-\s*.+\n?)*)/);
+    if (pcMatch) {
+      const files = pcMatch[1].match(/-\s*(.+)/g)?.map(l => l.replace(/^-\s*/, '').trim()) || [];
+      if (files.length > 0) {
+        console.log('[Continue] Summarizing', files.length, 'precompact chunks...');
+        try {
+          const resp = await fetch('/api/chat/summarize-precompact', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ precompact_files: files }),
+          });
+          const data = await resp.json();
+          if (data.ok && data.summary) {
+            precompactSummary = data.summary;
+            console.log('[Continue] Summary generated:', precompactSummary.length, 'chars');
+          }
+        } catch (e) {
+          console.warn('[Continue] Failed to summarize precompact:', e);
+        }
+      }
+    }
+  }
 
   // Create floating panel
   const panel = createFloatingPanel({ label: `${label} (continued)` });
@@ -4667,11 +4694,23 @@ function continueSavedChat(path, content) {
   sep.textContent = '— continued from saved chat —';
   messagesEl.appendChild(sep);
 
-  // Inject the full transcript as context for the first message
-  panel._forkedHistory = [
-    { role: 'user', content: 'Here is our previous conversation transcript:' },
-    { role: 'assistant', content: content },
-  ];
+  // Inject context for the first message
+  if (precompactSummary) {
+    // Compacted chat: inject summary of older messages + recent transcript
+    // Strip frontmatter from content for the recent part
+    const recentContent = content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+    panel._forkedHistory = [
+      { role: 'user', content: 'Summary of our earlier conversation (before context compaction):\n\n' + precompactSummary },
+      { role: 'assistant', content: 'I have the context from our earlier conversation. Here is the recent part:' },
+      { role: 'user', content: recentContent },
+    ];
+  } else {
+    // No compaction: inject full transcript
+    panel._forkedHistory = [
+      { role: 'user', content: 'Here is our previous conversation transcript:' },
+      { role: 'assistant', content: content },
+    ];
+  }
 
   // Track source file so on close we append instead of creating a new file
   panel._continuedFromPath = path;
