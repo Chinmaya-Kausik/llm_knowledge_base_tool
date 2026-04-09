@@ -994,69 +994,68 @@ function expandCardFullPage(card, highlightQuery) {
   const contentEl = overlay.querySelector('.fullpage-content');
 
   if (path.endsWith('.tex')) {
-    // TeX file: code editor + compile button + PDF preview pane
-    overlay.querySelector('.fullpage-toggle').style.display = 'none';
+    // TeX file: open split view with editor left, PDF right
+    // Remove the regular fullpage overlay — we'll use split view instead
+    overlay.remove();
+    expandedCard = null;
 
-    // Add compile button to header
-    const compileBtn = document.createElement('button');
-    compileBtn.className = 'fullpage-chat';
-    compileBtn.textContent = 'Compile';
-    compileBtn.title = 'Compile to PDF (latexmk)';
-    overlay.querySelector('.fullpage-header').insertBefore(
-      compileBtn, overlay.querySelector('.fullpage-toggle')
-    );
-
-    // Split layout: editor left, PDF right
-    contentEl.classList.add('tex-split');
-    const editorPane = document.createElement('div');
-    editorPane.className = 'tex-editor-pane';
-    const pdfPane = document.createElement('div');
-    pdfPane.className = 'tex-pdf-pane';
-    pdfPane.style.display = 'none';
-    contentEl.appendChild(editorPane);
-    contentEl.appendChild(pdfPane);
-
-    createCodeEditor(editorPane, rawContent, path).then(view => {
-      overlay._cmView = view;
-      view.dom.addEventListener('keydown', (ev) => {
-        const m = ev.metaKey || ev.ctrlKey;
-        if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
-      });
-    });
-
-    // Check if PDF already exists
     const pdfPath = path.replace(/\.tex$/, '.pdf');
-    fetch(`/media/${pdfPath}`, { method: 'HEAD' }).then(r => {
-      if (r.ok) {
-        pdfPane.style.display = '';
-        renderPdfInElement(pdfPane, `/media/${pdfPath}`);
-      }
-    }).catch(() => {});
+    let pdfPaneContent = null;
 
-    compileBtn.onclick = async () => {
-      compileBtn.textContent = 'Compiling...';
-      compileBtn.disabled = true;
-      try {
-        const resp = await fetch('/api/compile-tex', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path }),
-        });
-        const data = await resp.json();
-        if (data.ok) {
-          pdfPane.style.display = '';
-          await renderPdfInElement(pdfPane, `/media/${data.pdf_path}?t=${Date.now()}`);
+    openSplitView(
+      {
+        title: title,
+        path: path,
+        render: (contentEl, headerEl) => {
+          createCodeEditor(contentEl, rawContent, path);
+        },
+      },
+      {
+        title: path.replace(/\.tex$/, '.pdf').split('/').pop(),
+        path: pdfPath,
+        render: (contentEl, headerEl) => {
+          pdfPaneContent = contentEl;
+
+          // Add compile button to right pane header
+          const compileBtn = document.createElement('button');
           compileBtn.textContent = 'Compile';
-        } else {
-          pdfPane.style.display = '';
-          pdfPane.innerHTML = `<pre class="tex-error">${data.log || data.error}</pre>`;
-          compileBtn.textContent = 'Compile (failed)';
-        }
-      } catch (e) {
-        compileBtn.textContent = 'Compile (error)';
+          compileBtn.title = 'Compile to PDF (latexmk)';
+          headerEl.querySelector('[style="flex:1"]').after(compileBtn);
+
+          compileBtn.onclick = async () => {
+            compileBtn.textContent = 'Compiling...';
+            compileBtn.disabled = true;
+            try {
+              const resp = await fetch('/api/compile-tex', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path }),
+              });
+              const data = await resp.json();
+              if (data.ok) {
+                await renderPdfInElement(contentEl, `/media/${data.pdf_path}?t=${Date.now()}`);
+                compileBtn.textContent = 'Compile';
+              } else {
+                contentEl.innerHTML = `<pre class="tex-error">${data.log || data.error}</pre>`;
+                compileBtn.textContent = 'Compile (failed)';
+              }
+            } catch (e) {
+              compileBtn.textContent = 'Compile (error)';
+            }
+            compileBtn.disabled = false;
+          };
+
+          // Check if PDF already exists
+          fetch(`/media/${pdfPath}`, { method: 'HEAD' }).then(r => {
+            if (r.ok) renderPdfInElement(contentEl, `/media/${pdfPath}`);
+            else contentEl.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center;">Click Compile to generate PDF</div>';
+          }).catch(() => {
+            contentEl.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center;">Click Compile to generate PDF</div>';
+          });
+        },
       }
-      compileBtn.disabled = false;
-    };
+    );
+    return; // Don't continue with regular fullpage setup
   } else if (isCodeFile(path)) {
     // Render code files with CodeMirror
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
@@ -1194,6 +1193,69 @@ function collapseFullPage() {
       switchView(fullpageReturnView);
       fullpageReturnView = null;
     }
+  }
+}
+
+// ========================================
+// Split View (two files side by side)
+// ========================================
+let splitOverlay = null;
+
+function openSplitView(leftConfig, rightConfig) {
+  // leftConfig/rightConfig: { title, path, render: async (contentEl) => void }
+  closeSplitView();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'split-overlay';
+  overlay.id = 'split-overlay';
+
+  function makePane(config, side) {
+    const pane = document.createElement('div');
+    pane.className = `split-pane ${side}`;
+    pane.innerHTML = `
+      <div class="split-pane-header">
+        <button class="split-back" title="Close split view">← Back</button>
+        <span class="split-title">${config.title}</span>
+        <span class="split-path">${config.path || ''}</span>
+        <span style="flex:1"></span>
+      </div>
+      <div class="split-pane-content"></div>
+    `;
+    pane.querySelector('.split-back').onclick = closeSplitView;
+    // Store header for adding buttons
+    pane._header = pane.querySelector('.split-pane-header');
+    pane._content = pane.querySelector('.split-pane-content');
+    return pane;
+  }
+
+  const leftPane = makePane(leftConfig, 'left');
+  const rightPane = makePane(rightConfig, 'right');
+  overlay.appendChild(leftPane);
+  overlay.appendChild(rightPane);
+  document.getElementById('canvas-container').appendChild(overlay);
+  splitOverlay = overlay;
+
+  // Store pane refs on overlay for external access
+  overlay._leftPane = leftPane;
+  overlay._rightPane = rightPane;
+
+  // Render content
+  leftConfig.render(leftPane._content, leftPane._header);
+  rightConfig.render(rightPane._content, rightPane._header);
+
+  // Escape to close
+  function onKey(e) {
+    if (e.key === 'Escape') { closeSplitView(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+
+  return overlay;
+}
+
+function closeSplitView() {
+  if (splitOverlay) {
+    splitOverlay.remove();
+    splitOverlay = null;
   }
 }
 
@@ -4773,11 +4835,12 @@ async function renderPdfInElement(container, pdfUrl) {
     container.className = 'pdf-container';
 
     const containerWidth = container.clientWidth || 600;
+    const dpr = window.devicePixelRatio || 1;
 
     const numPages = Math.min(pdf.numPages, 50); // Cap at 50 pages for performance
     for (let i = 1; i <= numPages; i++) {
       const page = await pdf.getPage(i);
-      // Scale to fit container width with some padding
+      // Scale to fit container width with padding
       const baseViewport = page.getViewport({ scale: 1 });
       const scale = Math.min((containerWidth - 32) / baseViewport.width, 2);
       const viewport = page.getViewport({ scale });
@@ -4787,13 +4850,16 @@ async function renderPdfInElement(container, pdfUrl) {
       wrapper.style.width = viewport.width + 'px';
       wrapper.style.height = viewport.height + 'px';
 
-      // Canvas for rendering
+      // Canvas for rendering — render at device pixel ratio for retina sharpness
       const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      canvas.width = viewport.width * dpr;
+      canvas.height = viewport.height * dpr;
+      canvas.style.width = viewport.width + 'px';
+      canvas.style.height = viewport.height + 'px';
       wrapper.appendChild(canvas);
 
       const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
       await page.render({ canvasContext: ctx, viewport }).promise;
 
       // Text layer for selection
