@@ -515,6 +515,55 @@ def _serialize_dict(d: dict) -> dict:
 
 # --- API Endpoints ---
 
+@app.get("/api/children/{path:path}")
+def api_children(path: str, show_internals: bool = False):
+    """Get immediate children of a folder (for lazy-loading on drill-in)."""
+    from loom_mcp.lib.pages import walk_pages, get_page_content, get_page_metadata, get_page_title, is_hidden, is_loom_internal, get_filetype_category
+    full_path = (LOOM_ROOT / path).resolve()
+    loom_resolved = LOOM_ROOT.resolve()
+    if not str(full_path).startswith(str(loom_resolved)) or not full_path.is_dir():
+        raise HTTPException(404, "Not a folder")
+
+    children = []
+    try:
+        items = sorted(full_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    except (PermissionError, OSError):
+        return {"children": []}
+
+    for item in items:
+        if is_hidden(item):
+            continue
+        if not show_internals and is_loom_internal(item):
+            continue
+        if item.is_symlink():
+            continue
+        if item.name in ("ABOUT.md", "MEMORY.md"):
+            continue
+
+        rel = str(item.relative_to(LOOM_ROOT))
+        meta = get_page_metadata(item)
+        content = get_page_content(item) if item.is_dir() or item.suffix == ".md" else ""
+
+        children.append({
+            "data": {
+                "id": rel,
+                "label": item.name,
+                "path": rel,
+                "is_folder": item.is_dir(),
+                "parent_id": path,
+                "children": [],
+                "type": meta.get("type", "folder" if item.is_dir() else get_filetype_category(item)),
+                "category": "folder" if item.is_dir() else get_filetype_category(item),
+                "status": meta.get("status", ""),
+                "tags": meta.get("tags", []),
+                "has_readme": (item / "ABOUT.md").exists() if item.is_dir() else False,
+                "content": content[:8000] if content else "",
+            }
+        })
+
+    return {"children": children}
+
+
 @app.get("/api/graph")
 def api_graph(show_internals: bool = False):
     return build_graph_v2(LOOM_ROOT, show_internals=show_internals)

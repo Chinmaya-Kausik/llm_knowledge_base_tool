@@ -669,9 +669,34 @@ function updateEdges() {
 // ========================================
 // Canvas Stack / Navigation
 // ========================================
-function drillInto(parentPath) {
+async function drillInto(parentPath) {
   const nd = nodeById(parentPath);
   if (!nd) return;
+
+  // Lazy-load children if not already in graphData
+  const existingChildren = getChildIds(parentPath);
+  if (existingChildren.length === 0) {
+    try {
+      const showInternals = localStorage.getItem('loom-show-internals') === 'true';
+      const resp = await fetch(`/api/children/${parentPath}?show_internals=${showInternals}`);
+      const data = await resp.json();
+      if (data.children && data.children.length > 0) {
+        // Merge into graphData
+        for (const child of data.children) {
+          if (!nodeById(child.data.id)) {
+            graphData.nodes.push(child);
+            if (child.data.content) {
+              cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
+            }
+          }
+        }
+        console.log(`[Drill] Lazy-loaded ${data.children.length} children for ${parentPath}`);
+      }
+    } catch (e) {
+      console.warn('[Drill] Failed to lazy-load children:', e);
+    }
+  }
+
   canvasStack.push({ parentPath, label: nd.label });
   renderCurrentLevel();
 }
@@ -1265,7 +1290,25 @@ async function initSidebar() {
     if (!item) return;
     if (item.dataset.id) setFocusedItem(item.dataset.id, item);
     if (item.classList.contains('folder')) {
-      const ch = item.nextElementSibling; if (ch) ch.classList.toggle('open');
+      const ch = item.nextElementSibling;
+      if (ch) {
+        ch.classList.toggle('open');
+        // Lazy-load children if folder is empty and being opened
+        if (ch.classList.contains('open') && ch.children.length === 0 && item.dataset.id) {
+          const showInternals = localStorage.getItem('loom-show-internals') === 'true';
+          fetch(`/api/children/${item.dataset.id}?show_internals=${showInternals}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.children) {
+                const items = data.children.map(c => ({
+                  id: c.data.id, name: c.data.label, type: c.data.is_folder ? 'folder' : 'file',
+                  children: [], category: c.data.category,
+                }));
+                ch.innerHTML = renderTree(items, parseInt(item.style.paddingLeft || '8') / 14);
+              }
+            }).catch(() => {});
+        }
+      }
     } else if (item.classList.contains('file')) {
       const card = cardElements.get(item.dataset.id);
       if (card) { switchView('graph'); expandCardFullPage(card); }
@@ -1409,13 +1452,16 @@ function renderTreeItems(container, items, depth) {
 
     container.appendChild(row);
 
-    if (item.type === 'folder' && item.children?.length) {
+    if (item.type === 'folder') {
       const childContainer = document.createElement('div');
       childContainer.className = 'ftree-children';
-      renderTreeItems(childContainer, sortItems(item.children), depth + 1);
+      if (item.children?.length) {
+        renderTreeItems(childContainer, sortItems(item.children), depth + 1);
+      }
       container.appendChild(childContainer);
 
       let lastClickTime = 0;
+      let childrenLoaded = !!item.children?.length;
       row.onclick = (e) => {
         e.stopPropagation();
         if (item.id) setFocusedItem(item.id, row);
@@ -1430,6 +1476,23 @@ function renderTreeItems(container, items, depth) {
           // Single click — expand/collapse
           childContainer.classList.toggle('open');
           icon.textContent = childContainer.classList.contains('open') ? '▼' : '▶';
+          // Lazy-load children if needed
+          if (childContainer.classList.contains('open') && !childrenLoaded && item.id) {
+            childrenLoaded = true;
+            const showInternals = localStorage.getItem('loom-show-internals') === 'true';
+            fetch(`/api/children/${item.id}?show_internals=${showInternals}`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.children) {
+                  const kids = data.children.map(c => ({
+                    id: c.data.id, name: c.data.label, title: c.data.label,
+                    type: c.data.is_folder ? 'folder' : 'file',
+                    children: [], category: c.data.category,
+                  }));
+                  renderTreeItems(childContainer, sortItems(kids), depth + 1);
+                }
+              }).catch(() => {});
+          }
         }
         lastClickTime = now;
       };
