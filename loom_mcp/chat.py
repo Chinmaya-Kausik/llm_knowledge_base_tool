@@ -550,6 +550,7 @@ def resolve_permission(session_id: str, decision: str) -> None:
 async def _get_or_create_client(session_id: str, loom_root: Path, context_level: str, websocket: WebSocket):
     """Get an existing ClaudeSDKClient for the session, or create a new one."""
     from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    from claude_agent_sdk.types import HookMatcher, SyncHookJSONOutput
 
     session = sessions.get(session_id, {})
     client = session.get("sdk_client")
@@ -572,6 +573,41 @@ async def _get_or_create_client(session_id: str, loom_root: Path, context_level:
     perm_mode = "default" if has_rules else "auto"
     can_use_tool_cb = _make_permission_handler(session_id, websocket) if has_rules else None
 
+    # PreCompact hook: snapshot messages before compaction
+    async def _on_precompact(hook_input, matcher, context):
+        import logging
+        log = logging.getLogger("loom.chat")
+
+        panel = sessions.get(session_id, {})
+        messages = panel.get("messages_snapshot", [])
+        if not messages:
+            log.info("[compact] PreCompact fired but no messages to snapshot")
+            return SyncHookJSONOutput(exit_code=0)
+
+        # Save pre-compaction messages to a file
+        chats_dir = loom_root / "raw" / "chats"
+        chats_dir.mkdir(parents=True, exist_ok=True)
+
+        compact_count = panel.get("compact_count", 0) + 1
+        panel["compact_count"] = compact_count
+
+        filename = f"{session_id[:8]}_precompact_{compact_count}.md"
+        path = chats_dir / filename
+
+        from loom_mcp.tools.compile import _render_messages
+        lines = [f"# Pre-compaction snapshot {compact_count}", f"Session: {session_id}", ""]
+        lines.extend(_render_messages(messages))
+        path.write_text("\n".join(lines), encoding="utf-8")
+
+        # Track the precompact file paths
+        precompacts = panel.setdefault("precompact_files", [])
+        precompacts.append(str(path.relative_to(loom_root)))
+
+        log.info("[compact] Saved %d messages to %s (compaction #%d)", len(messages), filename, compact_count)
+        return SyncHookJSONOutput(exit_code=0)
+
+    precompact_hooks = [HookMatcher(hooks=[_on_precompact])]
+
     options = ClaudeAgentOptions(
         cwd=str(loom_root),
         system_prompt={"type": "preset", "preset": "claude_code", "append": system_prompt},
@@ -582,6 +618,7 @@ async def _get_or_create_client(session_id: str, loom_root: Path, context_level:
         resume=sdk_sid if has_run and sdk_sid else None,
         model=model,
         can_use_tool=can_use_tool_cb,
+        hooks={"PreCompact": precompact_hooks},
     )
 
     client = ClaudeSDKClient(options)
@@ -606,6 +643,12 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
         )
 
         client = await _get_or_create_client(session_id, loom_root, context_level, websocket)
+
+        # Track messages for PreCompact snapshot
+        session = sessions.get(session_id, {})
+        msg_snapshot = session.setdefault("messages_snapshot", [])
+        msg_snapshot.append({"role": "user", "content": prompt})
+
         await client.query(prompt)
 
         current_subagent_task_id = None
@@ -670,6 +713,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
                     result = getattr(event, 'result', '')
                     usage = getattr(event, 'usage', None) or {}
                     cost = getattr(event, 'total_cost_usd', None)
+                    # Track for PreCompact snapshot
+                    if result:
+                        msg_snapshot.append({"role": "assistant", "content": result})
                     await websocket.send_json({
                         "type": "result",
                         "content": result or '',

@@ -818,8 +818,14 @@ async def api_save_chat(request: Request):
     if not messages:
         return {"ok": False, "error": "No messages to save"}
 
+    # Get precompact files from session if available
+    from loom_mcp.chat import sessions as chat_sessions
+    session = chat_sessions.get(session_id, {})
+    precompact_files = session.get("precompact_files", [])
+
     from loom_mcp.tools.compile import save_chat_transcript
-    result = save_chat_transcript(LOOM_ROOT, session_id, messages, title=title, context_path=context_path)
+    result = save_chat_transcript(LOOM_ROOT, session_id, messages, title=title,
+                                  context_path=context_path, precompact_files=precompact_files)
     return {"ok": True, **result}
 
 

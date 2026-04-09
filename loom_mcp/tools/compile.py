@@ -417,7 +417,7 @@ def _derive_chat_tags(context_path: str | None) -> list[str]:
     return []
 
 
-def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict], title: str | None = None, context_path: str | None = None) -> dict:
+def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict], title: str | None = None, context_path: str | None = None, precompact_files: list[str] | None = None) -> dict:
     """Save a chat transcript to raw/chats/ with frontmatter and collapsible sections.
 
     Args:
@@ -425,6 +425,7 @@ def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict],
         messages: List of {role, content, subagent_id?} message dicts.
         title: Optional LLM-generated title. If provided, used as heading.
         context_path: Page/folder path the chat was associated with.
+        precompact_files: List of pre-compaction snapshot file paths (for Continue).
 
     Returns: {path, message_count}
     """
@@ -453,6 +454,8 @@ def save_chat_transcript(loom_root: Path, session_id: str, messages: list[dict],
         metadata["tags"] = tags
     if context_path:
         metadata["context_path"] = context_path
+    if precompact_files:
+        metadata["precompact_files"] = precompact_files
 
     content_lines = [f"Session: {session_id}", ""]
     content_lines.extend(_render_messages(messages))
