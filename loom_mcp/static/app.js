@@ -1007,14 +1007,13 @@ function expandCardFullPage(card, highlightQuery) {
     );
 
     // Split layout: editor left, PDF right
-    contentEl.style.display = 'flex';
-    contentEl.style.gap = '0';
+    contentEl.style.cssText = 'display:flex; gap:0; height:100%;';
     const editorPane = document.createElement('div');
     editorPane.className = 'tex-editor-pane';
-    editorPane.style.cssText = 'flex:1; overflow:auto; min-width:0;';
+    editorPane.style.cssText = 'width:50%; overflow:auto;';
     const pdfPane = document.createElement('div');
     pdfPane.className = 'tex-pdf-pane';
-    pdfPane.style.cssText = 'flex:1; overflow:auto; min-width:0; border-left:1px solid var(--border); display:none;';
+    pdfPane.style.cssText = 'width:50%; overflow:auto; border-left:1px solid var(--border); display:none;';
     contentEl.appendChild(editorPane);
     contentEl.appendChild(pdfPane);
 
@@ -4774,10 +4773,14 @@ async function renderPdfInElement(container, pdfUrl) {
     container.innerHTML = '';
     container.className = 'pdf-container';
 
+    const containerWidth = container.clientWidth || 600;
+
     const numPages = Math.min(pdf.numPages, 50); // Cap at 50 pages for performance
     for (let i = 1; i <= numPages; i++) {
       const page = await pdf.getPage(i);
-      const scale = 1.2;
+      // Scale to fit container width with some padding
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min((containerWidth - 32) / baseViewport.width, 2);
       const viewport = page.getViewport({ scale });
 
       const wrapper = document.createElement('div');
