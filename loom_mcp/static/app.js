@@ -1032,7 +1032,32 @@ function expandCardFullPage(card, highlightQuery) {
             {
               title: title,
               path: path,
-              render: (el) => createCodeEditor(el, rawContent, path),
+              render: (el, headerEl) => {
+                // Add compile button to left pane header
+                const recompileBtn = document.createElement('button');
+                recompileBtn.textContent = 'Compile';
+                recompileBtn.title = 'Recompile to PDF';
+                headerEl.appendChild(recompileBtn);
+                recompileBtn.onclick = async () => {
+                  recompileBtn.textContent = 'Compiling...';
+                  recompileBtn.disabled = true;
+                  try {
+                    const r = await fetch('/api/compile-tex', {
+                      method: 'POST', headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({ path }),
+                    });
+                    const d = await r.json();
+                    if (d.ok && sv?._rightPane?._content) {
+                      await renderPdfInElement(sv._rightPane._content, `/media/${d.pdf_path}?t=${Date.now()}`);
+                      recompileBtn.textContent = 'Compile';
+                    } else {
+                      recompileBtn.textContent = 'Compile (failed)';
+                    }
+                  } catch { recompileBtn.textContent = 'Compile (error)'; }
+                  recompileBtn.disabled = false;
+                };
+                createCodeEditor(el, rawContent, path);
+              },
             },
             {
               title: pdfPath.split('/').pop(),
@@ -1215,14 +1240,14 @@ function openSplitView(leftConfig, rightConfig) {
   function makePane(config, side) {
     const pane = document.createElement('div');
     pane.className = `split-pane ${side}`;
-    const btnLabel = side === 'left' ? '← Back' : '✕ Close';
-    const btnTitle = side === 'left' ? 'Return to canvas' : 'Close this pane';
+    const isLeft = side === 'left';
     pane.innerHTML = `
       <div class="split-pane-header">
-        <button class="split-back" title="${btnTitle}">${btnLabel}</button>
+        ${isLeft ? '<button class="split-back" title="Return to canvas">← Back</button>' : ''}
         <span class="split-title">${config.title}</span>
         <span class="split-path">${config.path || ''}</span>
         <span style="flex:1"></span>
+        ${!isLeft ? '<button class="split-close" title="Close this pane">✕</button>' : ''}
       </div>
       <div class="split-pane-content"></div>
     `;
@@ -1245,21 +1270,24 @@ function openSplitView(leftConfig, rightConfig) {
     overlay.remove();
   };
   // Right close: close PDF pane, return to fullpage editor
-  rightPane.querySelector('.split-back').onclick = () => {
-    const sourcePath = overlay._sourcePath;
-    splitOverlay = null;
-    overlay.remove();
-    if (sourcePath) {
-      const nd = nodeById(sourcePath);
-      if (nd) {
-        const fakeCard = document.createElement('div');
-        fakeCard.dataset.path = sourcePath;
-        fakeCard.dataset.isFolder = 'false';
-        fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
-        expandCardFullPage(fakeCard);
+  const closeBtn = rightPane.querySelector('.split-close');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      const sourcePath = overlay._sourcePath;
+      splitOverlay = null;
+      overlay.remove();
+      if (sourcePath) {
+        const nd = nodeById(sourcePath);
+        if (nd) {
+          const fakeCard = document.createElement('div');
+          fakeCard.dataset.path = sourcePath;
+          fakeCard.dataset.isFolder = 'false';
+          fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
+          expandCardFullPage(fakeCard);
+        }
       }
-    }
-  };
+    };
+  }
 
   // Store pane refs on overlay for external access
   overlay._leftPane = leftPane;
