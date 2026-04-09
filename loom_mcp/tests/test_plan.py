@@ -139,7 +139,7 @@ def test_api_put_plan_invalid_path(loom_app):
     """PUT /api/plan rejects paths outside .claude/plans/."""
     client, root, plan_file = loom_app
     resp = client.put("/api/plan", json={
-        "path": "wiki/README.md",
+        "path": "wiki/ABOUT.md",
         "content": "hacked",
     })
     data = resp.json()
@@ -162,7 +162,7 @@ def test_api_delete_plan_invalid_path(loom_app):
     """DELETE /api/plan rejects paths outside .claude/plans/."""
     client, root, plan_file = loom_app
     resp = client.request("DELETE", "/api/plan", json={
-        "path": "wiki/README.md",
+        "path": "wiki/ABOUT.md",
     })
     data = resp.json()
     assert data["ok"] is False

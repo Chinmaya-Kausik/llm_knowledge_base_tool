@@ -251,8 +251,8 @@ def generate_health_report(loom_root: Path) -> dict:
     scaling_alerts = []
 
     # Count total pages (folders with READMEs + files)
-    total_pages = sum(1 for _ in (loom_root / "wiki").rglob("README.md")) if (loom_root / "wiki").exists() else 0
-    total_pages += sum(1 for _ in (loom_root / "projects").rglob("README.md")) if (loom_root / "projects").exists() else 0
+    total_pages = sum(1 for _ in (loom_root / "wiki").rglob("ABOUT.md")) if (loom_root / "wiki").exists() else 0
+    total_pages += sum(1 for _ in (loom_root / "projects").rglob("ABOUT.md")) if (loom_root / "projects").exists() else 0
 
     # Master index size
     index_path = loom_root / "wiki" / "meta" / "index.md"

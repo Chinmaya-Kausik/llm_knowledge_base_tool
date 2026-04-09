@@ -41,11 +41,11 @@ src-tauri/           Tauri native app wrapper
 
 The core abstraction is in `loom_mcp/lib/pages.py`:
 
-- **A folder IS a page.** Its `README.md` holds the content (LLM-maintained summary).
+- **A folder IS a page.** Its `ABOUT.md` holds the content (LLM-maintained summary).
 - **A file IS a subpage** of its parent folder.
 - **`walk_pages(loom_root)`** walks the filesystem and returns all pages as a flat list with parent/child relationships.
 - **`build_page_graph(loom_root)`** adds edges from `[[wiki-links]]` and returns the full graph with top-level aggregation.
-- **README.md files are hidden** from the page list (they're represented by their parent folder).
+- **ABOUT.md files are hidden** from the page list (they're represented by their parent folder).
 - **Hidden patterns** (`.git`, `__pycache__`, `node_modules`) are excluded by default.
 
 ### Link Resolution
@@ -86,7 +86,7 @@ For the top-level canvas view, edges between nested pages are "lifted" to their 
 | `/api/chat/append` | POST | Append messages to existing transcript |
 | `/api/chat/generate-title` | POST | Generate title via Claude for a chat transcript |
 | `/api/chat/update-title` | POST | Update heading in a saved transcript file |
-| `/api/mkdir` | POST | Create directory (with README.md) |
+| `/api/mkdir` | POST | Create directory (with ABOUT.md) |
 | `/api/delete` | POST | Delete file or directory |
 | `/api/plan` | GET/PUT/DELETE | Plan file for checklist panel |
 | `/api/open-external` | POST | Open file in system default app |

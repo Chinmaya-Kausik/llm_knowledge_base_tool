@@ -1,6 +1,6 @@
 """Page abstraction — folders-as-pages with filesystem walk.
 
-A 'page' is a folder with a README.md, or a standalone file.
+A 'page' is a folder with a ABOUT.md, or a standalone file.
 Every folder and file in the loom is a page. Folder READMEs
 hold LLM-maintained summaries. Files are subpages of their parent folder.
 """
@@ -69,11 +69,11 @@ def get_page_title(path: Path, loom_root: Path) -> str:
 def get_page_content(path: Path) -> str:
     """Get the content for a page.
 
-    For folders: returns README.md content.
+    For folders: returns ABOUT.md content.
     For files: returns file content (for text files) or empty string.
     """
     if path.is_dir():
-        readme = path / "README.md"
+        readme = path / "ABOUT.md"
         if readme.exists():
             try:
                 _, content = read_frontmatter(readme)
@@ -101,12 +101,12 @@ def get_page_content(path: Path) -> str:
 def get_page_metadata(path: Path) -> dict[str, Any]:
     """Get metadata for a page.
 
-    For folders: reads frontmatter from README.md.
+    For folders: reads frontmatter from ABOUT.md.
     For files: reads frontmatter (if markdown) or returns basic metadata.
     """
     meta: dict[str, Any] = {}
     if path.is_dir():
-        readme = path / "README.md"
+        readme = path / "ABOUT.md"
         if readme.exists():
             try:
                 meta, _ = read_frontmatter(readme)
@@ -150,8 +150,8 @@ def walk_pages(loom_root: Path, include_hidden: bool = False, show_internals: bo
             if item.is_symlink():
                 continue
 
-            # Skip README.md and MEMORY.md — represented by parent folder / memory system
-            if item.name in ("README.md", "MEMORY.md") and item.is_file():
+            # Skip ABOUT.md and MEMORY.md — represented by parent folder / memory system
+            if item.name in ("ABOUT.md", "MEMORY.md") and item.is_file():
                 continue
 
             rel = str(item.relative_to(loom_root))
@@ -175,7 +175,7 @@ def walk_pages(loom_root: Path, include_hidden: bool = False, show_internals: bo
                 "status": meta.get("status", ""),
                 "tags": meta.get("tags", []),
                 "confidence": meta.get("confidence", ""),
-                "has_readme": (item / "README.md").exists() if item.is_dir() else False,
+                "has_readme": (item / "ABOUT.md").exists() if item.is_dir() else False,
             }
 
             pages.append(page)

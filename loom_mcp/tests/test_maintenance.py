@@ -18,7 +18,7 @@ def _make_git_loom(tmp: str) -> Path:
 
     # Create initial structure
     (root / "wiki").mkdir()
-    write_frontmatter(root / "wiki" / "README.md", {"title": "Wiki"}, "# Wiki\n")
+    write_frontmatter(root / "wiki" / "ABOUT.md", {"title": "Wiki"}, "# Wiki\n")
     (root / "projects").mkdir()
 
     subprocess.run(["git", "add", "."], cwd=str(root), capture_output=True)
@@ -38,13 +38,13 @@ def test_detect_changes_empty():
 def test_detect_changes_modified():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_git_loom(tmp)
-        (loom / "wiki" / "README.md").write_text("# Updated\n")
+        (loom / "wiki" / "ABOUT.md").write_text("# Updated\n")
         subprocess.run(["git", "add", "."], cwd=str(loom), capture_output=True)
         subprocess.run(["git", "commit", "-m", "update"], cwd=str(loom), capture_output=True)
 
         changes = detect_changes(loom, "HEAD~1")
         paths = {c["path"] for c in changes}
-        assert "wiki/README.md" in paths
+        assert "wiki/ABOUT.md" in paths
 
 
 def test_detect_changes_added():
@@ -68,7 +68,7 @@ def test_stale_readme_missing():
         proj = root / "projects" / "my-app"
         proj.mkdir(parents=True)
         (proj / "main.py").write_text("print('hello')")
-        # No README.md in my-app — should be flagged
+        # No ABOUT.md in my-app — should be flagged
 
         stale = get_stale_readmes(root)
         folders = {s["folder"] for s in stale}
@@ -82,7 +82,7 @@ def test_stale_readme_outdated():
         root.mkdir()
         proj = root / "projects" / "my-app"
         proj.mkdir(parents=True)
-        write_frontmatter(proj / "README.md", {"title": "My App"}, "# My App\n")
+        write_frontmatter(proj / "ABOUT.md", {"title": "My App"}, "# My App\n")
         time.sleep(0.1)  # Ensure different mtime
         (proj / "main.py").write_text("print('hello')")
 
@@ -100,7 +100,7 @@ def test_stale_readme_fresh():
         proj.mkdir(parents=True)
         (proj / "main.py").write_text("print('hello')")
         time.sleep(0.1)
-        write_frontmatter(proj / "README.md", {"title": "My App"}, "# My App\n")
+        write_frontmatter(proj / "ABOUT.md", {"title": "My App"}, "# My App\n")
 
         stale = get_stale_readmes(root)
         folders = {s["folder"] for s in stale}

@@ -192,12 +192,12 @@ def _read_wiki_file(loom_root: Path, rel_path: str) -> str | None:
 _DEFAULT_CONVENTIONS = """This workspace is a Loom — a unified knowledge base + project workspace.
 
 Structure:
-- wiki/ — standalone knowledge articles (each folder has a README.md)
+- wiki/ — standalone knowledge articles (each folder has a ABOUT.md)
 - projects/ — active code repos, paper drafts, experiments
 - raw/ — ingested sources, chat transcripts
 
 Loom conventions:
-- Pages are folders with README.md. Files are subpages.
+- Pages are folders with ABOUT.md. Files are subpages.
 - Cross-reference with [[wiki-links]] (e.g. [[Attention Mechanisms]])
 - The master index at wiki/meta/index.md catalogs all pages
 - When you discover cross-cutting knowledge, suggest adding it to the wiki
@@ -293,7 +293,7 @@ def _location_block(loom_root: Path, page_path: str | None, context_level: str, 
             if folder_readme_enabled:
                 parent = full_path.parent
                 if parent != loom_root:
-                    parent_readme = parent / "README.md"
+                    parent_readme = parent / "ABOUT.md"
                     if parent_readme.exists():
                         parent_content = get_page_content(parent)
                         if parent_content:

@@ -21,16 +21,16 @@ def _make_loom(tmp: str) -> Path:
     root.mkdir()
 
     # Root README
-    write_frontmatter(root / "README.md", {"title": "My Loom"}, "# My Loom\n\nOverview of everything.\n")
+    write_frontmatter(root / "ABOUT.md", {"title": "My Loom"}, "# My Loom\n\nOverview of everything.\n")
 
     # Wiki folder with subpages
     wiki = root / "wiki"
     wiki.mkdir()
-    write_frontmatter(wiki / "README.md", {"title": "Knowledge Base"}, "# Knowledge Base\n\nStandalone articles.\n")
+    write_frontmatter(wiki / "ABOUT.md", {"title": "Knowledge Base"}, "# Knowledge Base\n\nStandalone articles.\n")
 
     attn = wiki / "attention"
     attn.mkdir()
-    write_frontmatter(attn / "README.md", {
+    write_frontmatter(attn / "ABOUT.md", {
         "title": "Attention Mechanisms", "type": "concept", "tags": ["ml"],
         "related": ["[[transformers-app]]"],
     }, "# Attention Mechanisms\n\nCore concept. See [[transformers-app]].\n")
@@ -38,11 +38,11 @@ def _make_loom(tmp: str) -> Path:
     # Project folder
     proj = root / "projects"
     proj.mkdir()
-    write_frontmatter(proj / "README.md", {"title": "Projects"}, "# Projects\n\nActive work.\n")
+    write_frontmatter(proj / "ABOUT.md", {"title": "Projects"}, "# Projects\n\nActive work.\n")
 
     app = proj / "transformers-app"
     app.mkdir()
-    write_frontmatter(app / "README.md", {
+    write_frontmatter(app / "ABOUT.md", {
         "title": "Transformers Project", "type": "project", "tags": ["ml", "code"],
     }, "# Transformers Project\n\nUses [[attention]].\n")
 
@@ -137,7 +137,7 @@ def test_page_content_md_file_strips_frontmatter():
     with tempfile.TemporaryDirectory() as tmp:
         loom = _make_loom(tmp)
         # The attention README has frontmatter — content should NOT include ---
-        content = get_page_content(loom / "wiki" / "attention" / "README.md")
+        content = get_page_content(loom / "wiki" / "attention" / "ABOUT.md")
         assert "---" not in content
         assert "Attention" in content
 
@@ -258,7 +258,7 @@ def test_graph_top_pages():
         loom = _make_loom(tmp)
         graph = build_page_graph(loom)
         top_ids = {p["id"] for p in graph["top_pages"]}
-        # Top-level: README.md, wiki/, projects/
+        # Top-level: ABOUT.md, wiki/, projects/
         assert "wiki" in top_ids
         assert "projects" in top_ids
 

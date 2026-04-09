@@ -9,7 +9,7 @@ A knowledge base + project workspace on an infinite canvas.
 - `outputs/` — generated artifacts
 
 ## Conventions
-- Pages are folders with README.md. Files are subpages.
+- Pages are folders with ABOUT.md. Files are subpages.
 - Cross-reference with `[[wiki-links]]` (e.g. `[[Attention Mechanisms]]`)
 - The master index at `wiki/meta/index.md` catalogs all pages
 - Detailed conventions in `wiki/meta/conventions.md`

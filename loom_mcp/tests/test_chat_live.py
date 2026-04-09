@@ -26,7 +26,7 @@ def _make_loom(tmp: str) -> Path:
     write_frontmatter(wiki / "meta" / "index.md", {"title": "Master Index"}, "# Index\n- Test page\n")
     concepts = wiki / "concepts"
     concepts.mkdir(parents=True)
-    write_frontmatter(concepts / "README.md", {"title": "Concepts"}, "# Concepts\n\nTest concepts.\n")
+    write_frontmatter(concepts / "ABOUT.md", {"title": "Concepts"}, "# Concepts\n\nTest concepts.\n")
     return root
 
 

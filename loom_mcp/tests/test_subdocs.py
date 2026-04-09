@@ -19,7 +19,7 @@ def loom_with_nesting(tmp_path):
     # Create folder structure with READMEs
     wiki = root / "wiki"
     wiki.mkdir()
-    write_frontmatter(wiki / "README.md", {"title": "Knowledge Base"}, "# Wiki\n")
+    write_frontmatter(wiki / "ABOUT.md", {"title": "Knowledge Base"}, "# Wiki\n")
 
     concepts = wiki / "concepts"
     concepts.mkdir()
@@ -27,21 +27,21 @@ def loom_with_nesting(tmp_path):
     # Transformers folder-page
     transformers = concepts / "transformers"
     transformers.mkdir()
-    write_frontmatter(transformers / "README.md", {
+    write_frontmatter(transformers / "ABOUT.md", {
         "title": "Transformers", "type": "concept",
     }, "# Transformers\n\nUses [[self-attention]].\n")
 
     # Self-Attention subfolder inside transformers (child page)
     sa = transformers / "self-attention"
     sa.mkdir()
-    write_frontmatter(sa / "README.md", {
+    write_frontmatter(sa / "ABOUT.md", {
         "title": "Self-Attention", "type": "concept",
     }, "# Self-Attention\n\nPart of [[transformers]].\n")
 
     # Multi-Head inside self-attention (grandchild)
     mh = sa / "multi-head"
     mh.mkdir()
-    write_frontmatter(mh / "README.md", {
+    write_frontmatter(mh / "ABOUT.md", {
         "title": "Multi-Head Attention", "type": "concept",
     }, "# Multi-Head\n\nRuns [[self-attention]] in parallel.\n")
 
@@ -93,7 +93,7 @@ def test_top_nodes(loom_with_nesting):
     client, root = loom_with_nesting
     data = client.get("/api/graph").json()
     top_labels = {n["data"]["label"] for n in data["top_nodes"]}
-    # Top level should be wiki/ (and maybe README.md)
+    # Top level should be wiki/ (and maybe ABOUT.md)
     assert "wiki" in top_labels
     # transformers is nested inside wiki/concepts/, not top-level
     assert "transformers" not in top_labels
@@ -114,7 +114,7 @@ def test_top_edges_aggregated(loom_with_nesting):
     # Add a standalone page outside wiki that links to a nested page
     projects = root / "projects"
     projects.mkdir()
-    write_frontmatter(projects / "README.md", {"title": "Projects"}, "# Projects\n\nSee [[self-attention]].\n")
+    write_frontmatter(projects / "ABOUT.md", {"title": "Projects"}, "# Projects\n\nSee [[self-attention]].\n")
 
     data = client.get("/api/graph").json()
     top_edge_pairs = {(e["data"]["source"], e["data"]["target"]) for e in data["top_edges"]}

@@ -117,7 +117,7 @@ A knowledge base + project workspace on an infinite canvas.
 - `outputs/` — generated artifacts
 
 ## Conventions
-- Pages are folders with README.md. Files are subpages.
+- Pages are folders with ABOUT.md. Files are subpages.
 - Cross-reference with `[[wiki-links]]` (e.g. `[[Attention Mechanisms]]`)
 - The master index at `wiki/meta/index.md` catalogs all pages
 - Detailed conventions in `wiki/meta/conventions.md`
@@ -170,9 +170,9 @@ _LOOM_CONVENTIONS_CONTENT = """\
 - Always link back to originating sources in `sources` frontmatter field
 - Never generate `[[links]]` to pages not in the page registry
 
-## Folder READMEs
-- Every folder is a page. Its README.md holds the content.
-- Folder READMEs explain the folder's purpose, list key children with descriptions, and show relationships.
+## Folder Pages
+- Every folder is a page. Its ABOUT.md holds the content. README.md is a GitHub artifact, not special to loom.
+- Folder ABOUT.md explains the folder's purpose, lists key children with descriptions, and shows relationships.
 - Updated during `/compile`, not during normal conversation.
 
 ## Style
@@ -892,8 +892,8 @@ async def api_mkdir(request: Request):
         return {"ok": False, "error": "Invalid path"}
     try:
         full_path.mkdir(parents=True, exist_ok=True)
-        # Create README.md for the folder
-        readme = full_path / "README.md"
+        # Create ABOUT.md for the folder
+        readme = full_path / "ABOUT.md"
         if not readme.exists():
             readme.write_text(f"# {full_path.name}\n\n", encoding="utf-8")
         return {"ok": True}

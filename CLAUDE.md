@@ -46,7 +46,7 @@ outputs/               ← Generated artifacts
 
 ## Key Design Decisions
 
-- **ABOUT.md** is the loom page file for folders (migration pending — currently README.md). README.md is a GitHub artifact, not special to loom.
+- **ABOUT.md** is the loom page file for folders. README.md is a GitHub artifact, not special to loom.
 - **Memory files** live centrally in `wiki/meta/memory/`, tagged by project. Per-project `MEMORY.md` indexes in project folders. Root `MEMORY.md` for global memories. Memory index one-liners injected at session start; individual files read on demand.
 - **READMEs update during `/compile`** (structural snapshots). **Memories update during conversation** (operational context). Write path determines destination.
 - **Chat transcripts** get mechanical tags from context_path (project name). Saved with frontmatter.

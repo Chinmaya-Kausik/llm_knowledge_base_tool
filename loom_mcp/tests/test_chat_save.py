@@ -61,7 +61,7 @@ def test_save_includes_subagent():
         messages = [
             {"role": "user", "content": "Do a deep search"},
             {"role": "subagent", "content": "Started: Searching wiki"},
-            {"role": "tool", "content": "Read: wiki/concepts/attention/README.md"},
+            {"role": "tool", "content": "Read: wiki/concepts/attention/ABOUT.md"},
             {"role": "tool_result", "content": "Attention mechanisms..."},
             {"role": "subagent", "content": "Done (completed): Found 5 pages"},
             {"role": "assistant", "content": "The search found 5 relevant pages."},
@@ -100,7 +100,7 @@ def test_save_complex_conversation():
             {"role": "thinking", "content": "Need to search wiki and projects"},
             {"role": "tool", "content": "Grep: machine learning"},
             {"role": "tool_result", "content": "10 results"},
-            {"role": "tool", "content": "Read: wiki/indexes/machine-learning/README.md"},
+            {"role": "tool", "content": "Read: wiki/indexes/machine-learning/ABOUT.md"},
             {"role": "tool_result", "content": "ML index content..."},
             {"role": "subagent", "content": "Started: Deep search in projects"},
             {"role": "tool", "content": "Glob: projects/**/*.py"},

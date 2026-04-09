@@ -367,10 +367,10 @@ def get_stale_readmes(loom_root: Path) -> list[dict]:
         if not item.is_dir() or is_hidden(item):
             continue
 
-        readme = item / "README.md"
+        readme = item / "ABOUT.md"
         if not readme.exists():
             # Folder without README — it's "stale" (needs one)
-            children = [f.name for f in item.iterdir() if not is_hidden(f) and f.name != "README.md"]
+            children = [f.name for f in item.iterdir() if not is_hidden(f) and f.name != "ABOUT.md"]
             if children:
                 stale.append({
                     "folder": str(item.relative_to(loom_root)),
@@ -388,7 +388,7 @@ def get_stale_readmes(loom_root: Path) -> list[dict]:
 
         changed = []
         for child in item.iterdir():
-            if child.name == "README.md" or is_hidden(child):
+            if child.name == "ABOUT.md" or is_hidden(child):
                 continue
             try:
                 if child.stat().st_mtime > readme_mtime:

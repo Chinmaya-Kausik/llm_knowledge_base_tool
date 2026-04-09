@@ -144,7 +144,7 @@ class TestChatAppendAPI:
     def test_append_invalid_path(self, loom_client):
         client, root = loom_client
         r = client.post("/api/chat/append", json={
-            "path": "wiki/README.md",
+            "path": "wiki/ABOUT.md",
             "messages": [{"role": "user", "content": "hack"}],
         })
         assert r.json()["ok"] is False
@@ -184,7 +184,7 @@ class TestUpdateTitleAPI:
     def test_update_title_invalid_path(self, loom_client):
         client, root = loom_client
         r = client.post("/api/chat/update-title", json={
-            "path": "wiki/README.md",
+            "path": "wiki/ABOUT.md",
             "title": "hack",
         })
         assert r.json()["ok"] is False

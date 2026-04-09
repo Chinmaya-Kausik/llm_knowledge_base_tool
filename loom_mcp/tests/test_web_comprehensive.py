@@ -36,7 +36,7 @@ def loom_client(tmp_path):
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
     }, "# Glossary\n\n## attention\n\nFocusing on relevant parts of input.\n")
 
-    write_frontmatter(root / "wiki" / "concepts" / "alpha" / "README.md", {
+    write_frontmatter(root / "wiki" / "concepts" / "alpha" / "ABOUT.md", {
         "title": "Alpha Concept", "type": "concept", "status": "compiled",
         "created": "2026-04-04", "last_compiled": "2026-04-04T00:00:00Z",
         "tags": ["ml"], "related": [], "aliases": [], "confidence": "high", "sources": [],
@@ -46,7 +46,7 @@ def loom_client(tmp_path):
         "def alpha():\n    return 'attention'\n"
     )
 
-    write_frontmatter(root / "projects" / "demo" / "README.md", {
+    write_frontmatter(root / "projects" / "demo" / "ABOUT.md", {
         "title": "Demo", "type": "project",
     }, "# Demo\n\nUses [[Alpha Concept]].\n")
 
@@ -235,7 +235,7 @@ class TestPlanSecurity:
     def test_put_plan_outside_plans_dir(self, loom_client):
         client, root = loom_client
         r = client.put("/api/plan", json={
-            "path": "wiki/concepts/alpha/README.md",
+            "path": "wiki/concepts/alpha/ABOUT.md",
             "content": "overwrite",
         })
         assert r.json()["ok"] is False

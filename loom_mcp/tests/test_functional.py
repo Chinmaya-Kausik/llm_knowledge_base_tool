@@ -81,7 +81,7 @@ def _make_loom(tmp_path: Path) -> Path:
     transformers = root / "wiki" / "concepts" / "transformers"
     transformers.mkdir(parents=True)
     write_frontmatter(
-        transformers / "README.md",
+        transformers / "ABOUT.md",
         {
             "title": "Transformers",
             "type": "concept",
@@ -104,7 +104,7 @@ def _make_loom(tmp_path: Path) -> Path:
 
     # A project README
     write_frontmatter(
-        root / "projects" / "demo" / "README.md",
+        root / "projects" / "demo" / "ABOUT.md",
         {"title": "Demo Project", "type": "project"},
         "# Demo Project\n\nUses [[Transformers]] internally.\n",
     )
@@ -594,7 +594,7 @@ class TestPageRead:
         """GET /api/page/{path} returns frontmatter and content."""
         client, root = loom_client
 
-        resp = client.get("/api/page/wiki/concepts/transformers/README.md")
+        resp = client.get("/api/page/wiki/concepts/transformers/ABOUT.md")
         assert resp.status_code == 200
         data = resp.json()
 
@@ -607,7 +607,7 @@ class TestPageRead:
         """Content returned by page read should NOT contain YAML frontmatter markers."""
         client, root = loom_client
 
-        resp = client.get("/api/page/wiki/concepts/transformers/README.md")
+        resp = client.get("/api/page/wiki/concepts/transformers/ABOUT.md")
         data = resp.json()
         content = data["content"]
 

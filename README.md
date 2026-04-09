@@ -175,7 +175,7 @@ src-tauri/                  <- Tauri v2 native app (optional)
 ```
 
 **Key design decisions:**
-- Every folder is a page (README.md = content). Files are subpages.
+- Every folder is a page (ABOUT.md = content). Files are subpages. README.md is a GitHub artifact, not special to loom.
 - All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic — no API calls from the backend.
 - No API key needed. Claude Code uses your Max subscription.
 - No build step. ~5200 lines of vanilla JS with vendored libraries.

@@ -19,9 +19,9 @@ type: structure-note
 - Always link back to originating sources in `sources` frontmatter field
 - Never generate `[[links]]` to pages not in the page registry
 
-## Folder READMEs
-- Every folder is a page. Its README.md holds the content.
-- Folder READMEs explain the folder's purpose, list key children with descriptions, and show relationships.
+## Folder Pages
+- Every folder is a page. Its ABOUT.md holds the content. README.md is a GitHub artifact, not special to loom.
+- Folder ABOUT.md explains the folder's purpose, lists key children with descriptions, and shows relationships.
 - Updated during `/compile`, not during normal conversation.
 
 ## Style

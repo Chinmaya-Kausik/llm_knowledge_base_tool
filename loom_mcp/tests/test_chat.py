@@ -25,7 +25,7 @@ def _make_loom(tmp: str) -> Path:
     # A folder page
     attn = wiki / "attention"
     attn.mkdir()
-    write_frontmatter(attn / "README.md", {
+    write_frontmatter(attn / "ABOUT.md", {
         "title": "Attention Mechanisms",
     }, "# Attention\n\nSelf-attention is a key mechanism.\n\n## Children\n- query.py — query computation\n")
 
@@ -35,7 +35,7 @@ def _make_loom(tmp: str) -> Path:
     # Project folder
     proj = root / "projects" / "my-app"
     proj.mkdir(parents=True)
-    write_frontmatter(proj / "README.md", {"title": "My App"}, "# My App\n\nA project.\n")
+    write_frontmatter(proj / "ABOUT.md", {"title": "My App"}, "# My App\n\nA project.\n")
 
     return root
 

@@ -36,7 +36,7 @@ def _make_loom(tmp: str) -> Path:
     # A concept folder
     attn = wiki / "concepts" / "attention"
     attn.mkdir(parents=True)
-    write_frontmatter(attn / "README.md", {
+    write_frontmatter(attn / "ABOUT.md", {
         "title": "Attention Mechanisms", "type": "concept",
     }, "# Attention\n\nSelf-attention is key. See [[BERT]].\n\n## Children\n- query.py\n")
 
@@ -46,14 +46,14 @@ def _make_loom(tmp: str) -> Path:
     # A standalone markdown file
     bert = wiki / "concepts" / "bert"
     bert.mkdir(parents=True)
-    write_frontmatter(bert / "README.md", {
+    write_frontmatter(bert / "ABOUT.md", {
         "title": "BERT", "type": "concept",
     }, "# BERT\n\nBidirectional model. Uses [[Attention Mechanisms]].\n")
 
     # A project
     proj = root / "projects" / "my-app"
     proj.mkdir(parents=True)
-    write_frontmatter(proj / "README.md", {
+    write_frontmatter(proj / "ABOUT.md", {
         "title": "My App", "type": "project",
     }, "# My App\n\nUses [[Attention Mechanisms]] internally.\n")
     (proj / "main.py").write_text("from attention import SelfAttention\n")
@@ -283,7 +283,7 @@ class TestContextEdgeCases:
             loom = _make_loom(tmp)
             deep = loom / "a" / "b" / "c" / "d"
             deep.mkdir(parents=True)
-            write_frontmatter(deep / "README.md", {"title": "Deep"}, "# Deep page\n")
+            write_frontmatter(deep / "ABOUT.md", {"title": "Deep"}, "# Deep page\n")
             sessions["test-deep"] = {"page_path": "a/b/c/d"}
             prompt = build_system_prompt("test-deep", loom, "page")
             assert "Deep" in prompt
