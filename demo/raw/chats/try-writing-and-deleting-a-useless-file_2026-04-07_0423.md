@@ -1,3 +1,8 @@
+---
+tags:
+- demo
+---
+
 # Chat — 2026-04-07 04:23
 Session: 0f8eeedd-3944-4c91-be3f-2f49a1a8628d
 

@@ -8,8 +8,8 @@
     "y": 452
   },
   "raw": {
-    "x": 883,
-    "y": 338
+    "x": 650,
+    "y": 287
   },
   "wiki": {
     "x": 1453,
@@ -602,5 +602,161 @@
   "projects/attention-efficiency-paper/paper.pdf": {
     "x": 0,
     "y": 1210
+  },
+  "raw/chats/hey_2026-04-07_1221.md": {
+    "x": 2200,
+    "y": 450
+  },
+  "raw/chats/hey_2026-04-07_1222.md": {
+    "x": 0,
+    "y": 830
+  },
+  "raw/chats/pasted-image-usersckausikdocument_2026-04-09_0602.md": {
+    "x": 880,
+    "y": 830
+  },
+  "raw/chats/what-do-you-know-about-this-project_2026-04-07_1342.md": {
+    "x": 1320,
+    "y": 1590
+  },
+  "raw/chats/what-do-you-know-about-this-projects-se_2026-04-07_1340.md": {
+    "x": 1760,
+    "y": 1590
+  },
+  "raw/chats/what-do-you-remember-about-this-project_2026-04-07_1341.md": {
+    "x": 2200,
+    "y": 1590
+  },
+  "raw/chats/what-do-you-remember-about-this-projevt_2026-04-07_1355.md": {
+    "x": 0,
+    "y": 1970
+  },
+  "raw/chats/what-do-you-seepasted-image-usersc_2026-04-09_0719.md": {
+    "x": 440,
+    "y": 1970
+  },
+  "raw/chats/what-is-thispasted-image-usersckau_2026-04-09_0711.md": {
+    "x": 880,
+    "y": 1970
+  },
+  "raw/chats/what-is-thispasted-image-usersckau_2026-04-09_0717.md": {
+    "x": 1320,
+    "y": 1970
+  },
+  "raw/chats/what-next-here_2026-04-07_1337.md": {
+    "x": 0,
+    "y": 2350
+  },
+  "raw/chats/what-projects-are-active-rn_2026-04-09_0711.md": {
+    "x": 440,
+    "y": 2350
+  },
+  "wiki/pages": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/pages/attention-scaling.md": {
+    "x": 0,
+    "y": 450
+  },
+  "wiki/pages/attention.md": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/pages/backpropagation.md": {
+    "x": 880,
+    "y": 450
+  },
+  "wiki/pages/bert-vs-gpt.md": {
+    "x": 1320,
+    "y": 450
+  },
+  "wiki/pages/bert.md": {
+    "x": 1760,
+    "y": 450
+  },
+  "wiki/pages/design-patterns.md": {
+    "x": 0,
+    "y": 830
+  },
+  "wiki/pages/embeddings.md": {
+    "x": 440,
+    "y": 830
+  },
+  "wiki/pages/fine-tuning.md": {
+    "x": 880,
+    "y": 830
+  },
+  "wiki/pages/gpt.md": {
+    "x": 1320,
+    "y": 830
+  },
+  "wiki/pages/gradient-descent.md": {
+    "x": 1760,
+    "y": 830
+  },
+  "wiki/pages/lora-vs-full-finetuning.md": {
+    "x": 0,
+    "y": 1210
+  },
+  "wiki/pages/loss-functions.md": {
+    "x": 440,
+    "y": 1210
+  },
+  "wiki/pages/multi-head-attention.md": {
+    "x": 880,
+    "y": 1210
+  },
+  "wiki/pages/regularization.md": {
+    "x": 1320,
+    "y": 1210
+  },
+  "wiki/pages/reinforcement-learning.md": {
+    "x": 1760,
+    "y": 1210
+  },
+  "wiki/pages/self-attention.md": {
+    "x": 0,
+    "y": 1590
+  },
+  "wiki/pages/tokenization.md": {
+    "x": 440,
+    "y": 1590
+  },
+  "wiki/pages/transformers.md": {
+    "x": 880,
+    "y": 1590
+  },
+  "wiki/pages/why-transformers-won.md": {
+    "x": 1320,
+    "y": 1590
+  },
+  "raw/chats/what-projects-are-active-rn_2026-04-09_1501.md": {
+    "x": 880,
+    "y": 2350
+  },
+  "wiki/meta/indexes": {
+    "x": 182,
+    "y": 278
+  },
+  "wiki/meta/memory": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/meta/memory/2026-04-05-data-pipeline-csv-format.md": {
+    "x": 0,
+    "y": 450
+  },
+  "wiki/meta/memory/2026-04-05-transformer-uses-pytorch.md": {
+    "x": 440,
+    "y": 450
+  },
+  "wiki/meta/memory/2026-04-06-attention-paper-deadline.md": {
+    "x": 0,
+    "y": 830
+  },
+  "wiki/meta/memory/2026-04-06-prefer-concise-answers.md": {
+    "x": 440,
+    "y": 830
   }
 }

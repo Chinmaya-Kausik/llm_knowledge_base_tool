@@ -735,6 +735,7 @@ function renderCurrentLevel() {
   }
 
   scheduleEdgeUpdate();
+  populateTagFilter();
   requestAnimationFrame(() => requestAnimationFrame(fitView));
 }
 
@@ -1441,7 +1442,11 @@ function initFilterDropdowns() {
 function populateTagFilter() {
   const tagMenu = document.getElementById('filter-tag-menu');
   const counts = {};
-  for (const [,meta] of cardMeta) for (const tag of meta.frontmatter?.tags||[]) counts[tag]=(counts[tag]||0)+1;
+  // Only count tags from cards on the current canvas level
+  for (const [path] of cardElements) {
+    const meta = cardMeta.get(path);
+    for (const tag of meta?.frontmatter?.tags||[]) counts[tag]=(counts[tag]||0)+1;
+  }
   const tags = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   tagMenu.innerHTML = tags.map(([t,c])=>`<label><input type="checkbox" value="${t}" checked> ${t} (${c})</label>`).join('')
     + '<hr><button id="tag-select-all">Select All</button><button id="tag-clear-all">Clear All</button>';
@@ -1491,6 +1496,7 @@ async function initSidebar() {
   const treeData = await api.tree();
   const container = document.getElementById('sidebar-tree');
   container.innerHTML = renderTree(treeData.children||[], 0);
+  // Single click: focus item, expand/collapse folders
   container.addEventListener('click', (e) => {
     const item = e.target.closest('.tree-item');
     if (!item) return;
@@ -1515,23 +1521,38 @@ async function initSidebar() {
             }).catch(() => {});
         }
       }
-    } else if (item.classList.contains('file')) {
-      const card = cardElements.get(item.dataset.id);
-      if (card) { switchView('graph'); expandCardFullPage(card); }
+    }
+  });
+  // Double click: open file/folder in the current view
+  container.addEventListener('dblclick', (e) => {
+    const item = e.target.closest('.tree-item');
+    if (!item || !item.dataset.id) return;
+    const id = item.dataset.id;
+    if (e.metaKey || e.ctrlKey) { openExternal(id); return; }
+    if (item.classList.contains('folder')) {
+      // Navigate into folder in current view
+      const view = document.querySelector('.view-tab.active')?.dataset.view || 'graph';
+      if (view === 'files') {
+        filesTilePath = id.split('/');
+        if (filesMode === 'tree') renderFilesTree();
+        else renderFilesTiles();
+        updateBreadcrumbs();
+      } else {
+        // Canvas: drill into folder
+        drillInto(id);
+      }
+    } else {
+      // Open file in fullpage — stay in current view
+      const currentView = document.querySelector('.view-tab.active')?.dataset.view || 'graph';
+      fullpageReturnView = currentView;
+      const card = cardElements.get(id);
+      if (card) { expandCardFullPage(card); }
       else {
-        // Card might not be on current level — try to find it
-        const nd = nodeById(item.dataset.id);
-        if (nd) {
-          switchView('graph');
-          // Build a fake card for full page
-          const meta = cardMeta.get(item.dataset.id);
-          if (meta) {
-            const fakeCard = document.createElement('div');
-            fakeCard.dataset.path = item.dataset.id;
-            fakeCard.innerHTML = `<span class="doc-title">${nd.label}</span>`;
-            expandCardFullPage(fakeCard);
-          }
-        }
+        const nd = nodeById(id);
+        const fakeCard = document.createElement('div');
+        fakeCard.dataset.path = id;
+        fakeCard.innerHTML = `<span class="doc-title">${nd?.label || id.split('/').pop()}</span>`;
+        expandCardFullPage(fakeCard);
       }
     }
   });

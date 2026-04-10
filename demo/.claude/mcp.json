@@ -5,7 +5,7 @@
       "args": [
         "run",
         "--directory",
-        "/Users/ckausik/Documents/GitHub/loom",
+        "/Users/ckausik/Documents/loom/projects/loom",
         "python",
         "-m",
         "loom_mcp.server"

@@ -1,3 +1,8 @@
+---
+tags:
+- demo
+---
+
 # Trivial Demonstrations of Five Code Tools
 Session: 59ad6daf-9c40-4a75-9c20-5c5eca0c89db
 
