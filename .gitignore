@@ -42,12 +42,13 @@ htmlcov/
 src-tauri/target/
 src-tauri/icons/android/
 
-# LaTeX build intermediates
-*.aux
-*.bbl
-*.blg
-*.fdb_latexmk
-*.fls
+# LaTeX build intermediates (demo paper)
+demo/projects/attention-efficiency-paper/paper.aux
+demo/projects/attention-efficiency-paper/paper.bbl
+demo/projects/attention-efficiency-paper/paper.blg
+demo/projects/attention-efficiency-paper/paper.fdb_latexmk
+demo/projects/attention-efficiency-paper/paper.fls
+demo/projects/attention-efficiency-paper/paper.log
 
 # Claude Code auto-memory
-MEMORY.md
+/MEMORY.md
