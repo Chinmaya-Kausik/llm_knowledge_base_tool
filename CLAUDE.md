@@ -22,7 +22,7 @@ loom_mcp/              ← MCP server code (tools + lib)
   lib/                 ← Core: pages, frontmatter, links, hashing
   tools/               ← Ingest, compile, search, lint, git
   static/              ← Frontend (~5200 lines vanilla JS)
-  tests/               ← 300 tests across 25 files
+  tests/               ← 331 tests across 26 files
 
 demo/                  ← Demo loom (included in repo)
 src-tauri/             ← Tauri v2 native app (optional)

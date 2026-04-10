@@ -15,9 +15,12 @@ Ordered by: validate what's built → UX stability → features.
 - ~~Multi-panel chat isolation~~ — escape/interrupt scoped to focused panel
 - ~~Duplicate thinking fix~~ — ThinkingBlock no longer re-sent after streaming deltas
 - ~~Auto cache busting~~ — mtime-based query strings on static assets
+- ~~Canvas-aware tag filter~~ — filter shows only tags from current canvas level, updates on navigation
+- ~~Sidebar double-click navigation~~ — dblclick opens files in current view, navigates folders
+- ~~Demo chat tag backfill~~ — backfilled tags on 35 existing demo chats from context_path
 
 ## 1. Chat Transcript Tagging UI
-- Backend tagging done, canvas tag filter code exists but needs debugging (not filtering)
+- Canvas tag filter working (canvas-aware, updates on navigation)
 - Dedicated chat history view: group/filter saved chats by project tag
 - Quick access to recent chats per project
 
@@ -80,5 +83,5 @@ Multiple tabs/windows like VS Code — need git tracking with visual diffs:
 ## Known Issues
 - System prompt not updated when client is reused mid-session (chat.py _get_or_create_client). Context changes don't take effect until next session.
 - Premature dequeue: queued message went bright before the current response finished (before `done` event). Needs event log capture (#3) to diagnose.
-- Code block overflow hides text: long code blocks in assistant messages overflow their container and obscure the text that follows. Needs `overflow-x: auto` or `max-height` with scroll on `pre`/`code` elements in chat.
+- ~~Code block overflow~~ — fixed with `overflow: auto; max-height: 300px` on chat pre elements.
 - CLAUDE.md coexists with ABOUT.md in loom repo — intentional while VS Code is primary editor. Remove CLAUDE.md once loom is the main workspace.
