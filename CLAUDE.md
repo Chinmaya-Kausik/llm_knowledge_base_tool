@@ -82,6 +82,17 @@ outputs/               ← Generated artifacts
 - `config.yaml` context section controls memory caps, page content limits, enable/disable per block
 - `LOOM_PORT` env var for running multiple servers (stable on 8420, experimental on 8421)
 
+## Tauri App
+
+The native app (`src-tauri/`) is a self-contained wrapper:
+- Finds the loom project dir (checks `~/Documents/loom/projects/loom` then `~/Documents/GitHub/loom`)
+- Resolves `uv` binary (GUI apps don't inherit shell PATH — checks `~/.local/bin`, `~/.cargo/bin`, `/usr/local/bin`, `/opt/homebrew/bin`)
+- Spawns `uv run --extra web python -m loom_mcp.web` with correct `current_dir` and `LOOM_ROOT`
+- Waits for server readiness (TCP poll, 15s timeout) before showing window
+- Shows styled error pages for: missing project dir, missing `uv`, spawn failure, server timeout
+- Kills server on window close
+- Rejects stale config paths (pytest temp dirs) in `~/.loom-app-config.json`
+
 ## Current State
 
-See `TODO.md` for remaining work. Key items: ABOUT.md migration, repo migration into loom, TeX compilation, wiki/code review agents.
+See `TODO.md` for remaining work. Key items: wiki/code review agents, memory e2e, bug reporting, git visualization.

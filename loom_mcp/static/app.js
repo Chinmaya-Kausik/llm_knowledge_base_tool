@@ -2664,10 +2664,13 @@ function createFloatingPanel(options = {}) {
   const panelId = 'panel-' + (++panelCounter);
   const ctxName = options.contextPath ? options.contextPath.split('/').pop() : '';
   const label = options.label || (options.contextPath ? `Chat: ${ctxName}` : (options.fork ? `Fork ${panelCounter}` : `Chat ${panelCounter}`));
+  // Fork from the last focused panel, not necessarily the main panel
+  const sourceId = chatFocusHistory[0] || 'main';
+  const sourcePanel = chatPanels.get(sourceId) || activePanel;
   const panel = new ChatPanel(null, {
     sessionId: crypto.randomUUID(),
-    messages: options.fork ? [...activePanel.messages] : [],
-    contextLevel: options.contextPath ? 'page' : activePanel.contextLevel,
+    messages: options.fork ? [...sourcePanel.messages] : [],
+    contextLevel: options.contextPath ? 'page' : sourcePanel.contextLevel,
     contextPath: options.contextPath || null,
   });
 
@@ -2739,6 +2742,18 @@ function createFloatingPanel(options = {}) {
   panel.container = card;
   panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
+
+  // Pre-fill input with quoted text and auto-resize
+  if (options.prefill) {
+    input.value = options.prefill;
+    // Trigger auto-resize after the element is in the DOM
+    requestAnimationFrame(() => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+      input.focus();
+      input.selectionStart = input.selectionEnd = input.value.length;
+    });
+  }
 
   // Render forked messages with full content
   if (options.fork && panel.messages.length) {
@@ -5056,37 +5071,18 @@ function initSelectionTooltip() {
     tooltip.style.display = 'none';
     if (!pendingSelection?.text) return;
 
-    // Find the right input — check if selection is inside a floating panel
-    const selAnchor = window.getSelection()?.anchorNode?.parentElement;
-    const floatPanel = selAnchor?.closest('.floating-chat-panel');
-    let input;
-    if (floatPanel) {
-      input = floatPanel.querySelector('.fcp-input');
-    } else {
-      // Use main chat panel — open it if collapsed
-      const panel = document.getElementById('chat-panel');
-      if (panel.classList.contains('chat-collapsed') || panel.classList.contains('chat-collapsed-right') || panel.classList.contains('chat-collapsed-float')) {
-        const allC = ['chat-collapsed','chat-collapsed-right','chat-collapsed-float'];
-        allC.forEach(c => panel.classList.remove(c));
-        panel.classList.add('chat-bottom');
-        connectChat();
-      }
-      input = document.getElementById('chat-input');
-    }
-    if (!input) return;
-
-    // Insert selection as blockquote directly into the textarea
+    // Build the quoted text
     const fileName = pendingSelection.file ? pendingSelection.file.split('/').pop() : '';
     const prefix = fileName ? `From \`${fileName}\`:\n` : '';
     const quoted = pendingSelection.text.split('\n').map(l => `> ${l}`).join('\n');
     const insertion = `${prefix}${quoted}\n\n`;
-    const pos = input.selectionStart || input.value.length;
-    input.value = input.value.slice(0, pos) + insertion + input.value.slice(pos);
-    input.selectionStart = input.selectionEnd = pos + insertion.length;
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+
+    // Open a new floating panel with the quoted text pre-filled
+    const newPanel = createFloatingPanel({
+      contextPath: pendingSelection.file || null,
+      prefill: insertion,
+    });
     pendingSelection = null;
-    input.focus();
   };
 
   // Hide tooltip on click elsewhere

@@ -18,6 +18,11 @@ Ordered by: validate what's built → UX stability → features.
 - ~~Canvas-aware tag filter~~ — filter shows only tags from current canvas level, updates on navigation
 - ~~Sidebar double-click navigation~~ — dblclick opens files in current view, navigates folders
 - ~~Demo chat tag backfill~~ — backfilled tags on 35 existing demo chats from context_path
+- ~~Fork from last focused panel~~ — Ctrl+Shift+N forks the last interacted-with panel, not just main
+- ~~Chat with Claude opens new panel~~ — tooltip now opens a new floating panel with quoted text pre-filled and auto-resized
+- ~~Tauri self-contained app~~ — auto-starts Python server, waits for readiness, error pages for missing deps, clean shutdown
+- ~~Stale config guard~~ — rejects pytest/tmp paths in ~/.loom-app-config.json, falls back to default
+- ~~Test config isolation~~ — settings test no longer pollutes ~/.loom-app-config.json
 
 ## 1. Chat Transcript Tagging UI
 - Canvas tag filter working (canvas-aware, updates on navigation)

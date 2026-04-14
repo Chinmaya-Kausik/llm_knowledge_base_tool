@@ -315,9 +315,18 @@ class TestSettingsAPI:
 
     def test_put_settings_loom_root(self, loom_client):
         client, root = loom_client
-        new_root = str(root / "wiki")
-        r = client.put("/api/settings", json={"loom_root": new_root})
-        assert r.status_code == 200
+        # Save and restore the real config file so tests don't pollute it
+        config_path = Path.home() / ".loom-app-config.json"
+        original = config_path.read_text() if config_path.exists() else None
+        try:
+            new_root = str(root / "wiki")
+            r = client.put("/api/settings", json={"loom_root": new_root})
+            assert r.status_code == 200
+        finally:
+            if original is not None:
+                config_path.write_text(original)
+            elif config_path.exists():
+                config_path.unlink()
 
 
 # ---------------------------------------------------------------------------
