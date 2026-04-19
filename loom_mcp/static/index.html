@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="/static/icon-192.png">
   <title>Loom — Knowledge Base</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.ui-branch.css">
   <link rel="stylesheet" href="/static/vendor/xterm.min.css">
   <link rel="stylesheet" href="/static/vendor/katex.min.css">
   <script src="/static/vendor/katex.min.js"></script>
@@ -50,6 +51,7 @@
       </div>
     </div>
     <div class="toolbar-right">
+      <button id="theme-toggle" title="Cycle theme (dark/light/paper)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;padding:2px 8px;font-size:14px;line-height:1;">&#9790;</button>
       <input type="search" id="search-input" placeholder="Search... (Ctrl+F)">
       <div class="filter-dropdown" id="action-menu-dropdown">
         <button class="filter-btn" id="btn-action-menu" title="Actions">+</button>
@@ -240,6 +242,37 @@
     <button id="selection-ask-btn">Chat with Claude</button>
   </div>
 
+  <script>
+  // Theme switcher — cycles dark/light/paper, persists to localStorage
+  (function() {
+    const themes = ['dark', 'light', 'paper'];
+    const icons = { dark: '\u263E', light: '\u2600', paper: '\u{1F4D6}' }; // moon, sun, book
+    function getTheme() {
+      const saved = localStorage.getItem('loom-theme');
+      if (saved && themes.includes(saved)) return saved;
+      if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      return 'dark';
+    }
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem('loom-theme', t);
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = icons[t] || '\u263E';
+    }
+    applyTheme(getTheme());
+    document.addEventListener('DOMContentLoaded', function() {
+      const btn = document.getElementById('theme-toggle');
+      if (btn) {
+        btn.textContent = icons[getTheme()] || '\u263E';
+        btn.onclick = function() {
+          const cur = getTheme();
+          const next = themes[(themes.indexOf(cur) + 1) % themes.length];
+          applyTheme(next);
+        };
+      }
+    });
+  })();
+  </script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
   <script src="/static/app.js"></script>
 </body>

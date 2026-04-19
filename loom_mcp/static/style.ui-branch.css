@@ -1,0 +1,339 @@
+/* =============================================================
+   style.ui-branch.css — v2 visual pass
+
+   Pure CSS overlay. Append to style.css:
+     <link rel="stylesheet" href="/static/style.css">
+     <link rel="stylesheet" href="/static/style.ui-branch.css">
+
+   Zero behavior changes. Re-skins the existing DOM only.
+
+   What's new in v2:
+   - Three themes: dark (default), light, paper
+     Switch via: <html data-theme="dark" | "light" | "paper">
+   - Tuned palettes — calm under load, no loud accents
+   - Cards sit one notch above chrome; chrome above canvas
+   - Semantic tokens for diffs, danger, etc. — theme-aware
+   - Tool-call blocks quiet until opened
+   - User messages get the Claude Code CLI treatment
+   - Sidebar active stays bright; non-current dims
+   - Filename chips inside user messages pop against the accent wash
+   ============================================================= */
+
+/* =============================================================
+   THEME TOKENS
+   ============================================================= */
+
+/* Dark — default (matches the blue-undertone palette) -------- */
+:root {
+  --bg:          oklch(0.19 0.035 258);
+  --bg-surface:  oklch(0.25 0.038 258);
+  --bg-surface2: oklch(0.30 0.040 258);
+  --bg-hover:    oklch(0.34 0.045 258);
+  --bg-sunken:   oklch(0.16 0.035 258);
+
+  --border:      oklch(0.36 0.040 258);
+  --border-soft: oklch(0.32 0.040 258 / 0.6);
+
+  --text:        oklch(0.84 0.035 258);
+  --text-bright: oklch(0.92 0.030 258);
+  --text-muted:  oklch(0.62 0.035 258);
+  --text-dim:    oklch(0.48 0.030 258);
+
+  --accent:      oklch(0.74 0.15 258);
+  --accent-soft: oklch(0.74 0.15 258 / 0.16);
+
+  /* Semantic hues — same names, reduced chroma. */
+  --accent2: oklch(0.72 0.13 300);   /* purple */
+  --green:   oklch(0.74 0.13 150);
+  --orange:  oklch(0.78 0.13 65);
+  --red:     oklch(0.72 0.14 25);
+  --yellow:  oklch(0.80 0.13 85);
+  --cyan:    oklch(0.76 0.12 200);
+
+  --shadow:    0 1px 2px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 14px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.2);
+  --glow:      0 0 0 2px oklch(0.74 0.15 258 / 0.28);
+
+  /* Semantic — diff highlights, danger */
+  --danger:       oklch(0.72 0.14 25);
+  --diff-del-bg:  oklch(0.35 0.10 25 / .25);
+  --diff-del-fg:  oklch(0.82 0.08 25);
+  --diff-add-bg:  oklch(0.35 0.10 150 / .25);
+  --diff-add-fg:  oklch(0.85 0.08 150);
+}
+
+/* Light -------------------------------------------------------
+   Cleanest canvas white; chrome a notch darker; cards just
+   above chrome. Sunken is noticeably deeper so inputs read as
+   wells without needing a border. */
+html[data-theme="light"] {
+  --bg:          oklch(0.995 0.002 255);
+  --bg-surface:  oklch(0.965 0.005 255);
+  --bg-surface2: oklch(0.985 0.003 255);
+  --bg-hover:    oklch(0.940 0.005 255);
+  --bg-sunken:   oklch(0.930 0.007 255);
+
+  --border:      oklch(0.87 0.005 255);
+  --border-soft: oklch(0.91 0.005 255 / 0.9);
+
+  --text:        oklch(0.24 0.01 265);
+  --text-bright: oklch(0.15 0.01 265);
+  --text-muted:  oklch(0.52 0.01 265);
+  --text-dim:    oklch(0.65 0.01 265);
+
+  --accent:      oklch(0.55 0.15 255);
+  --accent-soft: oklch(0.55 0.15 255 / 0.11);
+
+  --accent2: oklch(0.55 0.12 300);
+  --green:   oklch(0.55 0.12 150);
+  --orange:  oklch(0.60 0.12 65);
+  --red:     oklch(0.55 0.14 25);
+  --yellow:  oklch(0.60 0.12 85);
+  --cyan:    oklch(0.55 0.12 200);
+
+  --shadow:    0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.06);
+  --glow:      0 0 0 2px oklch(0.55 0.15 255 / 0.20);
+
+  --danger:       oklch(0.55 0.14 25);
+  --diff-del-bg:  oklch(0.90 0.04 25);
+  --diff-del-fg:  oklch(0.38 0.12 25);
+  --diff-add-bg:  oklch(0.92 0.04 150);
+  --diff-add-fg:  oklch(0.38 0.10 150);
+}
+
+/* Paper -------------------------------------------------------
+   Warm cream canvas (hue 90 — cream, not sepia). Accent is a
+   rust-leaning burnt-orange so it reads distinct against the
+   cream instead of blending. Text is warm umber for reading
+   weight. */
+html[data-theme="paper"] {
+  --bg:          oklch(0.962 0.008 90);
+  --bg-surface:  oklch(0.942 0.009 90);
+  --bg-surface2: oklch(0.958 0.007 90);
+  --bg-hover:    oklch(0.915 0.010 90);
+  --bg-sunken:   oklch(0.900 0.011 90);
+
+  --border:      oklch(0.83 0.010 80);
+  --border-soft: oklch(0.87 0.008 80 / 0.85);
+
+  --text:        oklch(0.26 0.015 60);
+  --text-bright: oklch(0.14 0.015 60);
+  --text-muted:  oklch(0.48 0.012 60);
+  --text-dim:    oklch(0.62 0.010 60);
+
+  --accent:      oklch(0.50 0.15 35);
+  --accent-soft: oklch(0.50 0.15 35 / 0.12);
+
+  --accent2: oklch(0.52 0.13 300);
+  --green:   oklch(0.50 0.13 150);
+  --orange:  oklch(0.56 0.13 65);
+  --red:     oklch(0.52 0.13 25);
+  --yellow:  oklch(0.56 0.13 85);
+  --cyan:    oklch(0.52 0.12 200);
+
+  --shadow:    0 1px 2px rgba(60,40,20,.06);
+  --shadow-md: 0 4px 16px rgba(60,40,20,.08);
+  --glow:      0 0 0 2px oklch(0.50 0.15 35 / 0.22);
+
+  --danger:       oklch(0.50 0.13 25);
+  --diff-del-bg:  oklch(0.88 0.05 25);
+  --diff-del-fg:  oklch(0.36 0.12 25);
+  --diff-add-bg:  oklch(0.90 0.05 135);
+  --diff-add-fg:  oklch(0.38 0.10 150);
+}
+
+/* =============================================================
+   CARDS — opaque at rest, type color only on attention
+   ============================================================= */
+.doc-card {
+  background: var(--bg-surface2);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow);
+  transition: box-shadow .18s, border-color .18s;
+}
+.doc-card:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+.doc-card.focused {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md), var(--glow);
+  z-index: 3;
+}
+
+/* Override style.css always-on type/category left borders.
+   Color only shows on hover/focus. */
+.doc-card[data-type="concept"],
+.doc-card[data-type="summary"],
+.doc-card[data-type="index"],
+.doc-card[data-type="answer"],
+.doc-card[data-type="project"],
+.doc-card[data-category="code"],
+.doc-card[data-category="papers"],
+.doc-card[data-category="data"] {
+  border-left-width: 1px;
+  border-left-color: var(--border-soft);
+}
+.doc-card:hover[data-type="concept"],
+.doc-card.focused[data-type="concept"]  { border-left: 3px solid var(--accent); }
+.doc-card:hover[data-type="summary"],
+.doc-card.focused[data-type="summary"]  { border-left: 3px solid var(--green); }
+.doc-card:hover[data-type="index"],
+.doc-card.focused[data-type="index"]    { border-left: 3px solid var(--orange); }
+.doc-card:hover[data-type="answer"],
+.doc-card.focused[data-type="answer"]   { border-left: 3px solid var(--accent2); }
+.doc-card:hover[data-type="project"],
+.doc-card.focused[data-type="project"]  { border-left: 3px solid var(--cyan); }
+.doc-card:hover[data-category="code"],
+.doc-card.focused[data-category="code"]   { border-left: 3px solid var(--green); }
+.doc-card:hover[data-category="papers"],
+.doc-card.focused[data-category="papers"] { border-left: 3px solid var(--orange); }
+.doc-card:hover[data-category="data"],
+.doc-card.focused[data-category="data"]   { border-left: 3px solid var(--yellow); }
+
+/* Handle / title bar — soft tonal step. */
+.doc-handle {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-soft);
+}
+.doc-title {
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.doc-card:hover .doc-title,
+.doc-card.focused .doc-title { color: var(--text-bright); }
+
+/* =============================================================
+   SVG EDGES — whisper at rest
+   ============================================================= */
+#edge-layer path {
+  stroke: var(--border);
+  opacity: 0.18;
+  transition: opacity .2s, stroke .2s;
+}
+#edge-layer path.highlighted {
+  stroke: var(--accent);
+  opacity: 0.35;
+}
+#canvas-container:hover #edge-layer path { opacity: 0.30; }
+#canvas-container:hover #edge-layer path.highlighted { opacity: 0.85; }
+
+/* =============================================================
+   SIDEBAR — dim non-current, accent rail on active
+   ============================================================= */
+.tree-item {
+  color: var(--text-muted);
+  transition: color .15s, background .15s;
+}
+.tree-item:hover { color: var(--text); background: var(--bg-hover); }
+.tree-item.active,
+.tree-item[data-active="true"] {
+  color: var(--text-bright);
+  background: var(--accent-soft);
+}
+.tree-icon { color: var(--text-dim); }
+.tree-item:hover .tree-icon { color: var(--text-muted); }
+.tree-item.active .tree-icon { color: var(--accent); }
+
+/* =============================================================
+   SEARCH / INPUTS — deeper sunken, no border needed
+   ============================================================= */
+input[type="search"],
+input[type="text"],
+textarea {
+  background: var(--bg-sunken);
+  border: 1px solid transparent;
+  color: var(--text);
+  transition: border-color .12s, background .12s;
+}
+input[type="search"]:focus,
+input[type="text"]:focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* =============================================================
+   USER MESSAGES — Claude Code CLI feel
+   ============================================================= */
+.chat-msg-user {
+  position: relative;
+  padding: 8px 12px 8px 26px;
+  background: var(--accent-soft);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--radius, 6px) var(--radius, 6px) 0;
+  color: var(--text-bright);
+  font-family: var(--font);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.chat-msg-user::before {
+  content: ">";
+  position: absolute;
+  left: 10px; top: 8px;
+  color: var(--accent);
+  font-weight: 600;
+  opacity: 0.9;
+}
+/* Filename chips inside user messages — pop against the accent wash.
+   Use canvas bg (brightest surface on light/paper) with a soft
+   border and medium weight. */
+.chat-msg-user code {
+  background: var(--bg);
+  color: var(--text-bright);
+  border: 1px solid var(--border-soft);
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* =============================================================
+   CHAT AT REST — tool-call blocks recede until opened
+   ============================================================= */
+.chat-activity-group {
+  background: transparent;
+  border-radius: var(--radius, 6px);
+  transition: background .15s;
+}
+.chat-activity-group:has(.chat-activity-body.open) {
+  background: var(--bg-sunken);
+}
+.chat-activity-header {
+  opacity: 0.75;
+  transition: opacity .15s, color .15s;
+}
+.chat-activity-header:hover { opacity: 1; }
+.chat-activity-group:has(.chat-activity-body.open) .chat-activity-header {
+  opacity: 1;
+}
+.chat-tool-entry {
+  border-bottom-color: var(--border-soft);
+}
+
+/* Assistant avatar — border so it always reads as a shape */
+.chat-msg-assistant-avatar,
+.chat-msg-avatar {
+  background: var(--bg-surface2);
+  border: 1px solid var(--border-soft);
+}
+
+/* =============================================================
+   DIFFS — theme-aware tints
+   ============================================================= */
+.diff-del, .d-del {
+  background: var(--diff-del-bg);
+  color: var(--diff-del-fg);
+}
+.diff-add, .d-add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-fg);
+}
+
+/* Danger / deny actions */
+.btn-deny, .deny {
+  border-color: var(--danger);
+  color: var(--danger);
+}
