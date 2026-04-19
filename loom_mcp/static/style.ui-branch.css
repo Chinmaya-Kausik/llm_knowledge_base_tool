@@ -68,13 +68,13 @@
    wells without needing a border. */
 html[data-theme="light"] {
   --bg:          oklch(0.995 0.002 255);
-  --bg-surface:  oklch(0.965 0.005 255);
-  --bg-surface2: oklch(0.985 0.003 255);
-  --bg-hover:    oklch(0.940 0.005 255);
-  --bg-sunken:   oklch(0.930 0.007 255);
+  --bg-surface:  oklch(0.960 0.005 255);
+  --bg-surface2: oklch(0.980 0.003 255);
+  --bg-hover:    oklch(0.935 0.005 255);
+  --bg-sunken:   oklch(0.920 0.007 255);
 
-  --border:      oklch(0.87 0.005 255);
-  --border-soft: oklch(0.91 0.005 255 / 0.9);
+  --border:      oklch(0.78 0.008 255);
+  --border-soft: oklch(0.82 0.008 255);
 
   --text:        oklch(0.24 0.01 265);
   --text-bright: oklch(0.15 0.01 265);
@@ -109,13 +109,13 @@ html[data-theme="light"] {
    weight. */
 html[data-theme="paper"] {
   --bg:          oklch(0.962 0.008 90);
-  --bg-surface:  oklch(0.942 0.009 90);
-  --bg-surface2: oklch(0.958 0.007 90);
-  --bg-hover:    oklch(0.915 0.010 90);
-  --bg-sunken:   oklch(0.900 0.011 90);
+  --bg-surface:  oklch(0.938 0.009 90);
+  --bg-surface2: oklch(0.955 0.007 90);
+  --bg-hover:    oklch(0.910 0.010 90);
+  --bg-sunken:   oklch(0.895 0.011 90);
 
-  --border:      oklch(0.83 0.010 80);
-  --border-soft: oklch(0.87 0.008 80 / 0.85);
+  --border:      oklch(0.76 0.012 80);
+  --border-soft: oklch(0.80 0.010 80);
 
   --text:        oklch(0.26 0.015 60);
   --text-bright: oklch(0.14 0.015 60);
