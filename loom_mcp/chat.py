@@ -750,6 +750,21 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
         except Exception:
             pass
 
+        # Send ntfy notification on completion
+        try:
+            from loom_mcp.notify import notify_agent_done
+            session = sessions.get(session_id, {})
+            agent_type = session.get("agent_type", "claude-code")
+            # Get last result content for summary
+            last_result = ""
+            for msg in reversed(session.get("messages_snapshot", [])):
+                if msg.get("role") == "assistant":
+                    last_result = msg.get("content", "")[:200]
+                    break
+            notify_agent_done(agent_type, last_result)
+        except Exception:
+            pass
+
     except asyncio.CancelledError:
         # Interrupt and disconnect so next query starts fresh
         if adapter:

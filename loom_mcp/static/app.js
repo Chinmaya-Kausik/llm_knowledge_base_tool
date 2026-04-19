@@ -75,38 +75,130 @@ function saveKeyBindings() {
 }
 
 // --- API ---
+// --- Endpoint Switcher ---
+// Tries multiple backends in order: local WiFi -> Tailscale -> VM fallback
+let activeBackend = null; // {label, url, token} or null (same-origin)
+
+function getBackends() {
+  try { return JSON.parse(localStorage.getItem('loom-backends') || '[]'); } catch { return []; }
+}
+function setBackends(list) { localStorage.setItem('loom-backends', JSON.stringify(list)); }
+function getBaseUrl() { return activeBackend?.url || ''; }
+function getWsUrl() {
+  if (!activeBackend?.url) return `ws://${location.host}`;
+  const url = new URL(activeBackend.url);
+  return `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}`;
+}
+function getTokenParam() {
+  const token = activeBackend?.token || '';
+  return token ? `token=${encodeURIComponent(token)}` : '';
+}
+
+function authFetch(url, opts = {}) {
+  const token = activeBackend?.token;
+  if (token) {
+    opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}` };
+  }
+  return fetch(url, opts);
+}
+
+async function probeBackend(backend, timeoutMs = 2000) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const start = performance.now();
+    const r = await fetch(`${backend.url}/api/ping`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (r.ok) return { ok: true, latencyMs: Math.round(performance.now() - start) };
+  } catch {}
+  return { ok: false, latencyMs: -1 };
+}
+
+async function selectBackend() {
+  const backends = getBackends();
+  if (backends.length === 0) { activeBackend = null; return true; } // Same-origin, no switching needed
+
+  // Try last-working backend first (fast path)
+  const lastLabel = localStorage.getItem('loom-active-backend');
+  if (lastLabel) {
+    const last = backends.find(b => b.label === lastLabel);
+    if (last) {
+      const probe = await probeBackend(last, 1500);
+      if (probe.ok) { activeBackend = last; return true; }
+    }
+  }
+
+  // Try all in order
+  for (const backend of backends) {
+    const probe = await probeBackend(backend, 2000);
+    if (probe.ok) {
+      activeBackend = backend;
+      localStorage.setItem('loom-active-backend', backend.label);
+      console.log(`[backend] Connected to ${backend.label} (${probe.latencyMs}ms)`);
+      return true;
+    }
+  }
+
+  // None responded
+  activeBackend = null;
+  return false;
+}
+
+function showOfflineOverlay() {
+  let overlay = document.getElementById('offline-overlay');
+  if (overlay) return;
+  overlay = document.createElement('div');
+  overlay.id = 'offline-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+  overlay.innerHTML = `
+    <h1 style="color:var(--text);font-family:var(--font)">Loom</h1>
+    <p style="color:var(--text-muted);font-family:var(--font)">Cannot reach any backend. Turn on your laptop or check your connection.</p>
+    <button onclick="retryBackendConnection()" style="background:var(--accent);color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;font-family:var(--font)">Retry</button>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function hideOfflineOverlay() {
+  document.getElementById('offline-overlay')?.remove();
+}
+
+async function retryBackendConnection() {
+  const ok = await selectBackend();
+  if (ok) { hideOfflineOverlay(); location.reload(); }
+}
+
 const api = {
-  graph:       () => { const url = `/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] graph:', url); return fetch(url).then(r => r.json()); },
-  page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
-  tree:        () => { const url = `/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] tree:', url); return fetch(url).then(r => r.json()); },
-  search:      (q, s='all', mode='both') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
-  health:      () => fetch('/api/health').then(r => r.json()),
-  brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
-  orphans:     () => fetch('/api/orphans').then(r => r.json()),
-  stale:       () => fetch('/api/stale').then(r => r.json()),
-  getLayout:   () => fetch('/api/layout').then(r => r.json()).catch(() => ({})),
-  saveLayout:  (d) => fetch('/api/layout', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}),
-  savePage:    (p, fm, c) => fetch(`/api/page/${p}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({frontmatter:fm, content:c})}),
+  graph:       () => { const url = `${getBaseUrl()}/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] graph:', url); return authFetch(url).then(r => r.json()); },
+  page:        (p) => authFetch(`${getBaseUrl()}/api/page/${p}`).then(r => r.json()),
+  tree:        () => { const url = `${getBaseUrl()}/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] tree:', url); return authFetch(url).then(r => r.json()); },
+  search:      (q, s='all', mode='both') => authFetch(`${getBaseUrl()}/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
+  health:      () => authFetch(`${getBaseUrl()}/api/health`).then(r => r.json()),
+  brokenLinks: () => authFetch(`${getBaseUrl()}/api/broken-links`).then(r => r.json()),
+  orphans:     () => authFetch(`${getBaseUrl()}/api/orphans`).then(r => r.json()),
+  stale:       () => authFetch(`${getBaseUrl()}/api/stale`).then(r => r.json()),
+  getLayout:   () => authFetch(`${getBaseUrl()}/api/layout`).then(r => r.json()).catch(() => ({})),
+  saveLayout:  (d) => authFetch(`${getBaseUrl()}/api/layout`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}),
+  savePage:    (p, fm, c) => authFetch(`${getBaseUrl()}/api/page/${p}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({frontmatter:fm, content:c})}),
   // VM APIs
-  vms:         () => fetch('/api/vms').then(r => r.json()),
-  vmAdd:       (d) => fetch('/api/vms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmUpdate:    (id,d) => fetch(`/api/vms/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmDelete:    (id) => fetch(`/api/vms/${id}`, {method:'DELETE'}).then(r=>r.json()),
-  vmTree:      (id) => fetch(`/api/vms/${id}/tree`).then(r=>r.json()),
-  vmFile:      (id,p) => fetch(`/api/vms/${id}/file?path=${encodeURIComponent(p)}`).then(r=>r.json()),
-  vmSearch:    (id,q,mode='content') => fetch(`/api/vms/${id}/search?q=${encodeURIComponent(q)}&mode=${mode}`).then(r=>r.json()),
-  vmGraph:     (id) => fetch(`/api/vms/${id}/graph`).then(r=>r.json()),
-  vmPush:      (id,d={}) => fetch(`/api/vms/${id}/push`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmPull:      (id,d={}) => fetch(`/api/vms/${id}/pull`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmSyncStatus:(id) => fetch(`/api/vms/${id}/sync-status`).then(r=>r.json()),
-  vmMetrics:   (id) => fetch(`/api/vms/${id}/metrics`).then(r=>r.json()),
-  vmJobs:      (id) => fetch(`/api/vms/${id}/jobs`).then(r=>r.json()),
-  vmStartJob:  (id,d) => fetch(`/api/vms/${id}/jobs`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmStopJob:   (id,jid) => fetch(`/api/vms/${id}/jobs/${jid}`, {method:'DELETE'}).then(r=>r.json()),
-  vmJobOutput: (id,jid) => fetch(`/api/vms/${id}/jobs/${jid}/output`).then(r=>r.json()),
-  vmTunnels:   (id) => fetch(`/api/vms/${id}/tunnels`).then(r=>r.json()),
-  vmAddTunnel: (id,d) => fetch(`/api/vms/${id}/tunnels`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
-  vmCloseTunnel:(id,p) => fetch(`/api/vms/${id}/tunnels/${p}`, {method:'DELETE'}).then(r=>r.json()),
+  vms:         () => authFetch(`${getBaseUrl()}/api/vms`).then(r => r.json()),
+  vmAdd:       (d) => authFetch(`${getBaseUrl()}/api/vms`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmUpdate:    (id,d) => authFetch(`${getBaseUrl()}/api/vms/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmDelete:    (id) => authFetch(`${getBaseUrl()}/api/vms/${id}`, {method:'DELETE'}).then(r=>r.json()),
+  vmTree:      (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/tree`).then(r=>r.json()),
+  vmFile:      (id,p) => authFetch(`${getBaseUrl()}/api/vms/${id}/file?path=${encodeURIComponent(p)}`).then(r=>r.json()),
+  vmSearch:    (id,q,mode='content') => authFetch(`${getBaseUrl()}/api/vms/${id}/search?q=${encodeURIComponent(q)}&mode=${mode}`).then(r=>r.json()),
+  vmGraph:     (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/graph`).then(r=>r.json()),
+  vmPush:      (id,d={}) => authFetch(`${getBaseUrl()}/api/vms/${id}/push`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmPull:      (id,d={}) => authFetch(`${getBaseUrl()}/api/vms/${id}/pull`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmSyncStatus:(id) => authFetch(`${getBaseUrl()}/api/vms/${id}/sync-status`).then(r=>r.json()),
+  vmMetrics:   (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/metrics`).then(r=>r.json()),
+  vmJobs:      (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/jobs`).then(r=>r.json()),
+  vmStartJob:  (id,d) => authFetch(`${getBaseUrl()}/api/vms/${id}/jobs`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmStopJob:   (id,jid) => authFetch(`${getBaseUrl()}/api/vms/${id}/jobs/${jid}`, {method:'DELETE'}).then(r=>r.json()),
+  vmJobOutput: (id,jid) => authFetch(`${getBaseUrl()}/api/vms/${id}/jobs/${jid}/output`).then(r=>r.json()),
+  vmTunnels:   (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/tunnels`).then(r=>r.json()),
+  vmAddTunnel: (id,d) => authFetch(`${getBaseUrl()}/api/vms/${id}/tunnels`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmCloseTunnel:(id,p) => authFetch(`${getBaseUrl()}/api/vms/${id}/tunnels/${p}`, {method:'DELETE'}).then(r=>r.json()),
 };
 
 // --- VM / Target Switching ---
@@ -338,7 +430,7 @@ function createVMTerminalPanel(vmId, vmLabel) {
   requestAnimationFrame(() => fitAddon.fit());
 
   // WebSocket to VM terminal
-  const ws = new WebSocket(`ws://${location.host}/ws/vm-terminal/${vmId}`);
+  const ws = new WebSocket(`${getWsUrl()}/ws/vm-terminal/${vmId}?${getTokenParam()}`);
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { ws.send(`RESIZE:${term.cols}:${term.rows}`); };
   ws.onmessage = (e) => {
@@ -611,7 +703,7 @@ function showVMMetricsPanel(vmId) {
   const history = { cpu: [], ram: [], gpu: [] };
   const MAX_HISTORY = 60;
 
-  vmMetricsWs = new WebSocket(`ws://${location.host}/ws/vm-metrics/${vmId}`);
+  vmMetricsWs = new WebSocket(`${getWsUrl()}/ws/vm-metrics/${vmId}?${getTokenParam()}`);
   vmMetricsWs.onmessage = (e) => {
     const m = JSON.parse(e.data);
     const body = document.getElementById('vm-metrics-body');
@@ -3936,7 +4028,8 @@ function createFloatingPanel(options = {}) {
 }
 
 function connectPanelChat(panel, messagesEl) {
-  const wsUrl = `ws://${location.host}/ws/chat`;
+  const tokenParam = getTokenParam();
+  const wsUrl = `${getWsUrl()}/ws/chat${tokenParam ? '?' + tokenParam : ''}`;
   try {
     panel.ws = new WebSocket(wsUrl);
   } catch (e) { return; }
@@ -4170,7 +4263,7 @@ function createTerminalPanel() {
 
   // WebSocket to backend PTY
   console.log('[TERM] connecting to ws/terminal');
-  const ws = new WebSocket(`ws://${location.host}/ws/terminal`);
+  const ws = new WebSocket(`${getWsUrl()}/ws/terminal?${getTokenParam()}`);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
@@ -4530,7 +4623,8 @@ function connectChat() {
   const statusEl = document.querySelector('#chat-header .panel-status');
   if (statusEl) statusEl.className = 'panel-status';
 
-  const wsUrl = `ws://${location.host}/ws/chat`;
+  const tokenParam = getTokenParam();
+  const wsUrl = `${getWsUrl()}/ws/chat${tokenParam ? '?' + tokenParam : ''}`;
   let ws;
   try {
     ws = new WebSocket(wsUrl);
@@ -6535,6 +6629,13 @@ function renderKeybindingEditor(container) {
 
 // --- Main init ---
 async function init() {
+  // Try to select backend if multiple are configured
+  const backends = getBackends();
+  if (backends.length > 0) {
+    const ok = await selectBackend();
+    if (!ok) { showOfflineOverlay(); return; }
+  }
+
   initCanvas();
   initFilterDropdowns();
   initChat();

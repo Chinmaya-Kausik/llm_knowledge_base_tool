@@ -273,7 +273,20 @@ context:
 @asynccontextmanager
 async def lifespan(app):
     bootstrap_loom(LOOM_ROOT)
+    # Start sync daemon if configured
+    sync_task = None
+    try:
+        from loom_mcp.sync_daemon import run_sync_daemon
+        sync_task = await run_sync_daemon(LOOM_ROOT)
+    except Exception:
+        pass
     yield
+    if sync_task:
+        sync_task.cancel()
+        try:
+            await sync_task
+        except Exception:
+            pass
 
 
 app = FastAPI(title="Loom Knowledge Base", lifespan=lifespan)
@@ -1363,6 +1376,47 @@ async def upload_chat_image(request: Request):
     return {"path": str(file_path), "url": f"/media/raw/media/chat-images/{file_path.name}"}
 
 
+# --- Ntfy Settings ---
+
+@app.get("/api/settings/ntfy")
+def api_get_ntfy():
+    """Get ntfy config."""
+    config_path = Path.home() / ".loom-app-config.json"
+    if not config_path.exists():
+        return {"topic": "", "server": "https://ntfy.sh"}
+    try:
+        data = json.loads(config_path.read_text())
+        ntfy = data.get("ntfy", {})
+        return {"topic": ntfy.get("topic", ""), "server": ntfy.get("server", "https://ntfy.sh")}
+    except Exception:
+        return {"topic": "", "server": "https://ntfy.sh"}
+
+
+@app.put("/api/settings/ntfy")
+async def api_set_ntfy(request: Request):
+    """Set ntfy config."""
+    body = await request.json()
+    config_path = Path.home() / ".loom-app-config.json"
+    try:
+        data = json.loads(config_path.read_text()) if config_path.exists() else {}
+        data["ntfy"] = {
+            "topic": body.get("topic", ""),
+            "server": body.get("server", "https://ntfy.sh"),
+        }
+        config_path.write_text(json.dumps(data, indent=2))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/settings/ntfy/test")
+async def api_test_ntfy():
+    """Send a test notification."""
+    from loom_mcp.notify import send
+    ok = send("Loom Test", "Notifications are working!", tags="white_check_mark")
+    return {"ok": ok}
+
+
 # --- VM API ---
 
 @app.get("/api/vms")
@@ -1934,6 +1988,12 @@ async def auth_and_cache(request: Request, call_next):
     if path.startswith("/static") or path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Serve service worker from root scope."""
+    return FileResponse(str(STATIC_DIR / "sw.js"), media_type="application/javascript")
 
 
 @app.get("/")

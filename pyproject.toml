@@ -34,6 +34,7 @@ web = [
 
 [project.scripts]
 loom-web = "loom_mcp.web:main"
+loom-sync = "loom_mcp.sync_daemon:main"
 
 [build-system]
 requires = ["hatchling"]

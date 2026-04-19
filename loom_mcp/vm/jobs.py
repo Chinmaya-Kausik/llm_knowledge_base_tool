@@ -152,6 +152,12 @@ async def refresh_job_status(ssh_pool: Any, vm_config: dict[str, Any],
             except ValueError:
                 job["exit_code"] = None
             changed = True
+            # Send ntfy notification
+            try:
+                from loom_mcp.notify import notify_job_done
+                notify_job_done(job["name"], vm_config.get("label", ""), job["exit_code"])
+            except Exception:
+                pass
 
     if changed:
         save_jobs(loom_root, jobs)
