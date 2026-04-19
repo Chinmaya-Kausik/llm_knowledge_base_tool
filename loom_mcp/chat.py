@@ -1,4 +1,4 @@
-"""Chat backend — WebSocket bridge to Claude Code subprocess via Agent SDK."""
+"""Chat backend — WebSocket bridge to coding agents via adapter layer."""
 
 import asyncio
 import json
@@ -50,6 +50,7 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
                     "page_path": msg.get("page_path"),
                     "history": [],
                     "model": msg.get("model"),
+                    "agent_type": msg.get("agent", "claude-code"),
                     "permission_mode": msg.get("permission_mode", "auto"),
                 }
                 await websocket.send_json({"type": "init", "session_id": session_id})
@@ -111,11 +112,11 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
                 # Browser sends permission rules: {category: "allow"|"ask"|"deny"}
                 if session_id and session_id in sessions:
                     sessions[session_id]["permission_rules"] = msg.get("rules", {})
-                    # Disconnect existing client so next query uses new rules
-                    client = sessions[session_id].pop("sdk_client", None)
-                    if client:
+                    # Disconnect existing adapter so next query uses new rules
+                    adapter = sessions[session_id].pop("adapter", None)
+                    if adapter:
                         try:
-                            await client.disconnect()
+                            await adapter.disconnect()
                         except Exception:
                             pass
                     await websocket.send_json({"type": "permissions_set"})
@@ -130,12 +131,12 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
     finally:
         if query_task and not query_task.done():
             query_task.cancel()
-        # Clean up SDK client on disconnect
+        # Clean up agent adapter on disconnect
         if session_id and session_id in sessions:
-            client = sessions[session_id].pop("sdk_client", None)
-            if client:
+            adapter = sessions[session_id].pop("adapter", None)
+            if adapter:
                 try:
-                    await client.disconnect()
+                    await adapter.disconnect()
                 except Exception:
                     pass
 
@@ -398,6 +399,28 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
     if not page_path:
         return None
 
+    # VM context — page_path starts with "vm:"
+    if page_path.startswith("vm:"):
+        vm_id = page_path[3:]
+        try:
+            from loom_mcp.vm.config import get_vm
+            vm = get_vm(loom_root, vm_id)
+            if vm:
+                return (
+                    f'The user is currently viewing VM "{vm["label"]}" '
+                    f'({vm.get("user", "")}@{vm["host"]}:{vm.get("port", 22)}, '
+                    f'working dir: {vm.get("sync_dir", "~")}).\n\n'
+                    f"Use vm_* MCP tools (vm_bash, vm_read, vm_write, vm_edit, vm_glob, vm_grep, "
+                    f"vm_push, vm_pull, vm_status) to interact with this VM. "
+                    f'Pass vm_id="{vm_id}" to all vm_* tools.\n\n'
+                    f"Built-in tools (Read, Write, Bash, Glob, Grep, Edit) still operate on "
+                    f"the local filesystem — use them for memory, wiki, and local files."
+                )
+            else:
+                return f'The user is viewing a VM with id "{vm_id}" (not found in config).'
+        except ImportError:
+            return f'The user is viewing VM "{vm_id}" (VM module not available).'
+
     parts = []
 
     if context_level == "page":
@@ -560,211 +583,165 @@ def resolve_permission(session_id: str, decision: str) -> None:
         future.set_result(decision)
 
 
-async def _get_or_create_client(session_id: str, loom_root: Path, context_level: str, websocket: WebSocket):
-    """Get an existing ClaudeSDKClient for the session, or create a new one."""
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
-    from claude_agent_sdk.types import HookMatcher, SyncHookJSONOutput
+async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level: str, websocket: WebSocket):
+    """Get an existing agent adapter for the session, or create a new one."""
+    from loom_mcp.agents import AgentAdapter, get_adapter
 
     session = sessions.get(session_id, {})
-    client = session.get("sdk_client")
+    adapter = session.get("adapter")
 
-    if client is not None:
-        # Update system prompt for new context
-        system_prompt = build_system_prompt(session_id, loom_root, context_level)
-        # Client is already connected — just return it
-        return client
+    if adapter is not None:
+        return adapter
 
+    agent_type = session.get("agent_type", "claude-code")
     system_prompt = build_system_prompt(session_id, loom_root, context_level)
     model = session.get("model")
-    sdk_sid = session.get("sdk_session_id")
-    has_run = session.get("has_run", False)
     rules = session.get("permission_rules", {})
 
-    # Use "default" permission mode when we have a can_use_tool callback,
-    # "auto" when no rules are set (backwards compatible)
-    has_rules = any(v != "allow" for v in rules.values())
-    perm_mode = "default" if has_rules else "auto"
-    can_use_tool_cb = _make_permission_handler(session_id, websocket) if has_rules else None
+    # Build adapter config
+    config: dict = {
+        "session_id": session_id,
+        "loom_root": str(loom_root),
+        "system_prompt": system_prompt,
+        "model": model,
+    }
 
-    # PreCompact hook: snapshot messages before compaction
-    async def _on_precompact(hook_input, matcher, context):
-        import logging
-        log = logging.getLogger("loom.chat")
+    if agent_type == "claude-code":
+        # Claude-specific config
+        has_rules = any(v != "allow" for v in rules.values())
+        config["permission_mode"] = "default" if has_rules else "auto"
+        config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
+        config["resume_session_id"] = session.get("sdk_session_id")
+        config["has_run"] = session.get("has_run", False)
 
-        panel = sessions.get(session_id, {})
-        messages = panel.get("messages_snapshot", [])
-        if not messages:
-            log.info("[compact] PreCompact fired but no messages to snapshot")
+        # PreCompact hook
+        from claude_agent_sdk.types import HookMatcher, SyncHookJSONOutput
+
+        async def _on_precompact(hook_input, matcher, context):
+            import logging
+            log = logging.getLogger("loom.chat")
+            panel = sessions.get(session_id, {})
+            messages = panel.get("messages_snapshot", [])
+            if not messages:
+                return SyncHookJSONOutput(exit_code=0)
+            chats_dir = loom_root / "raw" / "chats"
+            chats_dir.mkdir(parents=True, exist_ok=True)
+            compact_count = panel.get("compact_count", 0) + 1
+            panel["compact_count"] = compact_count
+            filename = f"{session_id[:8]}_precompact_{compact_count}.md"
+            path = chats_dir / filename
+            from loom_mcp.tools.compile import _render_messages
+            lines = [f"# Pre-compaction snapshot {compact_count}", f"Session: {session_id}", ""]
+            lines.extend(_render_messages(messages))
+            path.write_text("\n".join(lines), encoding="utf-8")
+            precompacts = panel.setdefault("precompact_files", [])
+            precompacts.append(str(path.relative_to(loom_root)))
+            log.info("[compact] Saved %d messages to %s (compaction #%d)", len(messages), filename, compact_count)
             return SyncHookJSONOutput(exit_code=0)
 
-        # Save pre-compaction messages to a file
-        chats_dir = loom_root / "raw" / "chats"
-        chats_dir.mkdir(parents=True, exist_ok=True)
+        config["hooks"] = {"PreCompact": [HookMatcher(hooks=[_on_precompact])]}
+    else:
+        # Non-Claude agents: pass agent-specific config from app config
+        try:
+            import json as _json
+            app_config_path = Path.home() / ".loom-app-config.json"
+            if app_config_path.exists():
+                app_config = _json.loads(app_config_path.read_text())
+                agent_cfg = app_config.get("agents", {}).get(agent_type, {})
+                config.update(agent_cfg)
+        except Exception:
+            pass
 
-        compact_count = panel.get("compact_count", 0) + 1
-        panel["compact_count"] = compact_count
-
-        filename = f"{session_id[:8]}_precompact_{compact_count}.md"
-        path = chats_dir / filename
-
-        from loom_mcp.tools.compile import _render_messages
-        lines = [f"# Pre-compaction snapshot {compact_count}", f"Session: {session_id}", ""]
-        lines.extend(_render_messages(messages))
-        path.write_text("\n".join(lines), encoding="utf-8")
-
-        # Track the precompact file paths
-        precompacts = panel.setdefault("precompact_files", [])
-        precompacts.append(str(path.relative_to(loom_root)))
-
-        log.info("[compact] Saved %d messages to %s (compaction #%d)", len(messages), filename, compact_count)
-        return SyncHookJSONOutput(exit_code=0)
-
-    precompact_hooks = [HookMatcher(hooks=[_on_precompact])]
-
-    options = ClaudeAgentOptions(
-        cwd=str(loom_root),
-        system_prompt={"type": "preset", "preset": "claude_code", "append": system_prompt},
-        setting_sources=["project"],
-        include_partial_messages=True,
-        thinking={"type": "enabled", "budget_tokens": 10000},
-        permission_mode=perm_mode,
-        resume=sdk_sid if has_run and sdk_sid else None,
-        model=model,
-        can_use_tool=can_use_tool_cb,
-        hooks={"PreCompact": precompact_hooks},
-    )
-
-    client = ClaudeSDKClient(options)
-    await client.connect()
-    session["sdk_client"] = client
+    adapter = get_adapter(agent_type)
+    await adapter.connect(config)
+    session["adapter"] = adapter
     session["has_run"] = True
-    return client
+    return adapter
 
 
 async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_root: Path, context_level: str = "page"):
-    """Stream a Claude Code query response to the WebSocket using ClaudeSDKClient."""
-    try:
-        from claude_agent_sdk import (
-            AssistantMessage,
-            ResultMessage,
-            StreamEvent,
-            SystemMessage,
-            TaskNotificationMessage,
-            TaskProgressMessage,
-            TaskStartedMessage,
-            UserMessage,
-        )
+    """Stream an agent query response to the WebSocket.
 
-        client = await _get_or_create_client(session_id, loom_root, context_level, websocket)
+    Agent-agnostic: consumes AgentEvents from the adapter and forwards
+    them to the browser using the same WebSocket protocol.
+    """
+    adapter = None
+    try:
+        from loom_mcp.agents import AgentEvent
+
+        adapter = await _get_or_create_adapter(session_id, loom_root, context_level, websocket)
 
         # Track messages for PreCompact snapshot
         session = sessions.get(session_id, {})
         msg_snapshot = session.setdefault("messages_snapshot", [])
         msg_snapshot.append({"role": "user", "content": prompt})
 
-        await client.query(prompt)
+        await adapter.query(prompt)
 
-        current_subagent_task_id = None
-
-        async for event in client.receive_response():
+        async for event in adapter.receive():
             try:
-                if isinstance(event, StreamEvent):
-                    ev = getattr(event, 'event', None) or {}
-                    if isinstance(ev, dict):
-                        delta = ev.get("delta", {})
-                        if isinstance(delta, dict):
-                            dtype = delta.get("type", "")
-                            if dtype == "thinking_delta":
-                                await websocket.send_json({
-                                    "type": "thinking",
-                                    "subagent_id": current_subagent_task_id,
-                                    "content": delta.get("thinking", ""),
-                                })
-                            elif dtype == "text_delta":
-                                await websocket.send_json({
-                                    "type": "text",
-                                    "subagent_id": current_subagent_task_id,
-                                    "content": delta.get("text", ""),
-                                })
-
-                elif isinstance(event, AssistantMessage):
-                    for block in getattr(event, 'content', []):
-                        block_cls = type(block).__name__
-                        if block_cls == 'ToolUseBlock':
-                            await websocket.send_json({
-                                "type": "tool_use",
-                                "subagent_id": current_subagent_task_id,
-                                "tool": getattr(block, 'name', 'unknown'),
-                                "input": getattr(block, 'input', {}),
-                            })
-                        elif block_cls == 'ThinkingBlock':
-                            # Already streamed via thinking_delta events — skip
-                            # to avoid duplicating content in the UI
-                            pass
-
-                elif isinstance(event, UserMessage):
-                    for block in getattr(event, 'content', []):
-                        block_cls = type(block).__name__
-                        if block_cls == 'ToolResultBlock':
-                            content = getattr(block, 'content', '')
-                            if isinstance(content, list):
-                                content = '\n'.join(
-                                    getattr(item, 'text', str(item))
-                                    for item in content
-                                )
-                            await websocket.send_json({
-                                "type": "tool_result",
-                                "subagent_id": current_subagent_task_id,
-                                "output": str(content)[:3000],
-                            })
-
-                elif isinstance(event, ResultMessage):
-                    result = getattr(event, 'result', '')
-                    usage = getattr(event, 'usage', None) or {}
-                    cost = getattr(event, 'total_cost_usd', None)
-                    # Track for PreCompact snapshot
-                    if result:
-                        msg_snapshot.append({"role": "assistant", "content": result})
+                if event.type == "text":
+                    await websocket.send_json({
+                        "type": "text",
+                        "subagent_id": event.data.get("subagent_id"),
+                        "content": event.content,
+                    })
+                elif event.type == "thinking":
+                    await websocket.send_json({
+                        "type": "thinking",
+                        "subagent_id": event.data.get("subagent_id"),
+                        "content": event.content,
+                    })
+                elif event.type == "tool_use":
+                    await websocket.send_json({
+                        "type": "tool_use",
+                        "subagent_id": event.data.get("subagent_id"),
+                        "tool": event.data.get("tool", "unknown"),
+                        "input": event.data.get("input", {}),
+                    })
+                elif event.type == "tool_result":
+                    await websocket.send_json({
+                        "type": "tool_result",
+                        "subagent_id": event.data.get("subagent_id"),
+                        "output": event.content,
+                    })
+                elif event.type == "result":
+                    if event.content:
+                        msg_snapshot.append({"role": "assistant", "content": event.content})
                     await websocket.send_json({
                         "type": "result",
-                        "content": result or '',
-                        "usage": usage,
-                        "cost_usd": cost,
+                        "content": event.content,
+                        "usage": event.data.get("usage", {}),
+                        "cost_usd": event.data.get("cost_usd"),
                     })
-
-                elif isinstance(event, TaskStartedMessage):
-                    current_subagent_task_id = getattr(event, 'task_id', '')
+                elif event.type == "subagent_started":
                     await websocket.send_json({
                         "type": "subagent_started",
-                        "task_id": current_subagent_task_id,
-                        "description": getattr(event, 'description', ''),
-                        "task_type": getattr(event, 'task_type', ''),
+                        "task_id": event.data.get("task_id", ""),
+                        "description": event.data.get("description", ""),
+                        "task_type": event.data.get("task_type", ""),
                     })
-
-                elif isinstance(event, TaskProgressMessage):
+                elif event.type == "subagent_progress":
                     await websocket.send_json({
                         "type": "subagent_progress",
-                        "task_id": getattr(event, 'task_id', ''),
-                        "description": getattr(event, 'description', ''),
-                        "last_tool": getattr(event, 'last_tool_name', ''),
+                        "task_id": event.data.get("task_id", ""),
+                        "description": event.data.get("description", ""),
+                        "last_tool": event.data.get("last_tool", ""),
                     })
-
-                elif isinstance(event, TaskNotificationMessage):
+                elif event.type == "subagent_done":
                     await websocket.send_json({
                         "type": "subagent_done",
-                        "task_id": getattr(event, 'task_id', ''),
-                        "status": getattr(event, 'status', ''),
-                        "summary": getattr(event, 'summary', ''),
+                        "task_id": event.data.get("task_id", ""),
+                        "status": event.data.get("status", ""),
+                        "summary": event.data.get("summary", ""),
                     })
-                    current_subagent_task_id = None
-
-                elif isinstance(event, SystemMessage):
-                    subtype = getattr(event, 'subtype', '')
-                    if subtype == 'init':
-                        data = getattr(event, 'data', {})
-                        if isinstance(data, dict) and 'session_id' in data:
-                            sessions[session_id]["sdk_session_id"] = data["session_id"]
-
+                elif event.type == "init":
+                    # Store SDK session ID for resume support
+                    sdk_sid = event.data.get("sdk_session_id")
+                    if sdk_sid:
+                        sessions[session_id]["sdk_session_id"] = sdk_sid
+                elif event.type == "error":
+                    await websocket.send_json({"type": "error", "message": event.content})
             except Exception:
                 continue
 
@@ -774,31 +751,24 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
             pass
 
     except asyncio.CancelledError:
-        # Interrupt the client and disconnect so next query starts fresh.
-        # Use timeouts — client.interrupt()/disconnect() can hang with stuck subagents.
-        try:
-            await asyncio.wait_for(client.interrupt(), timeout=3.0)
-        except (asyncio.TimeoutError, Exception):
-            pass
-        # Disconnect client — interrupted state is unreliable for reuse
+        # Interrupt and disconnect so next query starts fresh
+        if adapter:
+            await adapter.stop()
         session = sessions.get(session_id, {})
-        old_client = session.pop("sdk_client", None)
-        if old_client:
-            try:
-                await asyncio.wait_for(old_client.disconnect(), timeout=3.0)
-            except (asyncio.TimeoutError, Exception):
-                pass
+        old_adapter = session.pop("adapter", None)
+        if old_adapter:
+            await old_adapter.disconnect()
         try:
             await websocket.send_json({"type": "stopped"})
         except Exception:
             pass
     except Exception as e:
-        # On error, disconnect the client so next message creates a fresh one
+        # On error, disconnect the adapter so next message creates a fresh one
         session = sessions.get(session_id, {})
-        client = session.pop("sdk_client", None)
-        if client:
+        old_adapter = session.pop("adapter", None)
+        if old_adapter:
             try:
-                await client.disconnect()
+                await old_adapter.disconnect()
             except Exception:
                 pass
         try:

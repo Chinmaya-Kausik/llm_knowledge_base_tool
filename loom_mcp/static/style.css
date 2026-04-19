@@ -646,6 +646,39 @@ body {
 .floating-chat-panel.minimized .panel-menu { display: none !important; }
 .floating-chat-panel.minimized { min-height: 0 !important; height: auto !important; width: 240px !important; min-width: 0 !important; }
 .floating-chat-panel.minimized .panel-header { border-bottom: none; }
+
+/* Toast notifications */
+.loom-toast {
+  position: fixed; bottom: 20px; right: 20px; z-index: 100000;
+  background: var(--bg-surface2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 16px; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0; transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.loom-toast.show { opacity: 1; transform: translateY(0); }
+
+/* Background agents badge */
+#bg-agents-badge {
+  position: fixed; bottom: 20px; left: 20px; z-index: 100000;
+  padding: 6px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;
+  cursor: pointer; user-select: none;
+}
+#bg-agents-badge.running { background: var(--blue); color: #fff; animation: status-pulse 1.5s infinite; }
+#bg-agents-badge.done { background: var(--green); color: #fff; }
+
+/* Background agents list */
+#bg-agents-list {
+  position: fixed; bottom: 50px; left: 20px; z-index: 100001;
+  background: var(--bg-surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px 0; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.bg-agent-row {
+  padding: 8px 14px; font-size: 13px; cursor: pointer;
+  color: var(--text-muted);
+}
+.bg-agent-row:hover { background: var(--bg-surface); }
+.bg-agent-row.done { color: var(--green); }
 .fcp-header {
   display: flex; align-items: center; gap: 6px; padding: 6px 10px;
   background: var(--bg-surface2); border-bottom: 1px solid var(--border);
@@ -1251,3 +1284,137 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* === VM Target Selector === */
+#target-selector { position: relative; margin-right: 8px; }
+#target-btn {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); padding: 4px 10px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+#target-btn:hover { border-color: var(--accent); background: var(--bg-surface2); }
+#target-btn.target-vm { border-color: #4fc3f7; background: #1e3a4d; }
+.target-caret { font-size: 10px; opacity: 0.5; }
+#target-dropdown {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+  min-width: 220px; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  padding: 4px 0; max-height: 400px; overflow-y: auto;
+}
+#target-dropdown.hidden { display: none; }
+.target-item {
+  padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text);
+}
+.target-item:hover { background: var(--bg-hover); }
+.target-item.active { background: #1e3a4d; }
+.target-dot { font-size: 8px; }
+.target-host { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+.target-separator { height: 1px; background: var(--border); margin: 4px 8px; }
+.target-action { color: var(--text-muted); }
+.target-action:hover { color: var(--text); }
+
+/* === VM Modals === */
+.vm-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+}
+.vm-modal {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+  width: 400px; max-height: 80vh; overflow-y: auto;
+}
+.vm-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 14px;
+}
+.vm-modal-close {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 16px; padding: 2px 6px;
+}
+.vm-modal-close:hover { color: var(--text); }
+.vm-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.vm-modal-body label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.vm-modal-body input {
+  background: var(--bg-surface2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; color: var(--text); font-size: 13px;
+}
+.vm-modal-body input:focus { border-color: var(--accent); outline: none; }
+.vm-modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* === VM Buttons === */
+.vm-btn {
+  background: var(--bg-surface2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 12px; color: var(--text); cursor: pointer; font-size: 12px;
+}
+.vm-btn:hover { border-color: var(--accent); }
+.vm-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.vm-btn-primary:hover { opacity: 0.9; }
+.vm-btn-sm { padding: 2px 8px; font-size: 11px; }
+.vm-input {
+  background: var(--bg-surface2); border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 8px; color: var(--text); font-size: 12px;
+}
+.vm-input:focus { border-color: var(--accent); outline: none; }
+
+/* === VM Status === */
+.vm-status-ok { color: #4caf50; font-size: 13px; padding: 4px; }
+.vm-status-error { color: #f44336; font-size: 13px; padding: 4px; }
+
+/* === VM Manage Modal === */
+.vm-manage-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.vm-manage-label { font-weight: 500; font-size: 13px; }
+.vm-manage-host { font-size: 11px; color: var(--text-muted); margin-left: auto; margin-right: 8px; }
+.vm-manage-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
+
+/* === VM Floating Panels (shared) === */
+.vm-panel-body {
+  flex: 1; overflow-y: auto; padding: 10px 12px; font-size: 13px;
+  background: var(--bg-surface);
+}
+.vm-panel-loading { color: var(--text-muted); text-align: center; padding: 20px; }
+.vm-panel-actions {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-top: 1px solid var(--border);
+}
+
+/* === VM Metrics === */
+.vm-metric-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.vm-metric-label { width: 36px; font-size: 11px; color: var(--text-muted); text-align: right; }
+.vm-metric-bar {
+  flex: 1; height: 14px; background: var(--bg-surface2); border-radius: 3px; overflow: hidden;
+}
+.vm-metric-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.vm-metric-val { width: 70px; font-size: 11px; color: var(--text-muted); }
+.vm-sparkline-row { display: flex; gap: 8px; margin-top: 8px; justify-content: center; }
+.vm-sparkline-row canvas { background: var(--bg-surface2); border-radius: 4px; }
+
+/* === VM Sync === */
+.vm-sync-section { margin-bottom: 10px; }
+.vm-sync-section strong { font-size: 12px; }
+.vm-sync-files { font-size: 11px; color: var(--text-muted); margin-top: 4px; max-height: 80px; overflow-y: auto; }
+.vm-sync-files div { padding: 1px 0; }
+
+/* === VM Jobs === */
+.vm-job-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.vm-job-status { font-size: 14px; width: 20px; text-align: center; }
+.vm-job-name { font-weight: 500; min-width: 60px; }
+.vm-job-cmd { flex: 1; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-job-elapsed { color: var(--text-muted); font-size: 11px; min-width: 50px; text-align: right; }
+
+/* === VM Output === */
+.vm-output-pre {
+  flex: 1; overflow: auto; padding: 10px; margin: 0;
+  background: #1a1b26; color: #c0caf5; font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre-wrap;
+}
+
+/* === VM Ports === */
+.vm-port-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.vm-port-row span { flex: 1; font-family: monospace; }

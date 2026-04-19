@@ -317,54 +317,41 @@ class TestThinkingBlockDedup:
     """Tests that ThinkingBlock in AssistantMessage is skipped when thinking_delta already streams it."""
 
     def test_thinking_block_is_skipped(self):
-        """Verify the stream_query logic skips ThinkingBlock."""
-        # We test the conditional logic directly:
-        # In chat.py, the ThinkingBlock handler is now just `pass`
-        import ast
+        """Verify the Claude Code adapter skips ThinkingBlock (already streamed via deltas)."""
+        # ThinkingBlock dedup logic lives in the Claude Code adapter (not chat.py)
+        # since the agent adapter refactor. Verify the adapter's receive() method
+        # only emits thinking via thinking_delta, not via ThinkingBlock.
         import inspect
-        from loom_mcp import chat
+        from loom_mcp.agents.claude_code import ClaudeCodeAdapter
 
-        source = inspect.getsource(chat.stream_query)
-        # The ThinkingBlock branch should contain a pass or comment, not send_json
-        assert "ThinkingBlock" in source
-        # Should NOT have send_json for ThinkingBlock
-        # Find the ThinkingBlock block and verify it doesn't send
+        source = inspect.getsource(ClaudeCodeAdapter.receive)
+        # The AssistantMessage handler should skip ThinkingBlock
+        # (only ToolUseBlock is yielded from AssistantMessage)
+        assert "AssistantMessage" in source
+        assert "ToolUseBlock" in source
+        # ThinkingBlock should NOT appear as a yielded event
         lines = source.split('\n')
-        in_thinking_block = False
-        sends_in_thinking = False
         for line in lines:
             if "ThinkingBlock" in line:
-                in_thinking_block = True
-                continue
-            if in_thinking_block:
-                if "send_json" in line and "thinking" in line:
-                    sends_in_thinking = True
-                    break
-                if "elif" in line or "else:" in line or (line.strip() and not line.strip().startswith('#') and not line.strip().startswith('pass')):
-                    break
-        assert not sends_in_thinking, "ThinkingBlock handler should not send thinking events (already streamed via deltas)"
+                # If mentioned, it should only be in a comment or skip
+                assert "yield" not in line, "ThinkingBlock should not be yielded"
 
     def test_thinking_delta_still_sends(self):
-        """Verify thinking_delta events are still sent."""
+        """Verify thinking_delta events are yielded by the Claude Code adapter."""
         import inspect
-        from loom_mcp import chat
+        from loom_mcp.agents.claude_code import ClaudeCodeAdapter
 
-        source = inspect.getsource(chat.stream_query)
-        # thinking_delta should still trigger send_json
+        source = inspect.getsource(ClaudeCodeAdapter.receive)
+        # thinking_delta should yield an AgentEvent with type="thinking"
+        assert "thinking_delta" in source
+        # Find the thinking_delta block and verify it yields (within 5 lines)
         lines = source.split('\n')
-        in_thinking_delta = False
-        sends_thinking = False
-        for line in lines:
+        for i, line in enumerate(lines):
             if "thinking_delta" in line:
-                in_thinking_delta = True
-                continue
-            if in_thinking_delta:
-                if "send_json" in line:
-                    sends_thinking = True
-                    break
-                if "elif" in line:
-                    break
-        assert sends_thinking, "thinking_delta should still send thinking events"
+                block = "\n".join(lines[i:i+5])
+                assert "yield" in block, "thinking_delta should yield an AgentEvent"
+                assert '"thinking"' in block or "'thinking'" in block, "should yield type=thinking"
+                break
 
 
 # ========================================

@@ -29,6 +29,7 @@ web = [
     "uvicorn[standard]>=0.32.0",
     "pexpect>=4.9.0",
     "claude-agent-sdk>=0.1.50",
+    "asyncssh>=2.14.0",
 ]
 
 [project.scripts]

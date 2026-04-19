@@ -28,6 +28,7 @@ const DEFAULT_KEYBINDINGS = {
   'new-terminal':   { key: '`', mod: true, label: 'New terminal' },
   'restart-server': { key: 'R', mod: true, shift: true, label: 'Restart server' },
   'delete-file':    { key: 'Backspace', mod: true, label: 'Delete file' },
+  'background-agent': { key: 'B', mod: true, shift: true, label: 'Background agent' },
 };
 
 let keyBindings = { ...DEFAULT_KEYBINDINGS };
@@ -75,9 +76,9 @@ function saveKeyBindings() {
 
 // --- API ---
 const api = {
-  graph:       () => { const url = `/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`; console.log('[API] graph:', url); return fetch(url).then(r => r.json()); },
+  graph:       () => { const url = `/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] graph:', url); return fetch(url).then(r => r.json()); },
   page:        (p) => fetch(`/api/page/${p}`).then(r => r.json()),
-  tree:        () => { const url = `/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}`; console.log('[API] tree:', url); return fetch(url).then(r => r.json()); },
+  tree:        () => { const url = `/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] tree:', url); return fetch(url).then(r => r.json()); },
   search:      (q, s='all', mode='both') => fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
   health:      () => fetch('/api/health').then(r => r.json()),
   brokenLinks: () => fetch('/api/broken-links').then(r => r.json()),
@@ -86,7 +87,768 @@ const api = {
   getLayout:   () => fetch('/api/layout').then(r => r.json()).catch(() => ({})),
   saveLayout:  (d) => fetch('/api/layout', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}),
   savePage:    (p, fm, c) => fetch(`/api/page/${p}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({frontmatter:fm, content:c})}),
+  // VM APIs
+  vms:         () => fetch('/api/vms').then(r => r.json()),
+  vmAdd:       (d) => fetch('/api/vms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmUpdate:    (id,d) => fetch(`/api/vms/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmDelete:    (id) => fetch(`/api/vms/${id}`, {method:'DELETE'}).then(r=>r.json()),
+  vmTree:      (id) => fetch(`/api/vms/${id}/tree`).then(r=>r.json()),
+  vmFile:      (id,p) => fetch(`/api/vms/${id}/file?path=${encodeURIComponent(p)}`).then(r=>r.json()),
+  vmSearch:    (id,q,mode='content') => fetch(`/api/vms/${id}/search?q=${encodeURIComponent(q)}&mode=${mode}`).then(r=>r.json()),
+  vmGraph:     (id) => fetch(`/api/vms/${id}/graph`).then(r=>r.json()),
+  vmPush:      (id,d={}) => fetch(`/api/vms/${id}/push`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmPull:      (id,d={}) => fetch(`/api/vms/${id}/pull`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmSyncStatus:(id) => fetch(`/api/vms/${id}/sync-status`).then(r=>r.json()),
+  vmMetrics:   (id) => fetch(`/api/vms/${id}/metrics`).then(r=>r.json()),
+  vmJobs:      (id) => fetch(`/api/vms/${id}/jobs`).then(r=>r.json()),
+  vmStartJob:  (id,d) => fetch(`/api/vms/${id}/jobs`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmStopJob:   (id,jid) => fetch(`/api/vms/${id}/jobs/${jid}`, {method:'DELETE'}).then(r=>r.json()),
+  vmJobOutput: (id,jid) => fetch(`/api/vms/${id}/jobs/${jid}/output`).then(r=>r.json()),
+  vmTunnels:   (id) => fetch(`/api/vms/${id}/tunnels`).then(r=>r.json()),
+  vmAddTunnel: (id,d) => fetch(`/api/vms/${id}/tunnels`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
+  vmCloseTunnel:(id,p) => fetch(`/api/vms/${id}/tunnels/${p}`, {method:'DELETE'}).then(r=>r.json()),
 };
+
+// --- VM / Target Switching ---
+let currentTarget = { type: 'local' }; // {type:'local'} or {type:'vm', id:'...', label:'...', host:'...'}
+let vmMetricsWs = null; // WebSocket for streaming metrics
+
+function isVMTarget() { return currentTarget.type === 'vm'; }
+
+async function initTargetSelector() {
+  const btn = document.getElementById('target-btn');
+  const dropdown = document.getElementById('target-dropdown');
+  if (!btn || !dropdown) return;
+
+  btn.onclick = async () => {
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) {
+      await populateTargetDropdown();
+    }
+  };
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+}
+
+async function populateTargetDropdown() {
+  const dropdown = document.getElementById('target-dropdown');
+  let vms = [];
+  try { vms = await api.vms(); } catch { /* no VMs configured */ }
+
+  let html = `<div class="target-item ${currentTarget.type==='local'?'active':''}" data-type="local">
+    <span class="target-dot" style="color:#4caf50">&#9679;</span> Local
+  </div>`;
+
+  if (vms.length > 0) {
+    html += '<div class="target-separator"></div>';
+    for (const vm of vms) {
+      const active = currentTarget.type === 'vm' && currentTarget.id === vm.id;
+      const color = vm.status === 'connected' ? '#4caf50' : vm.status === 'connecting' ? '#ff9800' : '#666';
+      html += `<div class="target-item ${active?'active':''}" data-type="vm" data-vm-id="${vm.id}" data-vm-label="${vm.label}" data-vm-host="${vm.user||''}@${vm.host}">
+        <span class="target-dot" style="color:${color}">&#9679;</span> ${vm.label}
+        <span class="target-host">${vm.user||''}@${vm.host}</span>
+      </div>`;
+    }
+  }
+
+  html += '<div class="target-separator"></div>';
+  html += '<div class="target-item target-action" data-action="add-vm">+ Add VM...</div>';
+  html += '<div class="target-item target-action" data-action="manage-vms">Manage VMs...</div>';
+
+  // VM-specific actions when a VM is selected
+  if (currentTarget.type === 'vm') {
+    html += '<div class="target-separator"></div>';
+    html += `<div class="target-item target-action" data-action="vm-terminal">&#9002; Terminal</div>`;
+    html += `<div class="target-item target-action" data-action="vm-sync">&#8645; Sync</div>`;
+    html += `<div class="target-item target-action" data-action="vm-metrics">&#9670; Metrics</div>`;
+    html += `<div class="target-item target-action" data-action="vm-jobs">&#9881; Jobs</div>`;
+    html += `<div class="target-item target-action" data-action="vm-ports">&#8644; Ports</div>`;
+  }
+
+  dropdown.innerHTML = html;
+
+  // Wire click handlers
+  dropdown.querySelectorAll('.target-item').forEach(item => {
+    item.onclick = async () => {
+      const type = item.dataset.type;
+      const action = item.dataset.action;
+      if (type === 'local') {
+        await switchTarget({ type: 'local' });
+      } else if (type === 'vm') {
+        await switchTarget({ type: 'vm', id: item.dataset.vmId, label: item.dataset.vmLabel, host: item.dataset.vmHost });
+      } else if (action === 'add-vm') {
+        showAddVMModal();
+      } else if (action === 'manage-vms') {
+        showManageVMsModal();
+      } else if (action === 'vm-terminal') {
+        createVMTerminalPanel(currentTarget.id, currentTarget.label);
+      } else if (action === 'vm-sync') {
+        showVMSyncPanel(currentTarget.id);
+      } else if (action === 'vm-metrics') {
+        showVMMetricsPanel(currentTarget.id);
+      } else if (action === 'vm-jobs') {
+        showVMJobsPanel(currentTarget.id);
+      } else if (action === 'vm-ports') {
+        showVMPortsPanel(currentTarget.id);
+      }
+      dropdown.classList.add('hidden');
+    };
+  });
+}
+
+async function switchTarget(target) {
+  // Close any open VM metrics WebSocket
+  if (vmMetricsWs) { vmMetricsWs.close(); vmMetricsWs = null; }
+
+  currentTarget = target;
+  const btn = document.getElementById('target-btn');
+  if (target.type === 'local') {
+    btn.innerHTML = 'Local <span class="target-caret">&#9662;</span>';
+    btn.classList.remove('target-vm');
+  } else {
+    btn.innerHTML = `${target.label} <span class="target-caret">&#9662;</span>`;
+    btn.classList.add('target-vm');
+  }
+
+  // Update chat context for VM targeting
+  if (target.type === 'vm') {
+    // Set page_path to vm:<id> so Claude gets VM context
+    activePanel.pagePath = `vm:${target.id}`;
+  } else {
+    activePanel.pagePath = lastFocusedPath || null;
+  }
+
+  // Refresh the active view
+  const activeView = document.querySelector('.view-tab.active')?.dataset?.view || 'graph';
+  await refreshCurrentView(activeView);
+}
+
+async function refreshCurrentView(viewName) {
+  if (viewName === 'graph') {
+    if (isVMTarget()) {
+      await initVMGraphView();
+    } else {
+      await initGraphView();
+    }
+  } else if (viewName === 'files') {
+    filesInitialized = false;
+    if (isVMTarget()) {
+      await initVMFilesView();
+    } else {
+      await initFilesView();
+    }
+  } else if (viewName === 'search') {
+    const q = document.getElementById('search-input')?.value;
+    if (q) doSearch(q);
+  } else if (viewName === 'tags') {
+    if (!isVMTarget()) initTagCloud();
+  } else if (viewName === 'health') {
+    if (!isVMTarget()) initHealth();
+  }
+}
+
+// --- VM Graph View ---
+async function initVMGraphView() {
+  const world = document.getElementById('world');
+  world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">Loading VM files...</div>';
+  cardElements.clear();
+  cardMeta.clear();
+
+  try {
+    graphData = await api.vmGraph(currentTarget.id);
+    if (!graphData || graphData.nodes.length === 0) {
+      world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">No files on VM.</div>';
+      return;
+    }
+    canvasStack = [{ parentPath: null, label: currentTarget.label }];
+    renderCurrentLevel();
+  } catch (err) {
+    world.innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">VM Error: ${err.message}</div>`;
+  }
+}
+
+// --- VM Files View ---
+let vmFilesTreeData = null;
+
+async function initVMFilesView() {
+  const vm = currentTarget;
+  try {
+    vmFilesTreeData = await api.vmTree(vm.id);
+    filesTreeData = vmFilesTreeData; // Reuse existing files view rendering
+    filesInitialized = true;
+    filesTilePath = [];
+    setFilesMode(filesMode);
+  } catch (err) {
+    document.getElementById('files-tree').innerHTML = `<div class="empty-state">VM Error: ${err.message}</div>`;
+  }
+}
+
+// --- VM Terminal Panel ---
+function createVMTerminalPanel(vmId, vmLabel) {
+  const card = document.createElement('div');
+  card.className = 'floating-chat-panel floating-terminal';
+  card.style.cssText = 'width:600px;height:400px;right:40px;bottom:80px;position:fixed;';
+
+  const header = document.createElement('div');
+  header.className = 'fcp-header';
+  header.style.borderTop = `3px solid ${currentTarget.color || '#4fc3f7'}`;
+  header.innerHTML = `
+    <span class="fcp-label" contenteditable="true" spellcheck="false">${vmLabel} (SSH)</span>
+    <span style="flex:1"></span>
+    <button class="fcp-btn fcp-minimize" title="Minimize">&#9472;</button>
+    <button class="fcp-btn fcp-close" title="Close">&#10005;</button>
+  `;
+
+  const termContainer = document.createElement('div');
+  termContainer.className = 'terminal-container';
+  termContainer.style.cssText = 'flex:1;overflow:hidden;';
+
+  // Resize handles
+  const handles = ['right','bottom','left','top','corner'].map(dir => {
+    const h = document.createElement('div');
+    h.className = `fcp-resize fcp-resize-${dir}`;
+    h.dataset.dir = dir;
+    return h;
+  });
+
+  card.appendChild(header);
+  handles.forEach(h => card.appendChild(h));
+  card.appendChild(termContainer);
+  document.body.appendChild(card);
+  bringToFront(card);
+
+  // xterm.js
+  const XTerm = window.Terminal;
+  const XFitAddon = window.FitAddon?.FitAddon;
+  const term = new XTerm({
+    cursorBlink: true, fontSize: 13,
+    fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+    theme: { background: '#1a1b26', foreground: '#c0caf5', cursor: '#c0caf5',
+             selectionBackground: '#33467c', black: '#15161e', red: '#f7768e',
+             green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7',
+             magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6' },
+  });
+  const fitAddon = new XFitAddon();
+  term.loadAddon(fitAddon);
+  term.open(termContainer);
+  requestAnimationFrame(() => fitAddon.fit());
+
+  // WebSocket to VM terminal
+  const ws = new WebSocket(`ws://${location.host}/ws/vm-terminal/${vmId}`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { ws.send(`RESIZE:${term.cols}:${term.rows}`); };
+  ws.onmessage = (e) => {
+    if (e.data instanceof ArrayBuffer) term.write(new Uint8Array(e.data));
+    else term.write(e.data);
+  };
+  ws.onerror = () => term.write('\r\n\x1b[31mSSH connection error\x1b[0m\r\n');
+  ws.onclose = () => term.write('\r\n\x1b[33mSSH session closed\x1b[0m\r\n');
+  term.onData(data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+  term.onResize(({cols, rows}) => { if (ws.readyState === WebSocket.OPEN) ws.send(`RESIZE:${cols}:${rows}`); });
+
+  // Resize observer
+  const ro = new ResizeObserver(() => { try { fitAddon.fit(); } catch {} });
+  ro.observe(termContainer);
+
+  // Minimize / Close / Drag
+  header.querySelector('.fcp-minimize').onclick = () => {
+    card.classList.toggle('minimized');
+    if (!card.classList.contains('minimized')) requestAnimationFrame(() => fitAddon.fit());
+  };
+  header.querySelector('.fcp-close').onclick = () => { ws.close(); ro.disconnect(); card.remove(); };
+
+  // Drag
+  let dx, dy;
+  header.onpointerdown = (e) => {
+    if (e.target.closest('button') || e.target.isContentEditable) return;
+    const r = card.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    card.style.position = 'fixed';
+    const move = (ev) => { card.style.left = (ev.clientX - dx) + 'px'; card.style.top = (ev.clientY - dy) + 'px'; card.style.right = 'auto'; card.style.bottom = 'auto'; };
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+
+  // Resize handles
+  handles.forEach(h => {
+    h.onpointerdown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const dir = h.dataset.dir;
+      const startX = e.clientX, startY = e.clientY;
+      const startW = card.offsetWidth, startH = card.offsetHeight;
+      const startL = card.offsetLeft, startT = card.offsetTop;
+      const move = (ev) => {
+        const dxR = ev.clientX - startX, dyR = ev.clientY - startY;
+        if (dir === 'right' || dir === 'corner') card.style.width = Math.max(300, startW + dxR) + 'px';
+        if (dir === 'bottom' || dir === 'corner') card.style.height = Math.max(200, startH + dyR) + 'px';
+        if (dir === 'left') { card.style.width = Math.max(300, startW - dxR) + 'px'; card.style.left = (startL + dxR) + 'px'; }
+        if (dir === 'top') { card.style.height = Math.max(200, startH - dyR) + 'px'; card.style.top = (startT + dyR) + 'px'; }
+        try { fitAddon.fit(); } catch {}
+      };
+      const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    };
+  });
+}
+
+// --- VM Add Modal ---
+function showAddVMModal() {
+  const existing = document.getElementById('vm-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'vm-modal';
+  modal.className = 'vm-modal-overlay';
+  modal.innerHTML = `
+    <div class="vm-modal">
+      <div class="vm-modal-header">Add VM <button class="vm-modal-close" onclick="this.closest('.vm-modal-overlay').remove()">&#10005;</button></div>
+      <div class="vm-modal-body">
+        <label>Label <input type="text" id="vm-add-label" placeholder="my-gpu-box"></label>
+        <label>Host <input type="text" id="vm-add-host" placeholder="10.0.1.5 or hostname"></label>
+        <label>User <input type="text" id="vm-add-user" placeholder="root"></label>
+        <label>Port <input type="number" id="vm-add-port" value="22"></label>
+        <label>SSH Key Path <input type="text" id="vm-add-key" placeholder="~/.ssh/id_ed25519"></label>
+        <label>Remote Working Dir <input type="text" id="vm-add-syncdir" placeholder="~"></label>
+        <div class="vm-modal-actions">
+          <button id="vm-add-test" class="vm-btn">Test Connection</button>
+          <button id="vm-add-save" class="vm-btn vm-btn-primary">Add VM</button>
+        </div>
+        <div id="vm-add-status"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  function getVMFormValues() {
+    const val = (id) => { const el = document.getElementById(id); return el.value.trim() || el.placeholder; };
+    return {
+      label: document.getElementById('vm-add-label').value.trim() || val('vm-add-host'),
+      host: val('vm-add-host'),
+      user: val('vm-add-user'),
+      port: parseInt(document.getElementById('vm-add-port').value) || 22,
+      key_path: val('vm-add-key'),
+      sync_dir: val('vm-add-syncdir'),
+    };
+  }
+
+  document.getElementById('vm-add-test').onclick = async () => {
+    const status = document.getElementById('vm-add-status');
+    status.textContent = 'Testing connection...';
+    status.className = '';
+    try {
+      const result = await api.vmAdd({ ...getVMFormValues(), dry_run: true });
+      if (result.ok) {
+        status.textContent = 'Connection successful!';
+        status.className = 'vm-status-ok';
+      } else {
+        status.textContent = result.error || 'Connection failed';
+        status.className = 'vm-status-error';
+      }
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+      status.className = 'vm-status-error';
+    }
+  };
+
+  document.getElementById('vm-add-save').onclick = async () => {
+    const status = document.getElementById('vm-add-status');
+    status.textContent = 'Adding VM...';
+    try {
+      const result = await api.vmAdd(getVMFormValues());
+      if (result.ok) {
+        status.textContent = 'VM added!';
+        status.className = 'vm-status-ok';
+        setTimeout(() => modal.remove(), 1000);
+      } else {
+        status.textContent = result.error || 'Failed to add VM';
+        status.className = 'vm-status-error';
+      }
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+      status.className = 'vm-status-error';
+    }
+  };
+}
+
+// --- VM Manage Modal ---
+async function showManageVMsModal() {
+  const existing = document.getElementById('vm-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'vm-modal';
+  modal.className = 'vm-modal-overlay';
+  let vms = [];
+  try { vms = await api.vms(); } catch {}
+
+  let rows = vms.map(vm => {
+    const statusColor = vm.status === 'connected' ? '#4caf50' : vm.status === 'connecting' ? '#ff9800' : '#666';
+    return `<div class="vm-manage-row" data-id="${vm.id}">
+      <span class="target-dot" style="color:${statusColor}">&#9679;</span>
+      <span class="vm-manage-label">${vm.label}</span>
+      <span class="vm-manage-host">${vm.user||''}@${vm.host}:${vm.port||22}</span>
+      <button class="vm-btn vm-btn-sm" onclick="deleteVM('${vm.id}', this)">Delete</button>
+    </div>`;
+  }).join('');
+  if (!rows) rows = '<div class="vm-manage-empty">No VMs configured</div>';
+
+  modal.innerHTML = `
+    <div class="vm-modal">
+      <div class="vm-modal-header">Manage VMs <button class="vm-modal-close" onclick="this.closest('.vm-modal-overlay').remove()">&#10005;</button></div>
+      <div class="vm-modal-body">${rows}</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+async function deleteVM(vmId, btn) {
+  if (!confirm('Delete this VM?')) return;
+  await api.vmDelete(vmId);
+  if (currentTarget.type === 'vm' && currentTarget.id === vmId) {
+    await switchTarget({ type: 'local' });
+  }
+  btn.closest('.vm-manage-row').remove();
+}
+
+// --- VM Sync Panel (floating) ---
+function showVMSyncPanel(vmId) {
+  const existing = document.querySelector('.vm-panel-sync');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'floating-chat-panel vm-panel-sync';
+  panel.style.cssText = 'width:380px;height:300px;right:40px;bottom:80px;position:fixed;';
+  panel.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-label">Sync &mdash; ${currentTarget.label}</span>
+      <span style="flex:1"></span>
+      <button class="fcp-btn fcp-close" onclick="this.closest('.vm-panel-sync').remove()">&#10005;</button>
+    </div>
+    <div class="vm-panel-body" id="vm-sync-body">
+      <div class="vm-panel-loading">Checking sync status...</div>
+    </div>
+    <div class="vm-panel-actions">
+      <button class="vm-btn" onclick="vmDoPush('${vmId}')">Push to VM</button>
+      <button class="vm-btn" onclick="vmDoPull('${vmId}')">Pull from VM</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  bringToFront(panel);
+  refreshSyncStatus(vmId);
+}
+
+async function refreshSyncStatus(vmId) {
+  const body = document.getElementById('vm-sync-body');
+  if (!body) return;
+  try {
+    const status = await api.vmSyncStatus(vmId);
+    body.innerHTML = `
+      <div class="vm-sync-section"><strong>&#8593; Push pending:</strong> ${status.push_count} files<br>
+        <div class="vm-sync-files">${(status.push_pending||[]).slice(0,10).map(f=>`<div>${f}</div>`).join('')}${status.push_count>10?`<div>...and ${status.push_count-10} more</div>`:''}</div>
+      </div>
+      <div class="vm-sync-section"><strong>&#8595; Pull pending:</strong> ${status.pull_count} files<br>
+        <div class="vm-sync-files">${(status.pull_pending||[]).slice(0,10).map(f=>`<div>${f}</div>`).join('')}${status.pull_count>10?`<div>...and ${status.pull_count-10} more</div>`:''}</div>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="vm-status-error">Error: ${err.message}</div>`;
+  }
+}
+
+async function vmDoPush(vmId) {
+  const body = document.getElementById('vm-sync-body');
+  if (body) body.innerHTML = '<div class="vm-panel-loading">Pushing...</div>';
+  const result = await api.vmPush(vmId);
+  if (body) body.innerHTML = result.ok
+    ? `<div class="vm-status-ok">Pushed ${result.files} files in ${result.elapsed_ms}ms</div>`
+    : `<div class="vm-status-error">${result.error}</div>`;
+}
+
+async function vmDoPull(vmId) {
+  const body = document.getElementById('vm-sync-body');
+  if (body) body.innerHTML = '<div class="vm-panel-loading">Pulling...</div>';
+  const result = await api.vmPull(vmId);
+  if (body) body.innerHTML = result.ok
+    ? `<div class="vm-status-ok">Pulled ${result.files} files in ${result.elapsed_ms}ms</div>`
+    : `<div class="vm-status-error">${result.error}</div>`;
+}
+
+// --- VM Metrics Panel (floating, live WebSocket) ---
+function showVMMetricsPanel(vmId) {
+  const existing = document.querySelector('.vm-panel-metrics');
+  if (existing) { existing.remove(); if (vmMetricsWs) { vmMetricsWs.close(); vmMetricsWs = null; } return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'floating-chat-panel vm-panel-metrics';
+  panel.style.cssText = 'width:340px;height:280px;right:40px;bottom:80px;position:fixed;';
+  panel.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-label">Metrics &mdash; ${currentTarget.label}</span>
+      <span style="flex:1"></span>
+      <button class="fcp-btn fcp-close" id="vm-metrics-close">&#10005;</button>
+    </div>
+    <div class="vm-panel-body" id="vm-metrics-body">
+      <div class="vm-panel-loading">Connecting...</div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  bringToFront(panel);
+
+  document.getElementById('vm-metrics-close').onclick = () => {
+    if (vmMetricsWs) { vmMetricsWs.close(); vmMetricsWs = null; }
+    panel.remove();
+  };
+
+  // History for sparklines
+  const history = { cpu: [], ram: [], gpu: [] };
+  const MAX_HISTORY = 60;
+
+  vmMetricsWs = new WebSocket(`ws://${location.host}/ws/vm-metrics/${vmId}`);
+  vmMetricsWs.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    const body = document.getElementById('vm-metrics-body');
+    if (!body) return;
+    if (m.error) { body.innerHTML = `<div class="vm-status-error">${m.error}</div>`; return; }
+
+    history.cpu.push(m.cpu_pct); if (history.cpu.length > MAX_HISTORY) history.cpu.shift();
+    const ramPct = m.ram_total_mb ? (m.ram_used_mb / m.ram_total_mb * 100) : 0;
+    history.ram.push(ramPct); if (history.ram.length > MAX_HISTORY) history.ram.shift();
+
+    let gpuHtml = '';
+    if (m.gpu_pct !== null && m.gpu_pct !== undefined) {
+      history.gpu.push(m.gpu_pct); if (history.gpu.length > MAX_HISTORY) history.gpu.shift();
+      gpuHtml = `
+        <div class="vm-metric-row">
+          <span class="vm-metric-label">GPU</span>
+          <div class="vm-metric-bar"><div class="vm-metric-fill" style="width:${m.gpu_pct}%;background:${barColor(m.gpu_pct)}"></div></div>
+          <span class="vm-metric-val">${m.gpu_pct.toFixed(0)}%</span>
+        </div>
+        <div class="vm-metric-row">
+          <span class="vm-metric-label">VRAM</span>
+          <div class="vm-metric-bar"><div class="vm-metric-fill" style="width:${m.vram_total_mb?(m.vram_used_mb/m.vram_total_mb*100):0}%;background:#7aa2f7"></div></div>
+          <span class="vm-metric-val">${m.vram_used_mb||0}/${m.vram_total_mb||0}MB</span>
+        </div>
+      `;
+    }
+
+    body.innerHTML = `
+      <div class="vm-metric-row">
+        <span class="vm-metric-label">CPU</span>
+        <div class="vm-metric-bar"><div class="vm-metric-fill" style="width:${m.cpu_pct}%;background:${barColor(m.cpu_pct)}"></div></div>
+        <span class="vm-metric-val">${m.cpu_pct.toFixed(1)}%</span>
+      </div>
+      <div class="vm-metric-row">
+        <span class="vm-metric-label">RAM</span>
+        <div class="vm-metric-bar"><div class="vm-metric-fill" style="width:${ramPct}%;background:${barColor(ramPct)}"></div></div>
+        <span class="vm-metric-val">${m.ram_used_mb}/${m.ram_total_mb}MB</span>
+      </div>
+      <div class="vm-metric-row">
+        <span class="vm-metric-label">Disk</span>
+        <div class="vm-metric-bar"><div class="vm-metric-fill" style="width:${m.disk_total_gb?(m.disk_used_gb/m.disk_total_gb*100):0}%;background:#7aa2f7"></div></div>
+        <span class="vm-metric-val">${m.disk_used_gb.toFixed(1)}/${m.disk_total_gb.toFixed(1)}GB</span>
+      </div>
+      ${gpuHtml}
+      <div class="vm-sparkline-row">
+        <canvas id="vm-spark-cpu" width="140" height="30" title="CPU history"></canvas>
+        <canvas id="vm-spark-ram" width="140" height="30" title="RAM history"></canvas>
+      </div>
+    `;
+
+    drawSparkline('vm-spark-cpu', history.cpu, '#9ece6a');
+    drawSparkline('vm-spark-ram', history.ram, '#7aa2f7');
+  };
+  vmMetricsWs.onerror = () => {
+    const body = document.getElementById('vm-metrics-body');
+    if (body) body.innerHTML = '<div class="vm-status-error">WebSocket error</div>';
+  };
+}
+
+function barColor(pct) {
+  if (pct < 50) return '#4caf50';
+  if (pct < 80) return '#ff9800';
+  return '#f44336';
+}
+
+function drawSparkline(canvasId, data, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const step = w / Math.max(data.length - 1, 1);
+  for (let i = 0; i < data.length; i++) {
+    const x = i * step;
+    const y = h - (data[i] / 100) * h;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// --- VM Jobs Panel (floating) ---
+function showVMJobsPanel(vmId) {
+  const existing = document.querySelector('.vm-panel-jobs');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'floating-chat-panel vm-panel-jobs';
+  panel.style.cssText = 'width:420px;height:350px;right:40px;bottom:80px;position:fixed;';
+  panel.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-label">Jobs &mdash; ${currentTarget.label}</span>
+      <span style="flex:1"></span>
+      <button class="fcp-btn fcp-close" onclick="this.closest('.vm-panel-jobs').remove()">&#10005;</button>
+    </div>
+    <div class="vm-panel-body" id="vm-jobs-body">
+      <div class="vm-panel-loading">Loading jobs...</div>
+    </div>
+    <div class="vm-panel-actions">
+      <input type="text" id="vm-job-name" placeholder="Job name" class="vm-input" style="width:100px">
+      <input type="text" id="vm-job-cmd" placeholder="Command" class="vm-input" style="flex:1">
+      <button class="vm-btn vm-btn-primary" onclick="vmStartJob('${vmId}')">Start</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  bringToFront(panel);
+  refreshVMJobs(vmId);
+}
+
+async function refreshVMJobs(vmId) {
+  const body = document.getElementById('vm-jobs-body');
+  if (!body) return;
+  try {
+    const jobs = await api.vmJobs(vmId);
+    if (!jobs.length) { body.innerHTML = '<div class="vm-manage-empty">No tracked jobs</div>'; return; }
+    body.innerHTML = jobs.map(j => {
+      const elapsed = j.status === 'running' ? formatElapsed(Date.now()/1000 - j.started) : (j.stopped ? formatElapsed(j.stopped - j.started) : '');
+      const statusIcon = j.status === 'running' ? '&#10227;' : j.status === 'completed' ? '&#10003;' : j.status === 'failed' ? '&#10007;' : '&#9632;';
+      return `<div class="vm-job-row">
+        <span class="vm-job-status">${statusIcon}</span>
+        <span class="vm-job-name">${j.name}</span>
+        <span class="vm-job-cmd" title="${j.command}">${j.command.substring(0,40)}</span>
+        <span class="vm-job-elapsed">${elapsed}</span>
+        ${j.status==='running'?`<button class="vm-btn vm-btn-sm" onclick="vmKillJob('${vmId}','${j.id}')">Kill</button>`:''}
+        <button class="vm-btn vm-btn-sm" onclick="vmShowOutput('${vmId}','${j.id}')">Logs</button>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    body.innerHTML = `<div class="vm-status-error">Error: ${err.message}</div>`;
+  }
+}
+
+function formatElapsed(secs) {
+  if (secs < 60) return `${Math.round(secs)}s`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ${Math.round(secs%60)}s`;
+  return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+}
+
+async function vmStartJob(vmId) {
+  const name = document.getElementById('vm-job-name')?.value || 'job';
+  const cmd = document.getElementById('vm-job-cmd')?.value;
+  if (!cmd) return;
+  await api.vmStartJob(vmId, { name, command: cmd });
+  document.getElementById('vm-job-name').value = '';
+  document.getElementById('vm-job-cmd').value = '';
+  refreshVMJobs(vmId);
+}
+
+async function vmKillJob(vmId, jobId) {
+  await api.vmStopJob(vmId, jobId);
+  refreshVMJobs(vmId);
+}
+
+async function vmShowOutput(vmId, jobId) {
+  const result = await api.vmJobOutput(vmId, jobId);
+  const existing = document.querySelector('.vm-panel-output');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.className = 'floating-chat-panel vm-panel-output';
+  panel.style.cssText = 'width:500px;height:350px;right:480px;bottom:80px;position:fixed;';
+  panel.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-label">Job Output</span>
+      <span style="flex:1"></span>
+      <button class="fcp-btn fcp-close" onclick="this.closest('.vm-panel-output').remove()">&#10005;</button>
+    </div>
+    <pre class="vm-output-pre">${(result.output||'').replace(/</g,'&lt;')}</pre>
+  `;
+  document.body.appendChild(panel);
+  bringToFront(panel);
+}
+
+// --- VM Ports Panel (floating) ---
+function showVMPortsPanel(vmId) {
+  const existing = document.querySelector('.vm-panel-ports');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'floating-chat-panel vm-panel-ports';
+  panel.style.cssText = 'width:360px;height:250px;right:40px;bottom:80px;position:fixed;';
+  panel.innerHTML = `
+    <div class="fcp-header">
+      <span class="fcp-label">Ports &mdash; ${currentTarget.label}</span>
+      <span style="flex:1"></span>
+      <button class="fcp-btn fcp-close" onclick="this.closest('.vm-panel-ports').remove()">&#10005;</button>
+    </div>
+    <div class="vm-panel-body" id="vm-ports-body">
+      <div class="vm-panel-loading">Loading tunnels...</div>
+    </div>
+    <div class="vm-panel-actions">
+      <input type="number" id="vm-port-local" placeholder="Local port" class="vm-input" style="width:90px">
+      <span style="margin:0 4px">&#8594;</span>
+      <input type="number" id="vm-port-remote" placeholder="Remote port" class="vm-input" style="width:90px">
+      <button class="vm-btn vm-btn-primary" onclick="vmAddTunnel('${vmId}')">Add</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  bringToFront(panel);
+  refreshVMPorts(vmId);
+}
+
+async function refreshVMPorts(vmId) {
+  const body = document.getElementById('vm-ports-body');
+  if (!body) return;
+  try {
+    const tunnels = await api.vmTunnels(vmId);
+    if (!tunnels.length) { body.innerHTML = '<div class="vm-manage-empty">No active tunnels</div>'; return; }
+    body.innerHTML = tunnels.map(t => `
+      <div class="vm-port-row">
+        <span>localhost:${t.local_port}</span>
+        <a href="http://localhost:${t.local_port}" target="_blank" class="vm-btn vm-btn-sm">Open</a>
+        <button class="vm-btn vm-btn-sm" onclick="vmCloseTunnel('${vmId}',${t.local_port})">Close</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    body.innerHTML = `<div class="vm-status-error">Error: ${err.message}</div>`;
+  }
+}
+
+async function vmAddTunnel(vmId) {
+  const local = parseInt(document.getElementById('vm-port-local')?.value);
+  const remote = parseInt(document.getElementById('vm-port-remote')?.value);
+  if (!local || !remote) return;
+  await api.vmAddTunnel(vmId, { local_port: local, remote_port: remote });
+  document.getElementById('vm-port-local').value = '';
+  document.getElementById('vm-port-remote').value = '';
+  refreshVMPorts(vmId);
+}
+
+async function vmCloseTunnel(vmId, localPort) {
+  await api.vmCloseTunnel(vmId, localPort);
+  refreshVMPorts(vmId);
+}
 
 // --- Markdown with [[wiki-links]] ---
 marked.use({ extensions: [{
@@ -124,9 +886,19 @@ function bringToFront(el) {
   el.style.setProperty('z-index', String(topZIndex), 'important');
 }
 
-// Canvas stack for drill-in navigation
+// Canvas stack for drill-in navigation (persisted to sessionStorage across reloads)
 let canvasStack = [];  // [{parentPath: null|string, label: string}]
 function currentLevel() { return canvasStack[canvasStack.length - 1] || { parentPath: null, label: 'Root' }; }
+function saveCanvasStack() {
+  try { sessionStorage.setItem('loom-canvas-stack', JSON.stringify(canvasStack)); } catch {}
+}
+function loadCanvasStack() {
+  try {
+    const saved = sessionStorage.getItem('loom-canvas-stack');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
 
 // --- Node helpers ---
 function nodeById(id) { return graphData?.nodes.find(n => n.data.id === id)?.data; }
@@ -712,11 +1484,13 @@ async function drillInto(parentPath) {
   }
 
   canvasStack.push({ parentPath, label: nd.label });
+  saveCanvasStack();
   renderCurrentLevel();
 }
 
 function navigateToLevel(index) {
   canvasStack = canvasStack.slice(0, index + 1);
+  saveCanvasStack();
   renderCurrentLevel();
 }
 
@@ -1414,28 +2188,36 @@ function initFilterDropdowns() {
   document.getElementById('filetype-select-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=true); applyFilters(); };
   document.getElementById('filetype-clear-all').onclick = () => { ftMenu.querySelectorAll('input').forEach(c=>c.checked=false); applyFilters(); };
 
-  // Visibility toggles
+  // Visibility toggles — affect ALL views (canvas, files, sidebar)
+  function refreshAllViews() {
+    refreshFileTree();
+    initGraphView(); // Re-fetch graph with new visibility settings
+    initSidebar();   // Re-fetch sidebar tree
+  }
+
   const internalsCheckbox = document.getElementById('filter-show-internals');
+  const dotfilesCheckbox = document.getElementById('filter-show-dotfiles');
   const hiddenCheckbox = document.getElementById('filter-show-hidden');
   if (internalsCheckbox) {
     internalsCheckbox.checked = localStorage.getItem('loom-show-internals') === 'true';
     internalsCheckbox.onchange = () => {
-      console.log('[View] Show internals:', internalsCheckbox.checked);
       localStorage.setItem('loom-show-internals', internalsCheckbox.checked);
-      refreshFileTree();
+      refreshAllViews();
     };
-  } else {
-    console.warn('[View] filter-show-internals checkbox not found');
+  }
+  if (dotfilesCheckbox) {
+    dotfilesCheckbox.checked = localStorage.getItem('loom-show-dotfiles') === 'true';
+    dotfilesCheckbox.onchange = () => {
+      localStorage.setItem('loom-show-dotfiles', dotfilesCheckbox.checked);
+      refreshAllViews();
+    };
   }
   if (hiddenCheckbox) {
     hiddenCheckbox.checked = localStorage.getItem('loom-show-hidden') === 'true';
     hiddenCheckbox.onchange = () => {
-      console.log('[View] Show hidden:', hiddenCheckbox.checked);
       localStorage.setItem('loom-show-hidden', hiddenCheckbox.checked);
-      refreshFileTree();
+      refreshAllViews();
     };
-  } else {
-    console.warn('[View] filter-show-hidden checkbox not found');
   }
 }
 
@@ -1481,8 +2263,37 @@ async function initGraphView() {
         if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
       }
     }
-    // Start at root
-    canvasStack = [{ parentPath: null, label: 'Root' }];
+    // Restore saved position or start at root
+    const savedStack = loadCanvasStack();
+    if (savedStack && savedStack.length > 0) {
+      canvasStack = [{ parentPath: null, label: 'Root' }];
+      // Re-drill to saved position, lazy-loading children along the way
+      for (let i = 1; i < savedStack.length; i++) {
+        const entry = savedStack[i];
+        if (entry.parentPath) {
+          // Lazy-load children if not in graphData
+          const childIds = getChildIds(entry.parentPath);
+          if (childIds.length === 0) {
+            try {
+              const resp = await fetch(`/api/children/${entry.parentPath}?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`);
+              const data = await resp.json();
+              if (data.children) {
+                for (const child of data.children) {
+                  if (!nodeById(child.data.id)) {
+                    graphData.nodes.push(child);
+                    if (child.data.content) cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
+                  }
+                }
+              }
+            } catch {}
+          }
+          canvasStack.push(entry);
+        }
+      }
+    } else {
+      canvasStack = [{ parentPath: null, label: 'Root' }];
+    }
+    saveCanvasStack();
     renderCurrentLevel();
 
     console.log(`Loom: rendered ${cardElements.size} cards`);
@@ -1977,9 +2788,12 @@ async function doSearch(query) {
     return;
   }
 
-  c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: `Searching ${scopeLabel}...` }));
+  const vmLabel = isVMTarget() ? currentTarget.label : null;
+  c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: `Searching ${vmLabel || scopeLabel}...` }));
   try {
-    const results = await api.search(query, scope, mode);
+    const results = isVMTarget()
+      ? await api.vmSearch(currentTarget.id, query, mode)
+      : await api.search(query, scope, mode);
     // Remove "Searching..." but keep options bar
     c.querySelectorAll('.empty-state').forEach(e => e.remove());
 
@@ -2036,34 +2850,41 @@ function switchView(name) {
   document.getElementById(`view-${name}`)?.classList.add('active');
   document.querySelector(`.view-tab[data-view="${name}"]`)?.classList.add('active');
   if (name==='files') {
+    if (isVMTarget()) {
+      initVMFilesView();
+      return;
+    }
     // Sync tile path to current canvas level
     const level = currentLevel();
     filesTilePath = level.parentPath ? level.parentPath.split('/') : [];
     if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     initFilesView();
   }
-  if (name==='graph' && filesTilePath.length > 0) {
-    // Sync canvas to the folder we were browsing in Files view
-    const tilePath = filesTilePath.join('/');
-    if (tilePath && currentLevel().parentPath !== tilePath) {
-      // Navigate canvas to match
-      const nd = nodeById(tilePath);
-      if (nd) {
-        canvasStack = [{ parentPath: null, label: 'Root' }];
-        // Build stack from root to target
-        const parts = tilePath.split('/');
-        let path = '';
-        for (const part of parts) {
-          path = path ? path + '/' + part : part;
-          const n = nodeById(path);
-          if (n) canvasStack.push({ parentPath: path, label: n.label || part });
+  if (name==='graph') {
+    if (isVMTarget()) {
+      initVMGraphView();
+    } else if (filesTilePath.length > 0) {
+      // Sync canvas to the folder we were browsing in Files view
+      const tilePath = filesTilePath.join('/');
+      if (tilePath && currentLevel().parentPath !== tilePath) {
+        const nd = nodeById(tilePath);
+        if (nd) {
+          canvasStack = [{ parentPath: null, label: 'Root' }];
+          const parts = tilePath.split('/');
+          let path = '';
+          for (const part of parts) {
+            path = path ? path + '/' + part : part;
+            const n = nodeById(path);
+            if (n) canvasStack.push({ parentPath: path, label: n.label || part });
+          }
+          saveCanvasStack();
+          renderCurrentLevel();
         }
-        renderCurrentLevel();
       }
     }
   }
-  if (name==='tags') initTagCloud();
-  if (name==='health') initHealth();
+  if (name==='tags' && !isVMTarget()) initTagCloud();
+  if (name==='health' && !isVMTarget()) initHealth();
 }
 
 // ========================================
@@ -2111,6 +2932,166 @@ class ChatPanel {
 const chatPanels = new Map(); // panelId → ChatPanel
 let activePanel = new ChatPanel(null); // set properly in initChat()
 chatPanels.set('main', activePanel);
+
+// ── Background Agents ──
+// When a user backgrounds a running agent, we stash its WS + state here.
+// The WS keeps receiving events silently. On completion, a toast notification fires.
+const backgroundAgents = []; // { id, label, ws, messages, responseText, done, result }
+
+function showToast(text, onclick) {
+  const toast = document.createElement('div');
+  toast.className = 'loom-toast';
+  toast.textContent = text;
+  if (onclick) { toast.style.cursor = 'pointer'; toast.onclick = () => { toast.remove(); onclick(); }; }
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 5000);
+}
+
+function backgroundCurrentAgent(panelId) {
+  const panel = chatPanels.get(panelId);
+  if (!panel || !panel.generating || !panel.ws || panel.ws.readyState !== WebSocket.OPEN) return;
+
+  const label = panel.container?.querySelector('.panel-label')?.textContent
+    || document.querySelector('#chat-header .panel-label')?.textContent
+    || 'Chat';
+  const bgId = 'bg-' + Date.now();
+  const bgAgent = {
+    id: bgId, label, ws: panel.ws,
+    messages: [...panel.messages],
+    responseText: panel.responseText || '',
+    done: false, result: null,
+  };
+
+  // Intercept remaining events on the stashed WS
+  const origOnmessage = bgAgent.ws.onmessage;
+  bgAgent.ws.onmessage = (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch { return; }
+    if (msg.type === 'text_delta' || msg.type === 'text') {
+      bgAgent.responseText += msg.text || msg.content || '';
+    } else if (msg.type === 'done' || msg.type === 'stopped') {
+      bgAgent.done = true;
+      bgAgent.result = msg;
+      if (bgAgent.responseText) {
+        bgAgent.messages.push({ role: 'assistant', content: bgAgent.responseText });
+      }
+      showToast(`✓ ${bgAgent.label} finished`, () => viewBackgroundAgent(bgAgent));
+      updateBackgroundBadge();
+    }
+  };
+
+  backgroundAgents.push(bgAgent);
+  updateBackgroundBadge();
+
+  // Reset the panel for a fresh session — detach the old WS
+  panel.ws = null;
+  panel.generating = false;
+  panel.sessionId = crypto.randomUUID();
+  panel.responseText = '';
+  panel.assistantEl = null;
+  panel.thinkingEl = null;
+  panel.thinkingWrapper = null;
+  panel.activityGroup = null;
+  panel.subagents = new Map();
+  panel.startTime = null;
+  panel.tokenCount = 0;
+  clearInterval(panel.timerInterval);
+  panel.timerInterval = null;
+
+  // Clear messages display and array — keep the conversation fresh
+  const msgContainer = panel.container?.querySelector('.fcp-messages')
+    || document.getElementById('chat-messages');
+  if (msgContainer) msgContainer.innerHTML = '';
+  panel.messages = [];
+
+  // Sync globals if this was the active panel
+  if (panel === activePanel || chatPanels.get(panelId) === activePanel) {
+    syncFromPanel(panel);
+    const isMainPanel = panelId === 'main';
+    if (isMainPanel) {
+      document.getElementById('chat-send').style.display = '';
+      document.getElementById('chat-stop').style.display = 'none';
+      document.getElementById('chat-redirect').style.display = 'none';
+    }
+  }
+
+  // Update status dot
+  const statusDot = panel.container?.querySelector('.panel-status')
+    || document.querySelector('#chat-header .panel-status');
+  if (statusDot) statusDot.className = 'panel-status';
+
+  showToast(`Backgrounded "${label}" — keep chatting`);
+}
+
+function viewBackgroundAgent(bgAgent) {
+  // Open a new floating panel showing the background agent's conversation
+  const fp = createFloatingPanel({ label: `${bgAgent.label} (done)` });
+  if (!fp) return;
+  fp.messages = bgAgent.messages;
+  const msgContainer = fp.container?.querySelector('.fcp-messages');
+  if (msgContainer) {
+    for (const msg of bgAgent.messages) {
+      const el = document.createElement('div');
+      if (msg.role === 'user') {
+        el.className = 'chat-msg chat-msg-user';
+        el.textContent = msg.content || '';
+      } else {
+        el.className = 'chat-msg chat-msg-assistant';
+        el.innerHTML = marked.parse(msg.content || '');
+      }
+      msgContainer.appendChild(el);
+    }
+  }
+  // Remove from background list
+  const idx = backgroundAgents.indexOf(bgAgent);
+  if (idx !== -1) backgroundAgents.splice(idx, 1);
+  updateBackgroundBadge();
+}
+
+function updateBackgroundBadge() {
+  let badge = document.getElementById('bg-agents-badge');
+  const running = backgroundAgents.filter(a => !a.done).length;
+  const finished = backgroundAgents.filter(a => a.done).length;
+  if (!badge && (running + finished) > 0) {
+    badge = document.createElement('div');
+    badge.id = 'bg-agents-badge';
+    badge.title = 'Background agents';
+    badge.onclick = () => showBackgroundAgentsList();
+    document.body.appendChild(badge);
+  }
+  if (badge) {
+    if (running + finished === 0) {
+      badge.remove();
+    } else {
+      badge.textContent = running > 0 ? `⟳ ${running}` : `✓ ${finished}`;
+      badge.className = running > 0 ? 'bg-badge running' : 'bg-badge done';
+    }
+  }
+}
+
+function showBackgroundAgentsList() {
+  let list = document.getElementById('bg-agents-list');
+  if (list) { list.remove(); return; }
+  list = document.createElement('div');
+  list.id = 'bg-agents-list';
+  for (const agent of backgroundAgents) {
+    const row = document.createElement('div');
+    row.className = 'bg-agent-row' + (agent.done ? ' done' : '');
+    row.innerHTML = `<span>${agent.done ? '✓' : '⟳'} ${agent.label}</span>`;
+    row.onclick = () => { list.remove(); if (agent.done) viewBackgroundAgent(agent); };
+    list.appendChild(row);
+  }
+  if (backgroundAgents.length === 0) {
+    list.innerHTML = '<div class="bg-agent-row">No background agents</div>';
+  }
+  document.body.appendChild(list);
+  setTimeout(() => document.addEventListener('click', function dismissBgList(e) {
+    if (!e.target.closest('#bg-agents-list') && !e.target.closest('#bg-agents-badge')) {
+      list.remove(); document.removeEventListener('click', dismissBgList);
+    }
+  }), 0);
+}
 
 // Global proxy — all existing code reads/writes these, which proxy to activePanel.
 // This lets us swap activePanel to operate on any panel without changing 400+ lines.
@@ -2394,7 +3375,18 @@ function createPanelHeader(panelId, label = 'Chat') {
     const customCtx = panel.contextPath || '';
     const ctxLabel = customCtx ? customCtx.split('/').slice(-2).join('/') : '';
 
+    const agent = panel.agentType || 'claude-code';
+    const agentLabel = {'claude-code': 'Claude Code', 'codex': 'Codex', 'generic-cli': 'Custom CLI'}[agent] || agent;
     menu.innerHTML = `
+      <div class="panel-menu-section">
+        <div class="panel-menu-label" data-toggle="agent-body">Agent: ${agentLabel}</div>
+        <div class="panel-menu-body collapsed" data-id="agent-body">
+          <div class="panel-menu-item${agent==='claude-code'?' active':''}" data-action="agent" data-value="claude-code">Claude Code</div>
+          <div class="panel-menu-item${agent==='codex'?' active':''}" data-action="agent" data-value="codex">Codex</div>
+          <div class="panel-menu-item${agent==='generic-cli'?' active':''}" data-action="agent" data-value="generic-cli">Custom CLI</div>
+        </div>
+      </div>
+      <div class="panel-menu-sep"></div>
       <div class="panel-menu-section">
         <div class="panel-menu-label" data-toggle="model-body">Model: ${model}</div>
         <div class="panel-menu-body collapsed" data-id="model-body">
@@ -2422,6 +3414,8 @@ function createPanelHeader(panelId, label = 'Chat') {
       <div class="panel-menu-item" data-action="dock-right">Dock Right →</div>
       <div class="panel-menu-item" data-action="dock-bottom">Dock Bottom ↓</div>
       <div class="panel-menu-item" data-action="float">Float ◻</div>
+      <div class="panel-menu-sep"></div>
+      <div class="panel-menu-item" data-action="background">⏎ Background Agent</div>
       <div class="panel-menu-sep"></div>
       <div class="panel-menu-item" data-action="clear">Clear Conversation</div>
     `;
@@ -2457,7 +3451,17 @@ function createPanelHeader(panelId, label = 'Chat') {
 
     let closeMenu = true;
 
-    if (action === 'model') {
+    if (action === 'agent') {
+      panel.agentType = value;
+      // Disconnect current WS so next message creates a fresh adapter
+      if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
+        panel.ws.close();
+        panel.ws = null;
+      }
+      panel.sessionId = crypto.randomUUID();
+      renderMenu();
+      closeMenu = false;
+    } else if (action === 'model') {
       panel.model = value;
       if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
         panel.ws.send(JSON.stringify({ type: 'set_model', model: value }));
@@ -2496,6 +3500,8 @@ function createPanelHeader(panelId, label = 'Chat') {
       closeMenu = false;
     } else if (action === 'dock-right' || action === 'dock-bottom' || action === 'float') {
       dockPanel(panelId, action);
+    } else if (action === 'background') {
+      backgroundCurrentAgent(panelId);
     } else if (action === 'clear') {
       syncToPanel(activePanel);
       activePanel = panel;
@@ -2801,6 +3807,8 @@ function createFloatingPanel(options = {}) {
 
     panel.generating = true;
     panel.startTime = Date.now();
+    const statusDot = panel.container?.querySelector('.panel-status');
+    if (statusDot) statusDot.className = 'panel-status generating';
   }
 
   // Send handler — uses panel directly, never touches activePanel/globals
@@ -2939,7 +3947,8 @@ function connectPanelChat(panel, messagesEl) {
     thisWs.send(JSON.stringify({
       type: 'init',
       session_id: panel.sessionId,
-      page_path: panel.contextPath || currentLevel().parentPath || '',
+      page_path: panel.contextPath || (isVMTarget() ? `vm:${currentTarget.id}` : currentLevel().parentPath) || '',
+      agent: panel.agentType || 'claude-code',
     }));
     thisWs.send(JSON.stringify({ type: 'set_permissions', rules: getPermissionRules() }));
   };
@@ -2986,6 +3995,16 @@ function connectPanelChat(panel, messagesEl) {
 
     // Generate title and drain queue after done event
     if (msg.type === 'done' || msg.type === 'stopped') {
+      // Update status dot and notify if panel was backgrounded (minimized while generating)
+      const statusDot = panel.container?.querySelector('.panel-status');
+      if (statusDot) statusDot.className = 'panel-status connected';
+      if (panel.container?.classList.contains('minimized')) {
+        const panelLabel = panel.container.querySelector('.panel-label')?.textContent || 'Chat';
+        showToast(`${panelLabel} finished`, () => {
+          panel.container.classList.remove('minimized');
+          bringToFront(panel.container);
+        });
+      }
       maybeGenerateChatTitle(panel);
       // Process queued messages for this floating panel
       if (panel._messageQueue && panel._messageQueue.length > 0) {
@@ -3532,7 +4551,8 @@ function connectChat() {
     ws.send(JSON.stringify({
       type: 'init',
       session_id: mainP.sessionId,
-      page_path: level.parentPath || '',
+      page_path: isVMTarget() ? `vm:${currentTarget.id}` : (level.parentPath || ''),
+      agent: mainP.agentType || 'claude-code',
     }));
     // Send permission rules
     const rules = getPermissionRules();
@@ -3656,6 +4676,8 @@ function sendChatMessage() {
   chatGenerating = true;
   chatStartTime = Date.now();
   chatTokenCount = 0;
+  const mainStatusDot = document.querySelector('#chat-header .panel-status');
+  if (mainStatusDot) mainStatusDot.className = 'panel-status generating';
   document.getElementById('chat-send').style.display = 'none';
   document.getElementById('chat-stop').style.display = 'none'; // Hidden — Redirect handles stopping
   document.getElementById('chat-redirect').style.display = '';
@@ -4436,6 +5458,8 @@ function handleChatEvent(msg) {
         document.getElementById('chat-send').style.display = '';
         document.getElementById('chat-stop').style.display = 'none';
         document.getElementById('chat-redirect').style.display = 'none';
+        const msd = document.querySelector('#chat-header .panel-status');
+        if (msd) msd.className = 'panel-status connected';
       }
 
       // Show interrupt prompt if user pressed Escape
@@ -5528,6 +6552,7 @@ async function init() {
     document.getElementById('sidebar').classList.toggle('collapsed');
   };
   initSettings();
+  initTargetSelector();
   initActionMenu();
 
   document.addEventListener('keydown', (e) => {
@@ -5581,6 +6606,7 @@ async function init() {
     if (matchesBinding(e, 'toggle-sidebar') && !inInput) { e.preventDefault(); document.getElementById('sidebar').classList.toggle('collapsed'); return; }
     if (matchesBinding(e, 'new-chat') && !inInput) { e.preventDefault(); createFloatingPanel(); return; }
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
+    if (matchesBinding(e, 'background-agent')) { e.preventDefault(); backgroundCurrentAgent(chatFocusHistory[0] || 'main'); return; }
     if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }

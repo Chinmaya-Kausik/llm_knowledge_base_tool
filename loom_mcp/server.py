@@ -400,6 +400,247 @@ def get_recent_changes(n: int = 10) -> str:
     return json.dumps(result, indent=2)
 
 
+# --- VM tools ---
+
+@mcp.tool()
+def vm_bash(vm_id: str, command: str, timeout: int = 30) -> str:
+    """Run a shell command on a remote VM.
+
+    Returns JSON: {stdout, stderr, exit_code}.
+    Use this for builds, tests, monitoring, and any shell operation on the VM.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    result = asyncio.get_event_loop().run_until_complete(
+        ssh_pool.exec_command(vm, command, timeout=timeout)
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def vm_read(vm_id: str, file_path: str) -> str:
+    """Read a file on a remote VM.
+
+    Returns the file content as a string. Equivalent to the built-in Read tool
+    but operates on the VM filesystem.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    try:
+        content = asyncio.get_event_loop().run_until_complete(
+            ssh_pool.read_file(vm, file_path)
+        )
+        return content
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def vm_write(vm_id: str, file_path: str, content: str) -> str:
+    """Write a file on a remote VM.
+
+    Creates or overwrites the file. Equivalent to the built-in Write tool
+    but operates on the VM filesystem.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    try:
+        asyncio.get_event_loop().run_until_complete(
+            ssh_pool.write_file(vm, file_path, content)
+        )
+        return json.dumps({"ok": True, "path": file_path})
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def vm_edit(vm_id: str, file_path: str, old_string: str, new_string: str) -> str:
+    """Edit a file on a remote VM by replacing old_string with new_string.
+
+    Equivalent to the built-in Edit tool but operates on the VM filesystem.
+    Reads the file, performs the replacement, and writes it back.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    try:
+        loop = asyncio.get_event_loop()
+        content = loop.run_until_complete(ssh_pool.read_file(vm, file_path))
+        if old_string not in content:
+            return json.dumps({"error": f"old_string not found in {file_path}"})
+        count = content.count(old_string)
+        if count > 1:
+            return json.dumps({"error": f"old_string found {count} times — must be unique"})
+        new_content = content.replace(old_string, new_string, 1)
+        loop.run_until_complete(ssh_pool.write_file(vm, file_path, new_content))
+        return json.dumps({"ok": True, "path": file_path})
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def vm_glob(vm_id: str, pattern: str, path: str = ".") -> str:
+    """Find files by glob pattern on a remote VM.
+
+    Returns JSON list of matching file paths. Equivalent to the built-in Glob tool
+    but operates on the VM filesystem.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    base = path if path != "." else vm.get("sync_dir", "~")
+    cmd = f"find {base} -path '*{pattern}' -not -path '*/.git/*' 2>/dev/null | head -200"
+    result = asyncio.get_event_loop().run_until_complete(
+        ssh_pool.exec_command(vm, cmd, timeout=15)
+    )
+    files = [l.strip() for l in result["stdout"].splitlines() if l.strip()]
+    return json.dumps(files, indent=2)
+
+
+@mcp.tool()
+def vm_grep(vm_id: str, pattern: str, path: str = ".", file_glob: str = "") -> str:
+    """Search file contents on a remote VM using grep.
+
+    Returns JSON list of matches [{path, line, content}]. Equivalent to the
+    built-in Grep tool but operates on the VM filesystem.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    base = path if path != "." else vm.get("sync_dir", "~")
+    glob_arg = f"--include='{file_glob}'" if file_glob else ""
+    # Try ripgrep first, fall back to grep
+    cmd = (f"(command -v rg >/dev/null && rg -n --no-heading {glob_arg} -- '{pattern}' {base} 2>/dev/null "
+           f"|| grep -rn {glob_arg} -- '{pattern}' {base} 2>/dev/null) | head -100")
+    result = asyncio.get_event_loop().run_until_complete(
+        ssh_pool.exec_command(vm, cmd, timeout=15)
+    )
+    matches = []
+    for line in result["stdout"].splitlines():
+        parts = line.split(":", 2)
+        if len(parts) >= 3:
+            matches.append({
+                "path": parts[0],
+                "line": int(parts[1]) if parts[1].isdigit() else 0,
+                "content": parts[2].strip(),
+            })
+    return json.dumps(matches, indent=2)
+
+
+@mcp.tool()
+def vm_push(vm_id: str, local_path: str = ".", remote_path: str = "") -> str:
+    """rsync push a local directory to a remote VM.
+
+    Syncs files from local to VM, respecting configured excludes.
+    Use local_path="." to push the current loom root.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm import sync
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    lp = str(LOOM_ROOT) if local_path == "." else local_path
+    result = asyncio.get_event_loop().run_until_complete(
+        sync.rsync_push(vm, lp, remote_path)
+    )
+    return json.dumps({
+        "ok": result.ok, "files": result.files_transferred,
+        "elapsed_ms": result.elapsed_ms, "error": result.error,
+    }, indent=2)
+
+
+@mcp.tool()
+def vm_pull(vm_id: str, remote_path: str = ".", local_path: str = "") -> str:
+    """rsync pull from a remote VM to local.
+
+    Artifacts land in outputs/vm/{vm_id}/ by default.
+    """
+    import asyncio
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm import sync
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return json.dumps({"error": f"VM '{vm_id}' not found"})
+    rp = "" if remote_path == "." else remote_path
+    lp = local_path or str(LOOM_ROOT / "outputs" / "vm" / vm_id)
+    Path(lp).mkdir(parents=True, exist_ok=True)
+    result = asyncio.get_event_loop().run_until_complete(
+        sync.rsync_pull(vm, rp, lp)
+    )
+    return json.dumps({
+        "ok": result.ok, "files": result.files_transferred,
+        "elapsed_ms": result.elapsed_ms, "error": result.error,
+    }, indent=2)
+
+
+@mcp.tool()
+def vm_status(vm_id: str = "") -> str:
+    """Get VM connection status and resource metrics.
+
+    Omit vm_id to get status of all configured VMs.
+    Returns JSON with connection status and basic resource info.
+    """
+    import asyncio
+    from loom_mcp.vm.config import load_vms, get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm.metrics import METRICS_COMMAND, parse_metrics
+
+    if vm_id:
+        vm = get_vm(LOOM_ROOT, vm_id)
+        if not vm:
+            return json.dumps({"error": f"VM '{vm_id}' not found"})
+        vms = [vm]
+    else:
+        vms = load_vms(LOOM_ROOT)
+
+    results = []
+    for vm in vms:
+        status = ssh_pool.get_status(vm["id"])
+        entry = {"id": vm["id"], "label": vm["label"], "host": vm["host"], "status": status}
+        if status == "connected":
+            try:
+                r = asyncio.get_event_loop().run_until_complete(
+                    ssh_pool.exec_command(vm, METRICS_COMMAND, timeout=10)
+                )
+                if r["exit_code"] == 0:
+                    entry["metrics"] = parse_metrics(r["stdout"])
+            except Exception:
+                pass
+        results.append(entry)
+
+    return json.dumps(results, indent=2)
+
+
 # --- Helpers ---
 
 def _serialize_frontmatter(fm: dict) -> dict:

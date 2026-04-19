@@ -30,6 +30,12 @@
     <div class="toolbar-left">
       <button id="sidebar-toggle" title="Toggle sidebar">☰</button>
       <span class="logo">Loom</span>
+      <div id="target-selector">
+        <button id="target-btn" title="Switch between local and VM">Local <span class="target-caret">&#9662;</span></button>
+        <div id="target-dropdown" class="hidden">
+          <!-- Populated by JS -->
+        </div>
+      </div>
       <div class="view-tabs">
         <button class="view-tab active" data-view="graph">Canvas</button>
         <button class="view-tab" data-view="files">Files</button>
@@ -102,7 +108,8 @@
             <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Hidden Files</div>
             <div class="toolbar-menu-body collapsed" id="filter-visibility-menu">
               <label><input type="checkbox" id="filter-show-internals"> Loom internals</label>
-              <label><input type="checkbox" id="filter-show-hidden"> Hidden files (tree only)</label>
+              <label><input type="checkbox" id="filter-show-dotfiles"> Dotfiles (.git, .env, ...)</label>
+              <label><input type="checkbox" id="filter-show-hidden"> Build artifacts</label>
             </div>
           </div>
           <hr>

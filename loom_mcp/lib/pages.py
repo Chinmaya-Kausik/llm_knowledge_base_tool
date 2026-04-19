@@ -11,14 +11,20 @@ from typing import Any
 
 from loom_mcp.lib.frontmatter import read_frontmatter
 
-# Directories and patterns always hidden (build artifacts, OS files)
+# Build artifacts and OS files — always hidden unless explicitly shown
 HIDDEN_PATTERNS = {
-    "__pycache__", ".git", ".venv", "venv", "node_modules",
-    ".pytest_cache", ".eggs", "dist", "build", ".idea", ".vscode",
-    ".DS_Store", "Thumbs.db", ".claude",
+    "__pycache__", "venv", "node_modules",
+    ".pytest_cache", ".eggs", "dist", "build",
+    "Thumbs.db",
 }
 
 HIDDEN_EXTENSIONS = {".pyc", ".pyo", ".egg-info", ".swp", ".swo"}
+
+# Dotfile patterns — separate toggle from build artifacts
+DOTFILE_PATTERNS = {
+    ".git", ".venv", ".idea", ".vscode", ".DS_Store", ".claude",
+    ".env", ".cache", ".config",
+}
 
 # Loom internals — hidden by default, togglable via show_internals
 LOOM_INTERNAL_PATTERNS = {"CLAUDE.md", "MEMORY.md", "config.yaml"}
@@ -32,8 +38,13 @@ FILETYPE_CATEGORIES = {
 }
 
 
+def is_dotfile(path: Path) -> bool:
+    """Check if a path is a dotfile (starts with .)."""
+    return path.name.startswith(".") or path.name in DOTFILE_PATTERNS
+
+
 def is_hidden(path: Path) -> bool:
-    """Check if a path should always be hidden (build artifacts, OS files)."""
+    """Check if a path should be hidden (build artifacts, OS files, dotfiles)."""
     name = path.name
     if name.startswith("."):
         return True
@@ -42,6 +53,11 @@ def is_hidden(path: Path) -> bool:
     if path.suffix in HIDDEN_EXTENSIONS:
         return True
     return False
+
+
+def is_build_artifact(path: Path) -> bool:
+    """Check if a path is a build artifact (non-dotfile hidden pattern)."""
+    return path.name in HIDDEN_PATTERNS or path.suffix in HIDDEN_EXTENSIONS
 
 
 def is_loom_internal(path: Path) -> bool:
@@ -120,12 +136,14 @@ def get_page_metadata(path: Path) -> dict[str, Any]:
     return meta
 
 
-def walk_pages(loom_root: Path, include_hidden: bool = False, show_internals: bool = False) -> list[dict[str, Any]]:
+def walk_pages(loom_root: Path, include_hidden: bool = False,
+               show_internals: bool = False, include_dotfiles: bool = False) -> list[dict[str, Any]]:
     """Walk the loom and return all pages (folders + files).
 
     Args:
-        include_hidden: Show build artifacts, OS files (.git, __pycache__, etc.)
+        include_hidden: Show build artifacts (node_modules, __pycache__, venv, dist, etc.)
         show_internals: Show loom internal files (CLAUDE.md, MEMORY.md, config.yaml)
+        include_dotfiles: Show dotfiles (.git, .env, .vscode, .DS_Store, etc.)
 
     Returns a flat list of page descriptors:
     [{id, title, path, is_folder, parent_id, children_ids, type, category, metadata}]
@@ -156,7 +174,9 @@ def walk_pages(loom_root: Path, include_hidden: bool = False, show_internals: bo
             return
 
         for item in items:
-            if not include_hidden and is_hidden(item):
+            if not include_dotfiles and is_dotfile(item):
+                continue
+            if not include_hidden and is_build_artifact(item):
                 continue
             if not show_internals and is_loom_internal(item):
                 continue
@@ -234,7 +254,8 @@ def resolve_wiki_link(target: str, pages: list[dict]) -> str | None:
     return None
 
 
-def build_page_graph(loom_root: Path, include_hidden: bool = False, show_internals: bool = False) -> dict[str, Any]:
+def build_page_graph(loom_root: Path, include_hidden: bool = False,
+                     show_internals: bool = False, include_dotfiles: bool = False) -> dict[str, Any]:
     """Build the full page graph for the loom.
 
     Returns:
@@ -247,7 +268,8 @@ def build_page_graph(loom_root: Path, include_hidden: bool = False, show_interna
     """
     from loom_mcp.lib.links import parse_links
 
-    pages = walk_pages(loom_root, include_hidden, show_internals)
+    pages = walk_pages(loom_root, include_hidden=include_hidden,
+                       show_internals=show_internals, include_dotfiles=include_dotfiles)
     page_map = {p["id"]: p for p in pages}
 
     # Build edges from [[wiki-links]] in page content

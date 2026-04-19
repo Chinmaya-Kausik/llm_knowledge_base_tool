@@ -2,13 +2,16 @@
 
 import json
 import os
+import secrets
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
-from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from loom_mcp.lib.frontmatter import read_frontmatter
@@ -35,6 +38,59 @@ def _resolve_loom_root() -> Path:
 
 LOOM_ROOT = _resolve_loom_root()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+# --- Auth config ---
+
+def _load_auth_config() -> tuple[bool, str]:
+    """Load remote access config. Returns (remote_enabled, auth_token)."""
+    remote = os.environ.get("LOOM_REMOTE", "").lower() in ("1", "true", "yes")
+    config_path = Path.home() / ".loom-app-config.json"
+
+    token = ""
+    if config_path.exists():
+        try:
+            data = json.loads(config_path.read_text())
+            token = data.get("auth_token", "")
+        except Exception:
+            pass
+
+    # Generate token on first remote-enabled run
+    if remote and not token:
+        token = "loom_" + secrets.token_hex(32)
+        try:
+            data = {}
+            if config_path.exists():
+                data = json.loads(config_path.read_text())
+            data["auth_token"] = token
+            config_path.write_text(json.dumps(data, indent=2))
+        except Exception:
+            pass
+
+    return remote, token
+
+
+REMOTE_ENABLED, AUTH_TOKEN = _load_auth_config()
+
+
+def _is_localhost(host: str | None) -> bool:
+    """Check if the request is from localhost."""
+    if not host:
+        return False
+    return host in ("127.0.0.1", "::1", "localhost")
+
+
+async def _ws_auth(websocket: WebSocket) -> bool:
+    """Check WebSocket auth. Returns True if authorized, False if rejected."""
+    if not REMOTE_ENABLED:
+        return True
+    if _is_localhost(websocket.client.host if websocket.client else None):
+        return True
+    token = websocket.query_params.get("token", "")
+    if token and token == AUTH_TOKEN:
+        return True
+    await websocket.close(code=4001, reason="Unauthorized")
+    return False
 
 
 def bootstrap_loom(loom_root: Path) -> None:
@@ -221,6 +277,24 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Loom Knowledge Base", lifespan=lifespan)
+
+# CORS — needed when phone hits a different origin than the server
+if REMOTE_ENABLED:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+# --- Unauthenticated endpoints ---
+
+@app.get("/api/ping")
+def api_ping():
+    """Health check — no auth required. Used by endpoint switcher."""
+    return {"ok": True, "ts": time.time()}
 
 
 # --- Graph builder (folder-as-page model) ---
@@ -438,10 +512,12 @@ def build_provenance(loom_root: Path) -> dict[str, Any]:
 
 # --- New graph builder (folder-as-page) ---
 
-def build_graph_v2(loom_root: Path, show_internals: bool = False) -> dict[str, Any]:
+def build_graph_v2(loom_root: Path, show_internals: bool = False,
+                   include_hidden: bool = False, include_dotfiles: bool = False) -> dict[str, Any]:
     """Build page graph using folder-as-page model."""
     from loom_mcp.lib.pages import build_page_graph, get_page_content, FILETYPE_CATEGORIES
-    graph = build_page_graph(loom_root, show_internals=show_internals)
+    graph = build_page_graph(loom_root, show_internals=show_internals,
+                             include_hidden=include_hidden, include_dotfiles=include_dotfiles)
 
     # Convert to frontend-compatible format
     def page_to_node(p):
@@ -463,10 +539,12 @@ def build_graph_v2(loom_root: Path, show_internals: bool = False) -> dict[str, A
     }
 
 
-def build_tree_v2(loom_root: Path, show_internals: bool = False, include_hidden: bool = False) -> dict[str, Any]:
+def build_tree_v2(loom_root: Path, show_internals: bool = False,
+                  include_hidden: bool = False, include_dotfiles: bool = False) -> dict[str, Any]:
     """Build folder tree using the new page model."""
     from loom_mcp.lib.pages import walk_pages
-    pages = walk_pages(loom_root, include_hidden=include_hidden, show_internals=show_internals)
+    pages = walk_pages(loom_root, include_hidden=include_hidden,
+                       show_internals=show_internals, include_dotfiles=include_dotfiles)
 
     # Build nested tree from flat page list
     page_map = {p["id"]: {**p, "children": []} for p in pages}
@@ -566,8 +644,9 @@ def api_children(path: str, show_internals: bool = False):
 
 
 @app.get("/api/graph")
-def api_graph(show_internals: bool = False):
-    return build_graph_v2(LOOM_ROOT, show_internals=show_internals)
+def api_graph(show_internals: bool = False, include_hidden: bool = False, include_dotfiles: bool = False):
+    return build_graph_v2(LOOM_ROOT, show_internals=show_internals,
+                          include_hidden=include_hidden, include_dotfiles=include_dotfiles)
 
 
 @app.get("/api/provenance")
@@ -611,8 +690,9 @@ async def api_pages_bulk(request: Request):
 
 
 @app.get("/api/tree")
-def api_tree(show_internals: bool = False, include_hidden: bool = False):
-    return build_tree_v2(LOOM_ROOT, show_internals=show_internals, include_hidden=include_hidden)
+def api_tree(show_internals: bool = False, include_hidden: bool = False, include_dotfiles: bool = False):
+    return build_tree_v2(LOOM_ROOT, show_internals=show_internals,
+                         include_hidden=include_hidden, include_dotfiles=include_dotfiles)
 
 
 @app.get("/api/search")
@@ -1165,6 +1245,8 @@ async def api_open_external(request: Request):
 
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
+    if not await _ws_auth(websocket):
+        return
     from loom_mcp.chat import ws_chat
     await ws_chat(websocket, LOOM_ROOT)
 
@@ -1173,6 +1255,8 @@ async def websocket_chat(websocket: WebSocket):
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
+    if not await _ws_auth(websocket):
+        return
     import os, fcntl, asyncio, traceback
     from ptyprocess import PtyProcess
     from starlette.websockets import WebSocketDisconnect
@@ -1279,6 +1363,526 @@ async def upload_chat_image(request: Request):
     return {"path": str(file_path), "url": f"/media/raw/media/chat-images/{file_path.name}"}
 
 
+# --- VM API ---
+
+@app.get("/api/vms")
+async def api_list_vms():
+    """List all configured VMs with connection status."""
+    from loom_mcp.vm.config import load_vms
+    from loom_mcp.vm.ssh import ssh_pool
+    vms = load_vms(LOOM_ROOT)
+    result = []
+    for vm in vms:
+        result.append({**vm, "status": ssh_pool.get_status(vm["id"])})
+    return result
+
+
+@app.post("/api/vms")
+async def api_add_vm(request: Request):
+    """Add a new VM. Optionally test connection with dry_run=true."""
+    body = await request.json()
+    dry_run = body.pop("dry_run", False)
+
+    label = body.get("label", "")
+    host = body.get("host", "")
+    user = body.get("user", "")
+    if not host:
+        return {"ok": False, "error": "host is required"}
+    if not label:
+        label = host
+
+    from loom_mcp.vm.config import add_vm as _add_vm
+    vm = _add_vm(
+        LOOM_ROOT, label=label, host=host, user=user,
+        port=body.get("port", 22),
+        key_path=body.get("key_path", ""),
+        sync_dir=body.get("sync_dir", "~"),
+        color=body.get("color", "#4fc3f7"),
+    )
+
+    if dry_run:
+        from loom_mcp.vm.ssh import ssh_pool
+        try:
+            await ssh_pool.connect(vm)
+            return {"ok": True, "vm": vm, "connection": "success"}
+        except Exception as exc:
+            # Remove the VM we just added since connection failed
+            from loom_mcp.vm.config import delete_vm as _del
+            _del(LOOM_ROOT, vm["id"])
+            return {"ok": False, "error": f"Connection failed: {exc}"}
+
+    return {"ok": True, "vm": vm}
+
+
+@app.put("/api/vms/{vm_id}")
+async def api_update_vm(vm_id: str, request: Request):
+    """Update a VM config."""
+    body = await request.json()
+    from loom_mcp.vm.config import update_vm as _update
+    vm = _update(LOOM_ROOT, vm_id, body)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    return {"ok": True, "vm": vm}
+
+
+@app.delete("/api/vms/{vm_id}")
+async def api_delete_vm(vm_id: str):
+    """Delete a VM and disconnect."""
+    from loom_mcp.vm.ssh import ssh_pool
+    await ssh_pool.disconnect(vm_id)
+    from loom_mcp.vm.config import delete_vm as _del
+    if _del(LOOM_ROOT, vm_id):
+        return {"ok": True}
+    return {"ok": False, "error": "VM not found"}
+
+
+@app.get("/api/vms/{vm_id}/tree")
+async def api_vm_tree(vm_id: str, path: str = ""):
+    """Get remote file tree via SFTP."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    raw_base = path or vm.get("sync_dir", "~")
+    base = await ssh_pool.resolve_path(vm, raw_base)
+
+    async def _build_tree(dir_path: str, depth: int = 0, max_depth: int = 3) -> dict:
+        entries = await ssh_pool.list_dir(vm, dir_path)
+        children = []
+        for entry in entries:
+            child_path = f"{dir_path}/{entry['name']}"
+            node = {
+                "id": child_path,
+                "name": entry["name"],
+                "type": entry["type"],
+                "size": entry.get("size", 0),
+                "mtime": entry.get("mtime", 0),
+                "children": [],
+            }
+            if entry["type"] == "folder" and depth < max_depth:
+                try:
+                    sub = await _build_tree(child_path, depth + 1, max_depth)
+                    node["children"] = sub.get("children", [])
+                except Exception:
+                    pass
+            children.append(node)
+        return {"id": dir_path, "name": dir_path.split("/")[-1] or dir_path,
+                "type": "folder", "children": children}
+
+    try:
+        tree = await _build_tree(base)
+        return tree
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/vms/{vm_id}/file")
+async def api_vm_file(vm_id: str, path: str):
+    """Read a remote file."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+    try:
+        content = await ssh_pool.read_file(vm, path)
+        return {"path": path, "content": content}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/api/vms/{vm_id}/search")
+async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: str = ""):
+    """Search remote files via grep/find over SSH."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    raw_base = vm.get("sync_dir", "~")
+    base = await ssh_pool.resolve_path(vm, raw_base)
+    results = []
+
+    if mode in ("content", "both"):
+        glob_arg = f"--include='{file_glob}'" if file_glob else ""
+        cmd = f"grep -rn --color=never {glob_arg} -- {_shell_escape(q)} {base} 2>/dev/null | head -100"
+        r = await ssh_pool.exec_command(vm, cmd, timeout=15)
+        for line in r["stdout"].splitlines():
+            # Format: path:line_number:content
+            parts = line.split(":", 2)
+            if len(parts) >= 3:
+                rel = parts[0].replace(base + "/", "", 1) if parts[0].startswith(base) else parts[0]
+                results.append({
+                    "path": rel,
+                    "line": int(parts[1]) if parts[1].isdigit() else 0,
+                    "snippet": parts[2].strip(),
+                    "match_type": "content",
+                })
+
+    if mode in ("name", "both"):
+        cmd = f"find {base} -iname '*{q}*' -not -path '*/.git/*' 2>/dev/null | head -50"
+        r = await ssh_pool.exec_command(vm, cmd, timeout=10)
+        for line in r["stdout"].splitlines():
+            line = line.strip()
+            if line:
+                rel = line.replace(base + "/", "", 1) if line.startswith(base) else line
+                results.append({
+                    "path": rel,
+                    "line": 0,
+                    "snippet": "",
+                    "match_type": "name",
+                })
+
+    return results
+
+
+@app.get("/api/vms/{vm_id}/graph")
+async def api_vm_graph(vm_id: str):
+    """Build a simple graph from remote file tree (no frontmatter parsing)."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    raw_base = vm.get("sync_dir", "~")
+    base = await ssh_pool.resolve_path(vm, raw_base)
+    # Get flat file listing
+    cmd = f"find {base} -maxdepth 3 -not -path '*/.git/*' -not -path '*/__pycache__/*' -not -path '*/node_modules/*' 2>/dev/null | head -500"
+    r = await ssh_pool.exec_command(vm, cmd, timeout=15)
+
+    nodes = []
+    edges = []
+    top_nodes = []
+    seen_parents = set()
+
+    for line in r["stdout"].splitlines():
+        line = line.strip()
+        if not line or line == base:
+            continue
+        rel = line.replace(base + "/", "", 1) if line.startswith(base) else line
+        parts = rel.split("/")
+        is_folder = not ("." in parts[-1]) if len(parts[-1]) > 0 else True
+        name = parts[-1]
+        parent = "/".join(parts[:-1]) if len(parts) > 1 else ""
+
+        # Determine category from extension
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        cat_map = {
+            "py": "code", "js": "code", "ts": "code", "rs": "code", "go": "code",
+            "md": "markdown", "txt": "markdown",
+            "json": "data", "yaml": "data", "yml": "data", "toml": "data",
+            "png": "image", "jpg": "image", "svg": "image",
+            "pdf": "paper",
+        }
+        category = "folder" if is_folder else cat_map.get(ext, "file")
+
+        node = {
+            "data": {
+                "id": rel,
+                "label": name,
+                "path": rel,
+                "is_folder": is_folder,
+                "parent_id": parent,
+                "type": "folder" if is_folder else "file",
+                "category": category,
+                "children": [],
+            }
+        }
+        nodes.append(node)
+
+        if parent and parent not in seen_parents:
+            edges.append({"data": {"source": parent, "target": rel}})
+
+        if len(parts) == 1:
+            top_nodes.append(node)
+
+        seen_parents.add(rel)
+
+    return {
+        "nodes": nodes, "edges": edges,
+        "top_nodes": top_nodes, "top_edges": [],
+        "filetype_categories": {},
+    }
+
+
+# --- VM Sync ---
+
+@app.post("/api/vms/{vm_id}/push")
+async def api_vm_push(vm_id: str, request: Request):
+    """rsync push local → VM."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm import sync
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    body = await request.json() if await request.body() else {}
+    local_path = body.get("local_path", str(LOOM_ROOT))
+    remote_path = body.get("remote_path", "")
+    result = await sync.rsync_push(vm, local_path, remote_path)
+    if result.ok:
+        from loom_mcp.vm.config import update_vm
+        from datetime import datetime, timezone
+        update_vm(LOOM_ROOT, vm_id, {"last_connected": datetime.now(timezone.utc).isoformat()})
+    return {"ok": result.ok, "files": result.files_transferred,
+            "elapsed_ms": result.elapsed_ms, "file_list": result.file_list,
+            "error": result.error}
+
+
+@app.post("/api/vms/{vm_id}/pull")
+async def api_vm_pull(vm_id: str, request: Request):
+    """rsync pull VM → local."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm import sync
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    body = await request.json() if await request.body() else {}
+    remote_path = body.get("remote_path", "")
+    local_path = body.get("local_path", str(LOOM_ROOT / "outputs" / "vm" / vm_id))
+    Path(local_path).mkdir(parents=True, exist_ok=True)
+    result = await sync.rsync_pull(vm, remote_path, local_path)
+    return {"ok": result.ok, "files": result.files_transferred,
+            "elapsed_ms": result.elapsed_ms, "file_list": result.file_list,
+            "error": result.error}
+
+
+@app.get("/api/vms/{vm_id}/sync-status")
+async def api_vm_sync_status(vm_id: str):
+    """Dry-run rsync in both directions to show pending changes."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm import sync
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    push_result = await sync.rsync_push(vm, str(LOOM_ROOT), "", dry_run=True)
+    pull_result = await sync.rsync_pull(vm, "", str(LOOM_ROOT / "outputs" / "vm" / vm_id), dry_run=True)
+    return {
+        "push_pending": push_result.file_list,
+        "pull_pending": pull_result.file_list,
+        "push_count": push_result.files_transferred,
+        "pull_count": pull_result.files_transferred,
+    }
+
+
+# --- VM Metrics ---
+
+@app.get("/api/vms/{vm_id}/metrics")
+async def api_vm_metrics(vm_id: str):
+    """One-shot metrics poll."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm.metrics import METRICS_COMMAND, parse_metrics
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+    r = await ssh_pool.exec_command(vm, METRICS_COMMAND, timeout=10)
+    if r["exit_code"] != 0:
+        return {"error": r["stderr"]}
+    return parse_metrics(r["stdout"])
+
+
+# --- VM Jobs ---
+
+@app.get("/api/vms/{vm_id}/jobs")
+async def api_vm_jobs(vm_id: str):
+    """List tracked jobs for a VM, refreshing status."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm import jobs
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return []
+    return await jobs.refresh_job_status(ssh_pool, vm, LOOM_ROOT)
+
+
+@app.post("/api/vms/{vm_id}/jobs")
+async def api_vm_start_job(vm_id: str, request: Request):
+    """Start a job on a VM."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm import jobs
+    body = await request.json()
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    return await jobs.start_job(ssh_pool, vm, LOOM_ROOT,
+                                name=body.get("name", "job"),
+                                command=body.get("command", ""))
+
+
+@app.delete("/api/vms/{vm_id}/jobs/{job_id}")
+async def api_vm_stop_job(vm_id: str, job_id: str):
+    """Stop a running job."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm import jobs
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    return await jobs.stop_job(ssh_pool, vm, LOOM_ROOT, job_id)
+
+
+@app.get("/api/vms/{vm_id}/jobs/{job_id}/output")
+async def api_vm_job_output(vm_id: str, job_id: str, tail: int = 100):
+    """Get job output."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm import jobs
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"output": ""}
+    output = await jobs.get_job_output(ssh_pool, vm, job_id, LOOM_ROOT, tail)
+    return {"output": output}
+
+
+# --- VM Tunnels ---
+
+@app.get("/api/vms/{vm_id}/tunnels")
+async def api_vm_tunnels(vm_id: str):
+    """List active SSH tunnels."""
+    from loom_mcp.vm.ssh import ssh_pool
+    return ssh_pool.get_tunnels(vm_id)
+
+
+@app.post("/api/vms/{vm_id}/tunnels")
+async def api_vm_create_tunnel(vm_id: str, request: Request):
+    """Create an SSH tunnel."""
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    body = await request.json()
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        return {"ok": False, "error": "VM not found"}
+    local_port = body.get("local_port")
+    remote_port = body.get("remote_port")
+    if not local_port or not remote_port:
+        return {"ok": False, "error": "local_port and remote_port required"}
+    ok = await ssh_pool.forward_local_port(vm, int(local_port), int(remote_port))
+    return {"ok": ok}
+
+
+@app.delete("/api/vms/{vm_id}/tunnels/{local_port}")
+async def api_vm_close_tunnel(vm_id: str, local_port: int):
+    """Close an SSH tunnel."""
+    from loom_mcp.vm.ssh import ssh_pool
+    ok = await ssh_pool.close_tunnel(vm_id, local_port)
+    return {"ok": ok}
+
+
+# --- VM Terminal WebSocket ---
+
+@app.websocket("/ws/vm-terminal/{vm_id}")
+async def websocket_vm_terminal(websocket: WebSocket, vm_id: str):
+    """Interactive SSH shell terminal for a VM."""
+    if not await _ws_auth(websocket):
+        return
+    import asyncio
+    from starlette.websockets import WebSocketDisconnect
+
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        await websocket.close(code=4004, reason="VM not found")
+        return
+
+    process = None
+    try:
+        await websocket.accept()
+        process = await ssh_pool.open_shell(vm)
+
+        async def read_ssh():
+            """Read from SSH and send to browser."""
+            try:
+                while True:
+                    data = await process.stdout.read(4096)
+                    if not data:
+                        break
+                    await websocket.send_bytes(data)
+            except Exception:
+                pass
+
+        read_task = asyncio.create_task(read_ssh())
+
+        while True:
+            msg = await websocket.receive()
+            if msg["type"] == "websocket.receive":
+                if "bytes" in msg:
+                    process.stdin.write(msg["bytes"])
+                elif "text" in msg:
+                    text = msg["text"]
+                    if text.startswith("RESIZE:"):
+                        try:
+                            _, cols, rows = text.split(":")
+                            process.change_terminal_size(int(cols), int(rows))
+                        except Exception:
+                            pass
+                    else:
+                        process.stdin.write(text.encode())
+            elif msg["type"] == "websocket.disconnect":
+                break
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        print(f"[VM-TERM] ERROR: {exc}", flush=True)
+    finally:
+        try:
+            read_task.cancel()
+        except Exception:
+            pass
+        if process:
+            try:
+                process.close()
+            except Exception:
+                pass
+
+
+# --- VM Metrics WebSocket ---
+
+@app.websocket("/ws/vm-metrics/{vm_id}")
+async def websocket_vm_metrics(websocket: WebSocket, vm_id: str):
+    """Stream VM metrics every 5 seconds."""
+    if not await _ws_auth(websocket):
+        return
+    import asyncio
+    from starlette.websockets import WebSocketDisconnect
+
+    from loom_mcp.vm.config import get_vm
+    from loom_mcp.vm.ssh import ssh_pool
+    from loom_mcp.vm.metrics import METRICS_COMMAND, parse_metrics
+
+    vm = get_vm(LOOM_ROOT, vm_id)
+    if not vm:
+        await websocket.close(code=4004, reason="VM not found")
+        return
+
+    try:
+        await websocket.accept()
+        while True:
+            try:
+                r = await ssh_pool.exec_command(vm, METRICS_COMMAND, timeout=10)
+                metrics = parse_metrics(r["stdout"]) if r["exit_code"] == 0 else {"error": r["stderr"]}
+                await websocket.send_json(metrics)
+            except Exception as exc:
+                await websocket.send_json({"error": str(exc)})
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+
+
+def _shell_escape(s: str) -> str:
+    """Escape a string for shell use."""
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
 # --- Media serving (downloaded images) ---
 
 @app.get("/media/{filepath:path}")
@@ -1299,10 +1903,35 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.middleware("http")
-async def no_cache_static(request: Request, call_next):
-    """Disable browser caching for static files during development."""
+async def auth_and_cache(request: Request, call_next):
+    """Auth check for remote access + no-cache for static files."""
+    path = request.url.path
+
+    # Skip auth for ping endpoint (used by endpoint switcher)
+    if path == "/api/ping":
+        return await call_next(request)
+
+    # Auth check when remote access is enabled
+    if REMOTE_ENABLED:
+        client_host = request.client.host if request.client else None
+        if not _is_localhost(client_host):
+            # Check bearer token or query param
+            auth_header = request.headers.get("authorization", "")
+            query_token = request.query_params.get("token", "")
+            token = ""
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+            elif query_token:
+                token = query_token
+
+            if token != AUTH_TOKEN:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Unauthorized. Provide Authorization: Bearer <token> header or ?token= query param."},
+                )
+
     response = await call_next(request)
-    if request.url.path.startswith("/static") or request.url.path == "/":
+    if path.startswith("/static") or path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
@@ -1329,8 +1958,13 @@ def main():
     """Run the web UI server."""
     import uvicorn
     port = int(os.environ.get("LOOM_PORT", "8420"))
-    print(f"Starting Loom UI at http://localhost:{port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    host = "0.0.0.0" if REMOTE_ENABLED else "127.0.0.1"
+    if REMOTE_ENABLED:
+        print(f"Remote access ON — auth token: {AUTH_TOKEN}")
+        print(f"Starting Loom UI at http://0.0.0.0:{port}")
+    else:
+        print(f"Starting Loom UI at http://localhost:{port}")
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
