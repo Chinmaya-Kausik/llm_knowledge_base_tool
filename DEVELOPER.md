@@ -4,10 +4,24 @@
 
 ```
 loom_mcp/
-  server.py          MCP server entrypoint (stdio transport, 28 tools)
-  web.py             FastAPI web server (REST + WebSocket)
-  chat.py            Chat backend — WebSocket bridge to Claude Agent SDK
+  server.py          MCP server entrypoint (stdio transport, 39 tools)
+  web.py             FastAPI web server (REST + WebSocket + auth)
+  chat.py            Agent-agnostic chat backend via adapter layer
   __main__.py        `python -m loom_mcp` -> MCP server
+
+  agents/            Agent adapter layer
+    __init__.py      AgentAdapter base class, AgentEvent, get_adapter() factory
+    claude_code.py   Claude Code adapter (wraps Agent SDK)
+    codex.py         OpenAI Codex CLI adapter (subprocess)
+    generic_cli.py   Generic stdin/stdout adapter (Aider, custom scripts)
+
+  vm/                VM integration
+    __init__.py      Package exports
+    config.py        VM config CRUD ({LOOM_ROOT}/.loom/vms.json)
+    ssh.py           SSHPool — persistent asyncssh connections, SFTP, tunnels
+    sync.py          rsync push/pull between local and VM
+    metrics.py       CPU/RAM/disk/GPU metric parsing
+    jobs.py          Job management (start/stop/monitor via nohup + PID tracking)
 
   lib/
     pages.py         Folder-as-page abstraction (filesystem walk, link resolution)
@@ -24,16 +38,16 @@ loom_mcp/
     git.py           Auto-commit, recent changes
 
   static/
-    index.html       Single-page app shell (settings dropdown, chat panels, terminals)
-    style.css        All styles (dark theme, canvas, cards, chat, PDF, terminals)
-    app.js           All frontend logic (~5100 lines)
+    index.html       Single-page app shell (target dropdown, chat panels, terminals)
+    style.css        All styles (dark theme, canvas, cards, chat, VM panels)
+    app.js           All frontend logic (~7000 lines)
     vendor/          Vendored JS libs (marked, d3-zoom, d3-drag, pdf.js, cola.min.js,
                      CodeMirror 6, xterm.js, KaTeX)
 
-  tests/             pytest tests (293 total across 25 files)
+  tests/             pytest tests (330+ across 26 files)
 
 src-tauri/           Tauri native app wrapper
-  src/main.rs        Starts Python server sidecar, Tauri commands for settings
+  src/main.rs        Starts Python server sidecar, waits for readiness, error pages
   tauri.conf.json    App config (window size, devUrl)
 ```
 
@@ -107,19 +121,32 @@ On startup (`lifespan`), `bootstrap_loom()` creates (if missing):
 
 ## Chat Backend
 
-`loom_mcp/chat.py` bridges browser <-> Claude Code via the Agent SDK:
+`loom_mcp/chat.py` bridges browser <-> coding agents via the adapter layer:
 
 ### Protocol
 
 1. Browser connects via WebSocket to `/ws/chat`
-2. Sends `{type: "init", session_id, page_path, permission_mode}` to start a session
+2. Sends `{type: "init", session_id, page_path, agent}` to start a session (agent defaults to "claude-code")
 3. Sends `{type: "set_model", model}` to change model mid-session
 4. Sends `{type: "message", text, context_level, context}` for each user message
 5. Sends `{type: "stop"}` to cancel generation
 6. Sends `{type: "set_permissions", rules}` to update permission categories
 7. Sends `{type: "permission_response", decision}` to respond to permission prompts
-8. Server spawns/reuses a `ClaudeSDKClient` with `ClaudeAgentOptions`
-9. Streams events back: `thinking`, `text`, `tool_use`, `tool_result`, `result`, `done`
+8. Server creates/reuses an `AgentAdapter` (Claude Code, Codex, or Generic CLI)
+9. Streams common `AgentEvent`s back: `thinking`, `text`, `tool_use`, `tool_result`, `result`, `done`
+
+### Agent Adapter Layer
+
+`loom_mcp/agents/` provides a common interface for all coding agents:
+
+- **`AgentAdapter`** — base class with `connect()`, `query()`, `receive()`, `stop()`, `disconnect()`
+- **`AgentEvent`** — common event type with `type`, `content`, `data` fields
+- **`get_adapter(agent_type)`** — factory returning the right adapter
+- **Claude Code adapter** — wraps Agent SDK. Full support: thinking, tool use, subagents, permissions, PreCompact hooks.
+- **Codex adapter** — spawns `codex` CLI subprocess. Parses stdout for tool use patterns.
+- **Generic CLI adapter** — any stdin/stdout agent. Configurable via `~/.loom-app-config.json`.
+
+The frontend is agent-agnostic — it renders the same event stream regardless of which adapter produced it.
 
 ### System Prompt (Modular Context Pipeline)
 
@@ -246,9 +273,68 @@ All shortcuts are rebindable via Cmd+K. Bindings are defined in `DEFAULT_KEYBIND
 | Enter | Drill into focused/selected folder |
 | Escape | Collapse full-page view, or navigate back |
 
+## VM Integration
+
+`loom_mcp/vm/` provides remote machine access via SSH:
+
+- **`SSHPool`** (`ssh.py`) — Persistent asyncssh connections per VM. Multiplexed channels for terminals, tool calls, metrics, SFTP. Auto-reconnect on stale connections.
+- **`config.py`** — VM config CRUD. Stored in `{LOOM_ROOT}/.loom/vms.json`.
+- **`sync.py`** — rsync push/pull with configurable excludes. Delta-only transfers.
+- **`metrics.py`** — Parses CPU/RAM/disk/GPU from a single SSH command.
+- **`jobs.py`** — Start/stop/monitor long-running processes via nohup + PID tracking. State persisted in `{LOOM_ROOT}/.loom/vm-jobs.json`.
+
+### VM MCP Tools
+
+9 tools mirror Claude Code's built-in tools for remote execution:
+
+| Tool | Mirrors | What it does |
+|------|---------|--------------|
+| `vm_bash` | Bash | Run shell command on VM |
+| `vm_read` | Read | Read file on VM via SFTP |
+| `vm_write` | Write | Write file on VM via SFTP |
+| `vm_edit` | Edit | Read-replace-write on VM |
+| `vm_glob` | Glob | Find files by pattern on VM |
+| `vm_grep` | Grep | Search file contents on VM |
+| `vm_push` | — | rsync local → VM |
+| `vm_pull` | — | rsync VM → local |
+| `vm_status` | — | Connection status + metrics |
+
+### VM Web Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/vms` | List VMs with connection status |
+| `POST/PUT/DELETE /api/vms/{id}` | CRUD |
+| `GET /api/vms/{id}/tree` | Remote file tree via SFTP |
+| `GET /api/vms/{id}/graph` | Remote file graph |
+| `GET /api/vms/{id}/search` | Search via grep over SSH |
+| `POST /api/vms/{id}/push` | rsync push |
+| `POST /api/vms/{id}/pull` | rsync pull |
+| `GET /api/vms/{id}/metrics` | One-shot metrics |
+| `GET/POST/DELETE /api/vms/{id}/jobs` | Job management |
+| `GET/POST/DELETE /api/vms/{id}/tunnels` | SSH tunnel management |
+| `/ws/vm-terminal/{id}` | Interactive SSH shell |
+| `/ws/vm-metrics/{id}` | Streaming metrics (5s interval) |
+
+### VM Context in Chat
+
+When the user switches to a VM target, `page_path` becomes `vm:{vm_id}`. The system prompt injects VM details and instructs the agent to use `vm_*` MCP tools while keeping built-in tools for local memory/wiki access.
+
+## Auth & Remote Access
+
+When `LOOM_REMOTE=1` is set:
+
+- Server binds to `0.0.0.0` instead of `127.0.0.1`
+- Token generated on first run, stored in `~/.loom-app-config.json`
+- HTTP middleware checks `Authorization: Bearer <token>` or `?token=` query param
+- Localhost (`127.0.0.1`, `::1`) is exempt from auth
+- All 4 WebSocket endpoints check `?token=` query param
+- `GET /api/ping` is unauthenticated (used by endpoint switcher)
+- CORS enabled with `allow_origins=["*"]` (safe behind auth)
+
 ## MCP Server
 
-`loom_mcp/server.py` registers 28 tools for Claude Code. The server uses stdio transport and is registered in `.claude/mcp.json`. All tools are deterministic -- no LLM calls from Python.
+`loom_mcp/server.py` registers 39 tools for coding agents. The server uses stdio transport and is registered in `.claude/mcp.json`. All tools are deterministic -- no LLM calls from Python.
 
 ### Tool Categories
 
@@ -278,7 +364,7 @@ uv run python -c "from loom_mcp.server import mcp; print(len(mcp._tool_manager._
 ## Testing
 
 ```bash
-uv run pytest                    # All 300 tests
+uv run pytest                    # All 330+ tests
 uv run pytest loom_mcp/tests/test_pages.py -v  # Just page model
 uv run pytest -k "test_chat"     # Just chat tests
 ```

@@ -42,18 +42,22 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
 ## How Loom extends Claude Code
 
-Loom builds on top of Claude Code, adding a visual workspace layer and features that complement the CLI:
+Loom builds on top of Claude Code (and other coding agents), adding a visual workspace layer:
 
-- **Selective tool call expansion.** Expand any individual tool call to see its details while the rest stay collapsed — and they stay open while the agent keeps working. Edit calls show inline diffs with colored removed/added text. Tool call details are preserved in saved chat transcripts.
-- **Browsable chat transcripts.** Every conversation auto-saves to `raw/chats/` as a readable markdown file with collapsible activity blocks. You can browse them in the file explorer, open them, and hit Continue to pick up where you left off — your conversation history is just files in the loom.
-- **Fork any conversation.** Branch a chat with full context injected into the new panel. Explore an alternative direction without losing the original thread.
-- **Redirect with checkpoints.** Set breakpoints on specific tool calls and intervene at that point with corrective feedback. More granular than Escape — you choose *where* to redirect, and the agent resumes with your instructions as context.
-- **Multiple concurrent agents.** Open several chat panels at once — floating, docked, or minimized. Each has its own session. Work on different parts of a project in parallel.
-- **Spatial file navigation.** Your files are cards on a canvas with wiki-link edges. Drill into folders, arrange things spatially, see the structure of your project at a glance.
-- **Browser-configurable permissions.** Per-category rules (allow/ask/deny) for file read, file write, shell, MCP tools, and destructive operations — configurable from a settings panel and enforced via the Agent SDK's `can_use_tool` callback.
-- **Terminals alongside everything else.** Embedded xterm.js terminals in the same window as chat panels, the canvas, and the editor.
-- **Knowledge base pipeline.** Ingest URLs and PDFs, compile them into structured wiki pages with cross-links and a master index. The accumulated knowledge becomes persistent context for every future conversation.
-- **Selection-to-Claude.** Highlight text in any card or editor to get an "Ask Claude" tooltip that injects the selection as context.
+- **Agent-agnostic.** Switch between Claude Code, OpenAI Codex, or any CLI agent per-panel. Agent adapter layer translates each agent's protocol into a common event stream.
+- **VM integration.** Connect to remote VMs via SSH. Target dropdown switches Canvas/Files/Search between local and remote. Full MCP tool suite mirrors built-in tools for VMs (`vm_bash`, `vm_read`, `vm_write`, `vm_edit`, `vm_glob`, `vm_grep`). SSH terminals, live metrics, job management, port forwarding.
+- **Background agents.** Push a running agent to the background and keep chatting. Pop it out into a new panel when it's done.
+- **Selective tool call expansion.** Expand individual tool calls while the agent keeps working. Edit calls show inline diffs. Details preserved in saved transcripts.
+- **Browsable chat transcripts.** Auto-saves to `raw/chats/` as markdown. Browse in the file explorer, open, and Continue to pick up where you left off.
+- **Fork any conversation.** Branch a chat with full context. Explore alternatives without losing the original thread.
+- **Redirect with checkpoints.** Set breakpoints on tool calls, intervene with corrective feedback.
+- **Multiple concurrent agents.** Floating, docked, or minimized panels. Each with its own session and agent.
+- **Spatial file navigation.** Files as cards on an infinite canvas with wiki-link edges. Drill into folders, arrange spatially.
+- **Browser-configurable permissions.** Per-category rules (allow/ask/deny) enforced via `can_use_tool` callback.
+- **Terminals.** Local and SSH terminal panels alongside chat and canvas.
+- **Knowledge base pipeline.** Ingest URLs and PDFs, compile into structured wiki pages with cross-links and master index.
+- **Selection-to-Claude.** Highlight text anywhere for an "Ask Claude" tooltip with context injection.
+- **Remote access.** Token-based auth for accessing Loom from other devices. CORS support.
 
 ## Features
 
@@ -103,7 +107,7 @@ Loom builds on top of Claude Code, adding a visual workspace layer and features 
 
 The compilation pipeline produces wiki pages with full YAML frontmatter, `[[wiki-link]]` cross-references, and a master index. The more you ingest, the better the context gets.
 
-### MCP Server (28 tools)
+### MCP Server (39 tools)
 - **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text`, `classify_inbox_item`
 - **Reading**: `read_source`, `read_wiki_page`, `get_page_registry`, `get_glossary`
 - **Compilation**: `write_wiki_page`, `mark_source_compiled`, `update_glossary`, `update_master_index`, `append_log`
@@ -112,6 +116,7 @@ The compilation pipeline produces wiki pages with full YAML frontmatter, `[[wiki
 - **Search**: `ripgrep_search` with file glob and scope filtering
 - **Maintenance**: `get_changed_sources`, `detect_changes`, `get_stale_readmes`, `save_chat_transcript`
 - **Git**: `auto_commit`, `get_recent_changes`
+- **VM**: `vm_bash`, `vm_read`, `vm_write`, `vm_edit`, `vm_glob`, `vm_grep`, `vm_push`, `vm_pull`, `vm_status`
 
 ## Keyboard Shortcuts
 
@@ -159,15 +164,17 @@ loom/                       <- A loom directory (user content)
   outputs/                  <- Generated artifacts
 
 loom_mcp/                   <- This repo (the tool)
-  server.py                 <- 28 MCP tools (stdio transport)
-  web.py                    <- FastAPI server + WebSocket endpoints
-  chat.py                   <- Claude Agent SDK bridge with modular context pipeline
+  agents/                   <- Agent adapter layer (Claude Code, Codex, Generic CLI)
+  vm/                       <- VM integration (SSH pool, sync, metrics, jobs)
+  server.py                 <- 39 MCP tools (stdio transport)
+  web.py                    <- FastAPI server + WebSocket endpoints + auth
+  chat.py                   <- Agent-agnostic chat bridge
   lib/                      <- Core: pages, frontmatter, links, hashing
   tools/                    <- Ingest, compile, search, lint, git
   static/
     index.html              <- Single-page app shell
     style.css               <- Dark theme styles
-    app.js                  <- Frontend (~5200 lines, vanilla JS)
+    app.js                  <- Frontend (~7000 lines, vanilla JS)
     vendor/                 <- d3, WebCoLa, marked, pdf.js, CodeMirror 6, xterm.js, KaTeX
 
 demo/                       <- Demo loom (included in repo)
@@ -175,22 +182,23 @@ src-tauri/                  <- Tauri v2 native app (optional)
 ```
 
 **Key design decisions:**
+- **Agent-agnostic.** Adapter layer translates Claude Code, Codex, or any CLI agent into a common event stream.
 - Every folder is a page (ABOUT.md = content). Files are subpages. README.md is a GitHub artifact, not special to loom.
-- All LLM reasoning routes through Claude Code. Python tooling is strictly deterministic — no API calls from the backend.
-- No API key needed. Claude Code uses your Max subscription.
-- No build step. ~5200 lines of vanilla JS with vendored libraries.
-- The permission system is enforced programmatically via `can_use_tool`, not just via system prompt instructions.
-- The chat backend uses Claude Code's preset system prompt with project-specific additions appended, and loads CLAUDE.md natively via `setting_sources=["project"]`.
-- The system prompt is assembled from modular, independently configurable context blocks (permissions, memory, page/folder context). Each block can be tuned or disabled via loom-local `config.yaml`.
-- Memory files live centrally in `wiki/meta/memory/`, tagged by project. Each project has a MEMORY.md index with one-liners that gets injected at session start. Cross-pollination happens through the wiki, not through memory.
+- LLM reasoning happens in the agent. Python tooling is strictly deterministic — no API calls from the backend.
+- No API key needed in the server. Claude Code uses your Max subscription.
+- No build step. ~7000 lines of vanilla JS with vendored libraries.
+- Permission system enforced programmatically via `can_use_tool`, not just system prompt instructions.
+- System prompt assembled from modular context blocks (permissions, memory, page/folder/VM context), configurable via `config.yaml`.
+- Memory files live centrally in `wiki/meta/memory/`, tagged by project. Each project has a MEMORY.md index injected at session start.
+- VM integration uses persistent SSH connections (asyncssh) with multiplexed channels. MCP tools mirror all built-in tools for remote execution.
 
 ## Tech Stack
 
-- **Backend**: Python 3.12+, FastAPI, Claude Agent SDK, MCP Python SDK
-- **Frontend**: Vanilla JS (~5100 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js, KaTeX
+- **Backend**: Python 3.12+, FastAPI, Claude Agent SDK, asyncssh, MCP Python SDK
+- **Frontend**: Vanilla JS (~7000 lines), CodeMirror 6, xterm.js, d3-zoom, WebCoLa, marked.js, pdf.js, KaTeX
 - **Native**: Tauri v2 (Rust)
 - **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
-- **Tests**: pytest (300 tests across 25 files)
+- **Tests**: pytest (330+ tests across 26 files)
 
 ## Configuration
 

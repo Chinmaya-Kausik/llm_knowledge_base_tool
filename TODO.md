@@ -23,6 +23,12 @@ Ordered by: validate what's built → UX stability → features.
 - ~~Tauri self-contained app~~ — auto-starts Python server, waits for readiness, error pages for missing deps, clean shutdown
 - ~~Stale config guard~~ — rejects pytest/tmp paths in ~/.loom-app-config.json, falls back to default
 - ~~Test config isolation~~ — settings test no longer pollutes ~/.loom-app-config.json
+- ~~VM integration~~ — SSH pool (asyncssh), target dropdown, Canvas/Files/Search on remote, MCP tools (vm_bash/read/write/edit/glob/grep/push/pull/status), SSH terminals, metrics, jobs, ports
+- ~~Agent adapter layer~~ — AgentAdapter base class, Claude Code/Codex/Generic CLI adapters, chat.py refactored to agent-agnostic
+- ~~Auth middleware~~ — token-based auth for remote access (LOOM_REMOTE=1), localhost exempt, WS auth, CORS
+- ~~Visibility toggles~~ — split into dotfiles/build artifacts/loom internals, all work across canvas+files+sidebar
+- ~~Canvas position persistence~~ — canvasStack saved to sessionStorage, restored on reload
+- ~~Background agents~~ — push running agent to background, continue chatting, pop out when done
 
 ## 1. Chat Transcript Tagging UI
 - Canvas tag filter working (canvas-aware, updates on navigation)
@@ -85,8 +91,15 @@ Multiple tabs/windows like VS Code — need git tracking with visual diffs:
 - Claude scans, proposes changes, user approves each
 - Single-project memories managed autonomously by Claude
 
+## In Progress
+- PWA manifest + service worker for mobile (phone) access
+- Responsive CSS for mobile layout (iterating in Claude Design)
+- Ntfy notifications (job done, agent done, sync complete)
+- Laptop↔VM sync daemon (auto rsync on change, pull on wake)
+- Endpoint switcher (phone tries local → Tailscale → VM → "turn on your laptop")
+
 ## Known Issues
-- System prompt not updated when client is reused mid-session (chat.py _get_or_create_client). Context changes don't take effect until next session.
+- System prompt not updated when adapter is reused mid-session (chat.py _get_or_create_adapter). Context changes don't take effect until next session.
 - Premature dequeue: queued message went bright before the current response finished (before `done` event). Needs event log capture (#3) to diagnose.
 - ~~Code block overflow~~ — fixed with `overflow: auto; max-height: 300px` on chat pre elements.
 - CLAUDE.md coexists with ABOUT.md in loom repo — intentional while VS Code is primary editor. Remove CLAUDE.md once loom is the main workspace.

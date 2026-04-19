@@ -6,23 +6,26 @@ A local-first workspace and knowledge management system. Infinite canvas UI with
 
 ## Architecture
 
-- **All LLM reasoning routes through Claude Code** (Max subscription). Python tooling is a local MCP server providing deterministic, non-LLM tools.
-- **No Anthropic SDK calls from Python.** No API key needed. Claude Code calls MCP tools, does the thinking, writes wiki pages.
-- **MCP server**: `loom_mcp/` — stdio transport, registered in `.claude/mcp.json`.
-- **Agent SDK**: web chat spawns a Claude Code subprocess with `preset + append` (preserves Claude Code defaults) and `setting_sources=["project"]` (loads CLAUDE.md from loom root).
+- **Agent-agnostic**: adapter layer supports Claude Code (Agent SDK), OpenAI Codex (CLI), and generic CLI agents. Switch per chat panel.
+- **All LLM reasoning happens in the agent** (Claude Code uses Max subscription). Python tooling is a local MCP server providing deterministic, non-LLM tools. No API keys needed in the server.
+- **MCP server**: `loom_mcp/` — stdio transport, registered in `.claude/mcp.json`. 39 tools including 9 VM tools.
+- **VM integration**: persistent SSH connections (asyncssh), target dropdown switches Canvas/Files/Search between local and VMs. MCP tools mirror built-in tools for remote execution.
 - **Modular context pipeline**: system prompt assembled from independent blocks (`_permissions_block`, `_memory_block`, `_location_block`), each configurable via loom-local `config.yaml`.
+- **Remote access**: `LOOM_REMOTE=1` enables token-based auth, binds to 0.0.0.0, adds CORS.
 
 ## Directory Layout
 
 ```
-loom_mcp/              ← MCP server code (tools + lib)
-  server.py            ← 29 MCP tools (stdio transport)
-  web.py               ← FastAPI server + WebSocket endpoints + bootstrap
-  chat.py              ← Agent SDK bridge with modular context pipeline
+loom_mcp/              ← Server code
+  agents/              ← Agent adapter layer (Claude Code, Codex, Generic CLI)
+  vm/                  ← VM integration (SSH pool, sync, metrics, jobs)
+  server.py            ← 39 MCP tools (stdio transport)
+  web.py               ← FastAPI server + WebSocket endpoints + auth
+  chat.py              ← Agent-agnostic chat bridge
   lib/                 ← Core: pages, frontmatter, links, hashing
   tools/               ← Ingest, compile, search, lint, git
-  static/              ← Frontend (~5200 lines vanilla JS)
-  tests/               ← 331 tests across 26 files
+  static/              ← Frontend (~7000 lines vanilla JS)
+  tests/               ← 330+ tests across 26 files
 
 demo/                  ← Demo loom (included in repo)
 src-tauri/             ← Tauri v2 native app (optional)

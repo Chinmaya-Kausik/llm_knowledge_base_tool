@@ -1,26 +1,28 @@
 ---
 title: Loom
 type: project
-tags: [loom, tools]
+tags: [loom, tools, workspace]
 ---
 
 # Loom
 
-A local-first workspace and knowledge management system. Infinite canvas UI with Claude Code as the built-in agent via the Agent SDK.
+A local-first workspace and knowledge management system on an infinite canvas. Agent-agnostic — works with Claude Code, OpenAI Codex, or any CLI coding agent. VM integration for remote compute. Markdown on disk, git-versioned.
 
 ## Architecture
-- All LLM reasoning routes through Claude Code (Max subscription). Python tooling is a local MCP server providing deterministic, non-LLM tools.
-- Agent SDK subprocess uses `preset + append` with `setting_sources=["project"]`.
+- **Agent-agnostic**: adapter layer in `loom_mcp/agents/` supports Claude Code (Agent SDK), Codex (CLI), and generic CLI agents. Switch per chat panel.
+- LLM reasoning happens in the agent. Python tooling is a local MCP server (39 tools) providing deterministic, non-LLM tools.
+- **VM integration**: persistent SSH connections (asyncssh) in `loom_mcp/vm/`. Target dropdown switches Canvas/Files/Search between local and remote. MCP tools mirror built-in tools for remote execution.
 - Modular context pipeline: `_permissions_block`, `_memory_block`, `_location_block_adaptive`, each configurable via `config.yaml`.
-- Split view for TeX compilation (editor + PDF side by side).
-- Adaptive context budget: total char limit with priority trimming.
+- **Remote access**: `LOOM_REMOTE=1` enables token-based auth, binds to 0.0.0.0, CORS.
 
 ## Key Files
-- `loom_mcp/chat.py` — Agent SDK bridge with modular context pipeline
-- `loom_mcp/web.py` — FastAPI server, bootstrap, WebSocket endpoints, TeX compilation
-- `loom_mcp/server.py` — 29 MCP tools (stdio transport)
-- `loom_mcp/lib/pages.py` — folder-as-page model, ABOUT.md = page content, depth-limited walk
-- `loom_mcp/static/app.js` — frontend (~5400 lines vanilla JS)
+- `loom_mcp/agents/` — Agent adapter layer (AgentAdapter base, Claude Code, Codex, Generic CLI)
+- `loom_mcp/vm/` — VM integration (SSH pool, sync, metrics, jobs, port forwarding)
+- `loom_mcp/chat.py` — Agent-agnostic chat bridge with modular context pipeline
+- `loom_mcp/web.py` — FastAPI server, auth middleware, 15+ VM endpoints, WebSocket routes
+- `loom_mcp/server.py` — 39 MCP tools (stdio transport, including 9 VM tools)
+- `loom_mcp/lib/pages.py` — folder-as-page model, ABOUT.md = page content, visibility toggles (dotfiles, build artifacts, internals)
+- `loom_mcp/static/app.js` — frontend (~7000 lines vanilla JS)
 
 ## Style
 - Type hints everywhere. Docstrings on public functions.
@@ -40,4 +42,4 @@ A local-first workspace and knowledge management system. Infinite canvas UI with
 
 `loom-ui.command` checks out `main`. `loom-dev.command` checks out `dev`. Both can run simultaneously on different ports.
 
-**300 tests. Run them before merging.**
+**330+ tests. Run them before merging.**
