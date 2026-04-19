@@ -758,5 +758,117 @@
   "wiki/meta/memory/2026-04-06-prefer-concise-answers.md": {
     "x": 440,
     "y": 830
+  },
+  ".bashrc": {
+    "x": 1085,
+    "y": 465
+  },
+  ".cloud-locale-test.skip": {
+    "x": 1525,
+    "y": 465
+  },
+  ".cache": {
+    "x": 1085,
+    "y": 785
+  },
+  "internship": {
+    "x": 1525,
+    "y": 785
+  },
+  ".ssh": {
+    "x": 1085,
+    "y": 1105
+  },
+  ".profile": {
+    "x": 1525,
+    "y": 1105
+  },
+  "Documents": {
+    "x": 1085,
+    "y": 1425
+  },
+  "internship/chinmaya_internship_project": {
+    "x": 0,
+    "y": 450
+  },
+  "internship/.DS_Store": {
+    "x": 440,
+    "y": 450
+  },
+  "internship/pyproject.toml": {
+    "x": 880,
+    "y": 450
+  },
+  "internship/MEMORY.md": {
+    "x": 1320,
+    "y": 450
+  },
+  "internship/.newt.yml": {
+    "x": 1760,
+    "y": 450
+  },
+  "internship/tox.ini": {
+    "x": 0,
+    "y": 830
+  },
+  "internship/output.png": {
+    "x": 440,
+    "y": 830
+  },
+  "internship/venv": {
+    "x": 880,
+    "y": 830
+  },
+  "internship/.netflix": {
+    "x": 1320,
+    "y": 830
+  },
+  "internship/.vscode": {
+    "x": 1760,
+    "y": 830
+  },
+  "internship/.gitignore": {
+    "x": 0,
+    "y": 1210
+  },
+  "internship/ABOUT.md": {
+    "x": 440,
+    "y": 1210
+  },
+  "internship/.tox": {
+    "x": 880,
+    "y": 1210
+  },
+  "internship/requirements.in": {
+    "x": 1320,
+    "y": 1210
+  },
+  "internship/.pre-commit-config.yaml": {
+    "x": 1760,
+    "y": 1210
+  },
+  "internship/setup.py": {
+    "x": 0,
+    "y": 1590
+  },
+  "internship/CLAUDE.md": {
+    "x": 440,
+    "y": 1590
+  },
+  "internship/MANIFEST.in": {
+    "x": 880,
+    "y": 1590
+  },
+  "internship/auxiliary_content": {
+    "x": 1320,
+    "y": 1590
+  },
+  "internship/requirements.txt": {
+    "x": 1760,
+    "y": 1590
+  },
+  "internship/README.md": {
+    "x": 0,
+    "y": 1970
   }
 }

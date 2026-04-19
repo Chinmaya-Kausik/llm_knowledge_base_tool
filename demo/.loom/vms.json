@@ -1,0 +1,23 @@
+{
+  "vms": [
+    {
+      "id": "249b9cb4",
+      "label": "agentic-memory-exps",
+      "host": "195.201.89.107",
+      "port": 22,
+      "user": "root",
+      "key_path": "~/.ssh/id_ed25519",
+      "sync_dir": "~",
+      "sync_excludes": [
+        ".git/",
+        "__pycache__/",
+        "node_modules/",
+        ".venv/",
+        "*.pyc"
+      ],
+      "color": "#4fc3f7",
+      "created": "2026-04-18T00:18:57.801221+00:00",
+      "last_connected": null
+    }
+  ]
+}
