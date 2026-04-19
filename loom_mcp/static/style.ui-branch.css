@@ -337,3 +337,11 @@ textarea:focus {
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* =============================================================
+   SCROLLBARS — lighter in light/paper themes
+   ============================================================= */
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: oklch(0.85 0.005 255); }
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.75 0.008 255); }
+html[data-theme="paper"] ::-webkit-scrollbar-thumb { background: oklch(0.84 0.008 80); }
+html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.76 0.010 80); }
