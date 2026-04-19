@@ -332,6 +332,43 @@ When `LOOM_REMOTE=1` is set:
 - `GET /api/ping` is unauthenticated (used by endpoint switcher)
 - CORS enabled with `allow_origins=["*"]` (safe behind auth)
 
+## Notifications (ntfy)
+
+`loom_mcp/notify.py` — fire-and-forget push notifications via [ntfy.sh](https://ntfy.sh):
+
+- `send(title, message, tags, priority)` — POST to `ntfy.sh/{topic}`
+- `notify_agent_done(agent_name, summary)` — called from `chat.py` after agent completes
+- `notify_job_done(job_name, vm_label, exit_code)` — called from `vm/jobs.py` on status change
+- `notify_sync_done(direction, file_count, vm_label)` — called from sync daemon
+
+Config in `~/.loom-app-config.json` → `{"ntfy": {"topic": "loom-xxx", "server": "https://ntfy.sh"}}`.
+Settings API: `GET/PUT /api/settings/ntfy`, `POST /api/settings/ntfy/test`.
+
+## Sync Daemon
+
+`loom_mcp/sync_daemon.py` — lightweight bidirectional sync between laptop and VM:
+
+- Runs as background `asyncio.Task` in web server lifespan (if `sync_vm` configured)
+- Polls every 60s for local changes via `git status --porcelain`
+- On change: debounce 10s, `git commit`, then `rsync_push` to VM
+- On wake from sleep (gap > 3× poll interval): `rsync_pull` first, then push
+- Sends ntfy notification on sync complete
+- Also available as standalone `loom-sync` CLI command
+
+Config: `~/.loom-app-config.json` → `{"sync_vm": "vm-id"}`.
+
+## PWA & Endpoint Switcher
+
+**PWA:** `manifest.json`, `sw.js` (cache-first for static, network-only for API), app icons. Service worker served from `/sw.js` for root scope.
+
+**Endpoint switcher** (in `app.js`):
+- `getBackends()` / `setBackends()` — read/write localStorage `loom-backends`
+- `selectBackend()` — tries last-working first (1.5s), then all in order (2s each)
+- `authFetch(url, opts)` — wraps `fetch()` with `Authorization: Bearer` header
+- `getWsUrl()` — converts active backend URL to WebSocket URL with token
+- All `api.*` calls and WebSocket connections use these helpers
+- Offline overlay with retry when no backend responds
+
 ## MCP Server
 
 `loom_mcp/server.py` registers 39 tools for coding agents. The server uses stdio transport and is registered in `.claude/mcp.json`. All tools are deterministic -- no LLM calls from Python.

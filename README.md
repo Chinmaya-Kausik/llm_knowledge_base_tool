@@ -58,6 +58,9 @@ Loom builds on top of Claude Code (and other coding agents), adding a visual wor
 - **Knowledge base pipeline.** Ingest URLs and PDFs, compile into structured wiki pages with cross-links and master index.
 - **Selection-to-Claude.** Highlight text anywhere for an "Ask Claude" tooltip with context injection.
 - **Remote access.** Token-based auth for accessing Loom from other devices. CORS support.
+- **Mobile (PWA).** Installable on iPhone/Android home screen. Smart endpoint switcher tries local WiFi → Tailscale → VM fallback → "turn on your laptop."
+- **Ntfy notifications.** Push notifications to your phone when agents finish, jobs complete, or sync happens. No native app needed.
+- **Sync daemon.** Auto-syncs memory/wiki/transcripts between laptop and VM via rsync. Detects wake from sleep, pulls first.
 
 ## Features
 
@@ -72,7 +75,8 @@ Loom builds on top of Claude Code (and other coding agents), adding a visual wor
 
 ### Chat
 - Multiple concurrent chat panels — floating, dockable, forkable
-- Full Claude Code agent via the Agent SDK (bills to your Max subscription, no API key)
+- Agent-agnostic: Claude Code, OpenAI Codex, or any CLI agent per panel
+- Background agents: push running agents to background, pop out when done
 - Context levels: Page, Folder, or Global (master index)
 - Streaming responses with collapsible thinking trace and tool use blocks
 - Inline diffs for Edit calls, command display for Bash, expandable tool details
@@ -200,14 +204,44 @@ src-tauri/                  <- Tauri v2 native app (optional)
 - **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
 - **Tests**: pytest (330+ tests across 26 files)
 
+## Mobile Access (iPhone/Android)
+
+Loom is a PWA — installable on your phone's home screen:
+
+1. **Enable remote access:** `LOOM_REMOTE=1 uv run --extra web python -m loom_mcp.web`
+2. **Set up Tailscale** on laptop and phone (for access outside your home network)
+3. **Open** `http://<laptop-ip>:8420` on your phone, tap "Add to Home Screen"
+4. **Configure backends** in Settings: add local WiFi IP, Tailscale IP, and optionally a VM fallback
+
+The phone tries backends in order: local WiFi (~3ms) → Tailscale (~30ms) → VM fallback (~120ms). If nothing responds, shows "Turn on your laptop."
+
+### Notifications (ntfy)
+
+Install the [ntfy app](https://ntfy.sh) on your phone, then configure in Loom Settings:
+- Set a topic name (e.g., `loom-yourname`)
+- Subscribe to the same topic in the ntfy app
+- Get notifications when: agents finish, VM jobs complete, sync happens
+
+### Sync Daemon
+
+Auto-syncs memory, wiki, and chat transcripts between laptop and VM:
+- Polls every 60s for local changes, rsyncs to VM
+- Detects wake from sleep, pulls from VM first
+- Git safety commits before each sync
+- Configure by setting `"sync_vm": "<vm-id>"` in `~/.loom-app-config.json`
+
+Also available standalone: `loom-sync`
+
 ## Configuration
 
 - `LOOM_ROOT` env var, `~/.loom-app-config.json`, or the Settings dropdown in the UI
+- `LOOM_REMOTE=1` enables remote access with token-based auth
 - `.claude/mcp.json` registers the loom MCP server for Claude Code (auto-created on startup)
 - `.claude/settings.json` hooks (e.g., mdformat after wiki page writes) — auto-copied on startup
 - `CLAUDE.md` at loom root — project context loaded by the Agent SDK subprocess
 - `config.yaml` at loom root — context pipeline tuning (memory caps, page content limits, enable/disable blocks)
 - `wiki/meta/conventions.md` — detailed project conventions, editable from the canvas
+- `~/.loom-app-config.json` — auth token, ntfy config, sync VM, backend list
 
 ## Development
 

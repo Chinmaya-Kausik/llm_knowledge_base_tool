@@ -18,11 +18,13 @@ A local-first workspace and knowledge management system on an infinite canvas. A
 ## Key Files
 - `loom_mcp/agents/` — Agent adapter layer (AgentAdapter base, Claude Code, Codex, Generic CLI)
 - `loom_mcp/vm/` — VM integration (SSH pool, sync, metrics, jobs, port forwarding)
+- `loom_mcp/notify.py` — Ntfy push notifications (agent done, job done, sync complete)
+- `loom_mcp/sync_daemon.py` — Laptop↔VM bidirectional sync daemon (rsync, wake detection)
 - `loom_mcp/chat.py` — Agent-agnostic chat bridge with modular context pipeline
-- `loom_mcp/web.py` — FastAPI server, auth middleware, 15+ VM endpoints, WebSocket routes
+- `loom_mcp/web.py` — FastAPI server, auth middleware, 15+ VM endpoints, ntfy settings, WebSocket routes
 - `loom_mcp/server.py` — 39 MCP tools (stdio transport, including 9 VM tools)
-- `loom_mcp/lib/pages.py` — folder-as-page model, ABOUT.md = page content, visibility toggles (dotfiles, build artifacts, internals)
-- `loom_mcp/static/app.js` — frontend (~7000 lines vanilla JS)
+- `loom_mcp/lib/pages.py` — folder-as-page model, visibility toggles (dotfiles, build artifacts, internals)
+- `loom_mcp/static/app.js` — frontend (~7500 lines vanilla JS, endpoint switcher, PWA)
 
 ## Style
 - Type hints everywhere. Docstrings on public functions.

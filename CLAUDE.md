@@ -81,9 +81,23 @@ outputs/               ← Generated artifacts
 ## Configuration
 
 - `LOOM_ROOT` env var, `~/.loom-app-config.json`, or Settings dropdown
+- `LOOM_REMOTE=1` enables remote access with token-based auth (binds to 0.0.0.0)
 - Bootstrap auto-creates: `.claude/mcp.json`, `.claude/settings.json` (hooks), `CLAUDE.md`, `config.yaml`, `wiki/meta/conventions.md`, `wiki/meta/memory/`
 - `config.yaml` context section controls memory caps, page content limits, enable/disable per block
 - `LOOM_PORT` env var for running multiple servers (stable on 8420, experimental on 8421)
+- `~/.loom-app-config.json` stores: loom_root, auth_token, ntfy config, sync_vm, agent configs
+
+## Mobile Access
+
+PWA installable on iPhone/Android. Endpoint switcher tries backends in order:
+1. Local WiFi (laptop on same network, ~3ms)
+2. Tailscale (laptop reachable peer-to-peer, ~30ms)
+3. VM fallback (always-on VM with synced loom copy, ~120ms)
+4. "Turn on your laptop" offline screen
+
+Ntfy notifications: agent done, job done, sync complete. Install ntfy app, configure topic in Settings.
+
+Sync daemon: auto-rsyncs memory/wiki/transcripts to VM every 60s. Detects wake from sleep, pulls first.
 
 ## Tauri App
 
