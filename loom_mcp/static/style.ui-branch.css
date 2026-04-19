@@ -362,14 +362,13 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   z-index: 100;
 }
 
-.tb-left, .tb-center, .tb-right {
+.tb-left, .tb-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.tb-left { flex-shrink: 0; }
-.tb-center { flex: 1; justify-content: center; gap: 6px; }
-.tb-right { flex-shrink: 0; margin-left: auto; }
+.tb-left { flex: 1; min-width: 0; }
+.tb-right { flex-shrink: 0; }
 
 .tb-divider {
   width: 1px;
@@ -380,7 +379,6 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 }
 
 /* Brand */
-.tb-brand-glyph { color: var(--accent); flex-shrink: 0; }
 .tb-brand {
   font-size: 15px;
   font-weight: 600;
@@ -550,5 +548,3 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 .toolbar-left, .toolbar-right { display: contents; }
 .logo { display: none; }
 .view-tabs { display: contents; }
-.filter-btn { display: none; }
-#btn-toolbar-menu.filter-btn { display: none; }
