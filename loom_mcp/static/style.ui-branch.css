@@ -378,14 +378,22 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   flex-shrink: 0;
 }
 
-/* Brand */
+/* Brand — doubles as sidebar toggle */
 .tb-brand {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--accent);
   letter-spacing: -0.02em;
   user-select: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-family: var(--font);
+  transition: background .12s, color .12s;
 }
+.tb-brand:hover { background: var(--bg-hover); color: var(--text-bright); }
 
 /* Icon buttons */
 .tb-icon-btn {
