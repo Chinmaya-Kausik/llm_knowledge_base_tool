@@ -61,10 +61,10 @@ class TestPass1GlobalCSS:
     def test_scrollbar_inset_trick(self, css):
         assert 'border: 2px solid var(--bg)' in css
 
-    def test_google_fonts_loaded(self, html):
-        assert 'fonts.googleapis.com' in html
-        assert 'Inter' in html
-        assert 'JetBrains+Mono' in html or 'JetBrains Mono' in html
+    def test_fonts_loaded_locally(self, html):
+        """Fonts should be bundled locally, not loaded from Google"""
+        assert 'fonts.googleapis.com' not in html
+        assert 'fonts.css' in html
 
 
 # -----------------------------------------------------------------------
