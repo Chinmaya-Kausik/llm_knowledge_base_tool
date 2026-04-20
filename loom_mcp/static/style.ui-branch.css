@@ -552,6 +552,112 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   display: none;
 }
 
+/* =============================================================
+   CANVAS BACKGROUNDS — switchable via data-canvas attribute
+   ============================================================= */
+html[data-canvas="dots"] #infinite-canvas {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+html[data-canvas="grid"] #infinite-canvas {
+  background-image:
+    linear-gradient(var(--border-soft, var(--border)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft, var(--border)) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+html[data-canvas="paper"] #infinite-canvas {
+  background-image: none;
+  background-color: var(--bg-sunken, var(--bg));
+}
+html[data-canvas="constellation"] #infinite-canvas {
+  background:
+    radial-gradient(ellipse at 30% 20%, oklch(0.28 0.05 265 / 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, oklch(0.26 0.06 285 / 0.3) 0%, transparent 60%),
+    var(--bg);
+}
+html[data-canvas="constellation"] #infinite-canvas::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 70%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 10% 80%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 45% 45%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 33% 66%, var(--text-muted) 0%, transparent 100%),
+    radial-gradient(1px 1px at 88% 55%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 55% 22%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 15% 50%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1px 1px at 72% 35%, var(--text-dim) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 40% 85%, var(--text-muted) 0%, transparent 100%),
+    radial-gradient(1px 1px at 92% 20%, var(--text-dim) 0%, transparent 100%);
+  opacity: .4;
+}
+html[data-canvas="none"] #infinite-canvas {
+  background-image: none;
+}
+
+/* =============================================================
+   CARD ACCENT MODES — switchable via data-accent attribute
+   ============================================================= */
+/* Border mode (default) — already defined above in the card section */
+
+/* Dot mode — small colored circle in card handle */
+html[data-accent="dot"] .doc-card[data-type="concept"] .doc-handle::before,
+html[data-accent="dot"] .doc-card[data-type="summary"] .doc-handle::before,
+html[data-accent="dot"] .doc-card[data-type="index"] .doc-handle::before,
+html[data-accent="dot"] .doc-card[data-type="answer"] .doc-handle::before,
+html[data-accent="dot"] .doc-card[data-type="project"] .doc-handle::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+html[data-accent="dot"] .doc-card[data-type="concept"] .doc-handle::before { background: var(--accent); }
+html[data-accent="dot"] .doc-card[data-type="summary"] .doc-handle::before { background: var(--green); }
+html[data-accent="dot"] .doc-card[data-type="index"] .doc-handle::before { background: var(--orange); }
+html[data-accent="dot"] .doc-card[data-type="answer"] .doc-handle::before { background: var(--accent2); }
+html[data-accent="dot"] .doc-card[data-type="project"] .doc-handle::before { background: var(--cyan); }
+/* In dot mode, suppress left borders */
+html[data-accent="dot"] .doc-card:hover[data-type],
+html[data-accent="dot"] .doc-card.focused[data-type] {
+  border-left: 1px solid var(--border-soft) !important;
+}
+
+/* Flat mode — no accent at all */
+html[data-accent="flat"] .doc-card:hover[data-type],
+html[data-accent="flat"] .doc-card.focused[data-type],
+html[data-accent="flat"] .doc-card:hover[data-category],
+html[data-accent="flat"] .doc-card.focused[data-category] {
+  border-left: 1px solid var(--border-soft) !important;
+}
+
+/* =============================================================
+   DENSITY MULTIPLIER — compact / standard / roomy
+   ============================================================= */
+html[data-density="compact"] { --density: 0.85; }
+html[data-density="standard"] { --density: 1; }
+html[data-density="roomy"] { --density: 1.15; }
+
+/* Apply density to key spacing */
+html[data-density="compact"] .doc-card .doc-handle { padding: 5px 8px; }
+html[data-density="compact"] .doc-card .doc-body { padding: 6px 8px; font-size: 11px; }
+html[data-density="compact"] .tree-item { padding: 3px 8px; min-height: 28px; }
+html[data-density="compact"] .tb-tabs .view-tab { padding: 3px 7px; font-size: 11px; }
+html[data-density="compact"] #chat-input { font-size: 12px; padding: 6px 8px; }
+html[data-density="compact"] .chat-msg { font-size: 12px; }
+
+html[data-density="roomy"] .doc-card .doc-handle { padding: 12px 14px; }
+html[data-density="roomy"] .doc-card .doc-body { padding: 14px 14px; font-size: 14px; }
+html[data-density="roomy"] .tree-item { padding: 10px 14px; min-height: 44px; }
+html[data-density="roomy"] .tb-tabs .view-tab { padding: 7px 14px; font-size: 14px; }
+html[data-density="roomy"] #chat-input { font-size: 15px; padding: 10px 12px; }
+html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
+
 /* Override old toolbar styles that conflict */
 .toolbar-left, .toolbar-right { display: contents; }
 .logo { display: none; }

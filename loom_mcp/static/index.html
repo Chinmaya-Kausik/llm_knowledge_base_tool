@@ -147,6 +147,32 @@
           </div>
           <hr>
           <div class="toolbar-menu-section">
+            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Appearance</div>
+            <div class="toolbar-menu-body collapsed" id="appearance-menu">
+              <label class="settings-label" style="margin-bottom:4px">Canvas Background</label>
+              <select id="setting-canvas-bg" class="settings-input" style="width:100%;margin-bottom:8px">
+                <option value="none">None</option>
+                <option value="dots" selected>Dots</option>
+                <option value="grid">Grid</option>
+                <option value="paper">Paper</option>
+                <option value="constellation">Constellation</option>
+              </select>
+              <label class="settings-label" style="margin-bottom:4px">Card Accent</label>
+              <select id="setting-card-accent" class="settings-input" style="width:100%;margin-bottom:8px">
+                <option value="border" selected>Border</option>
+                <option value="dot">Dot</option>
+                <option value="flat">Flat</option>
+              </select>
+              <label class="settings-label" style="margin-bottom:4px">Density</label>
+              <select id="setting-density" class="settings-input" style="width:100%">
+                <option value="compact">Compact</option>
+                <option value="standard" selected>Standard</option>
+                <option value="roomy">Roomy</option>
+              </select>
+            </div>
+          </div>
+          <hr>
+          <div class="toolbar-menu-section">
             <div id="settings-menu">
           <div class="settings-section">
             <label class="settings-label">Loom Root</label>
@@ -307,6 +333,22 @@
         menu.onclick = function(e) { e.stopPropagation(); };
       }
     });
+
+    // Appearance settings: canvas bg, card accent, density
+    function initAppearance(id, attr, defaultVal) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var saved = localStorage.getItem('loom-' + attr) || defaultVal;
+      el.value = saved;
+      document.documentElement.setAttribute('data-' + attr, saved);
+      el.onchange = function() {
+        localStorage.setItem('loom-' + attr, el.value);
+        document.documentElement.setAttribute('data-' + attr, el.value);
+      };
+    }
+    initAppearance('setting-canvas-bg', 'canvas', 'dots');
+    initAppearance('setting-card-accent', 'accent', 'border');
+    initAppearance('setting-density', 'density', 'standard');
   })();
   </script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
