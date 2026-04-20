@@ -919,51 +919,48 @@ html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 /* =============================================================
    CONTEXT CHIP — token count in chat composer
    ============================================================= */
-/* Pills row — full-width strip above the textarea */
-#chat-input-area {
-  display: flex;
-  flex-direction: column;
-}
+/* Pills row — light strip above textarea, no heavy borders */
 .chat-input-pills {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px 4px;
+  padding: 4px 10px 2px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--border-soft, var(--border));
 }
 .chat-input-pills:empty { display: none; }
 
-/* Context chip — styled to match v3 prototype */
+/* Context chip — minimal inline pill matching v3 demo */
 .chat-context-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 8px;
-  background: var(--bg-sunken, var(--bg));
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  background: transparent;
   border: 1px solid var(--border-soft, var(--border));
-  border-radius: 12px;
+  border-radius: 10px;
   font-family: var(--font-mono, monospace);
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color .15s, background .15s;
+  transition: border-color .12s;
   user-select: none;
 }
 .chat-context-chip:hover {
   border-color: var(--accent);
-  background: var(--accent-soft, rgba(122,162,247,0.1));
-  color: var(--text-bright, var(--text));
+  color: var(--text);
+}
+.chat-context-chip .ctx-icon {
+  width: 10px; height: 10px;
+  color: var(--text-dim);
 }
 .chat-context-chip .ctx-scope {
-  color: var(--text-bright, var(--text));
-  font-weight: 600;
-  letter-spacing: .02em;
+  color: var(--text);
+  font-weight: 500;
 }
-.chat-context-chip .ctx-sep { color: var(--text-dim); font-size: 9px; }
-.chat-context-chip .ctx-tokens { letter-spacing: .02em; }
+.chat-context-chip .ctx-sep { color: var(--text-dim); }
+.chat-context-chip .ctx-tokens { color: var(--text-muted); }
 .chat-context-chip .ctx-bar {
-  width: 32px; height: 4px;
+  width: 28px; height: 3px;
   background: var(--bg-hover);
   border-radius: 2px;
   overflow: hidden;
