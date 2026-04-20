@@ -20,11 +20,38 @@
    ============================================================= */
 
 /* =============================================================
+   TYPOGRAPHY — Inter for UI, mono for code/paths/stats
+   ============================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* =============================================================
    THEME TOKENS
    ============================================================= */
 
 /* Dark — default (matches the blue-undertone palette) -------- */
 :root {
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Menlo', monospace;
+  --font-read: var(--font-ui);
+
+  /* Type scale */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+
+  /* Spacing */
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+
+  /* Radius */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
   --bg:          oklch(0.19 0.035 258);
   --bg-surface:  oklch(0.25 0.038 258);
   --bg-surface2: oklch(0.30 0.040 258);
@@ -144,17 +171,87 @@ html[data-theme="paper"] {
 }
 
 /* =============================================================
+   GLOBAL TYPOGRAPHY — Inter for UI, mono for code only
+   ============================================================= */
+body {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* UI elements get sans-serif */
+#toolbar, #sidebar, .view-tab, .filter-menu, .toolbar-menu,
+.action-menu, .settings-section, .settings-label,
+.vm-modal, .target-item, .tb-brand, .tb-chip,
+.fcp-label, .panel-menu-item, .panel-menu-label,
+.breadcrumb-item, .crumb {
+  font-family: var(--font-ui);
+}
+
+/* Chat message prose gets sans-serif */
+.chat-msg-assistant .chat-msg-content,
+.chat-msg-text {
+  font-family: var(--font-ui);
+  line-height: 1.55;
+}
+
+/* Code, paths, tool calls, stats stay mono */
+.chat-msg-user,
+pre, code, .doc-body pre, .doc-body code,
+.chat-activity-header, .chat-tool-entry,
+.chat-thinking-body, .chat-activity-body,
+.doc-title, .doc-badges,
+.terminal-container,
+.vm-metric-label, .vm-metric-val, .vm-job-cmd,
+.vm-output-pre {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbars — wider with inset effect */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  border: 2px solid var(--bg);
+  border-radius: 5px;
+}
+
+/* =============================================================
+   SIDEBAR — active rail, dimmed non-current
+   ============================================================= */
+.tree-item {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  position: relative;
+}
+.tree-item.active::before,
+.tree-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* =============================================================
+   CANVAS — cursor states
+   ============================================================= */
+#infinite-canvas { cursor: grab; }
+#infinite-canvas:active { cursor: grabbing; }
+#infinite-canvas.panning { cursor: grabbing; }
+
+/* =============================================================
    CARDS — opaque at rest, type color only on attention
    ============================================================= */
 .doc-card {
   background: var(--bg-surface2);
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg, 8px);
   box-shadow: var(--shadow);
-  transition: box-shadow .18s, border-color .18s;
+  transition: box-shadow .18s, border-color .18s, transform .18s;
 }
 .doc-card:hover {
   border-color: var(--border);
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
   z-index: 2;
 }
 .doc-card.focused {
