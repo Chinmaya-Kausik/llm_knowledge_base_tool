@@ -1793,11 +1793,10 @@ function renderSubCanvas(world, parentPath) {
   world.appendChild(parentCard);
   cardElements.set(parentPath, parentCard);
 
-  // Layout children below — offset by actual parent card height
-  const cardW = 400, cardH = 340, gap = 40;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(childNodes.length)));
-  const parentHeight = parentCard.offsetHeight || 300;
-  const childStartY = parentHeight + gap + 20;
+  // Layout children below parent
+  const cardW = 400, cardH = 280, gap = 30;
+  const cols = Math.max(2, Math.ceil(Math.sqrt(childNodes.length * 1.5)));
+  const childStartY = 400;
 
   childNodes.forEach((nd, i) => {
     const col = i % cols;
