@@ -3863,13 +3863,19 @@ function createPanelHeader(panelId, label = 'Chat') {
     const ctxLabel = customCtx ? customCtx.split('/').slice(-2).join('/') : '';
 
     const agent = panel.agentType || 'claude-code';
-    const agentLabel = {'claude-code': 'Claude Code', 'codex': 'Codex', 'generic-cli': 'Custom CLI'}[agent] || agent;
+    const builtinLabels = {'claude-code': 'Claude Code', 'codex': 'Codex', 'generic-cli': 'Custom CLI'};
+    const customAgents = JSON.parse(localStorage.getItem('loom-custom-agents') || '[]');
+    const agentLabel = builtinLabels[agent] || customAgents.find(a => a.id === agent)?.name || agent;
+    const customItems = customAgents.map(a =>
+      `<div class="panel-menu-item${agent===a.id?' active':''}" data-action="agent" data-value="${a.id}">${a.name}</div>`
+    ).join('');
     menu.innerHTML = `
       <div class="panel-menu-section">
         <div class="panel-menu-label" data-toggle="agent-body">Agent: ${agentLabel}</div>
         <div class="panel-menu-body collapsed" data-id="agent-body">
           <div class="panel-menu-item${agent==='claude-code'?' active':''}" data-action="agent" data-value="claude-code">Claude Code</div>
           <div class="panel-menu-item${agent==='codex'?' active':''}" data-action="agent" data-value="codex">Codex</div>
+          ${customItems}
           <div class="panel-menu-item${agent==='generic-cli'?' active':''}" data-action="agent" data-value="generic-cli">Custom CLI</div>
         </div>
       </div>
@@ -4467,7 +4473,8 @@ function connectPanelChat(panel, messagesEl) {
       type: 'init',
       session_id: panel.sessionId,
       page_path: panel.contextPath || (isVMTarget() ? `vm:${currentTarget.id}` : currentLevel().parentPath) || '',
-      agent: panel.agentType || 'claude-code',
+      agent: resolveAgentType(panel.agentType),
+      agent_command: resolveAgentCommand(panel.agentType),
     }));
     thisWs.send(JSON.stringify({ type: 'set_permissions', rules: getPermissionRules() }));
   };
@@ -5166,7 +5173,8 @@ function connectChat() {
       type: 'init',
       session_id: mainP.sessionId,
       page_path: isVMTarget() ? `vm:${currentTarget.id}` : (level.parentPath || ''),
-      agent: mainP.agentType || 'claude-code',
+      agent: resolveAgentType(mainP.agentType),
+      agent_command: resolveAgentCommand(mainP.agentType),
     }));
     // Send permission rules
     const rules = getPermissionRules();
@@ -7634,6 +7642,59 @@ function openFullSettings(initialTab) {
         if (el) { el.textContent = 'Unreachable'; el.style.color = 'var(--red)'; }
       });
 
+      // Custom agents section
+      const agentSection = document.createElement('div');
+      agentSection.innerHTML = `
+        <div class="fs-row" style="border-top:1px solid var(--border-soft);margin-top:4px">
+          <div class="fs-row-text"><div class="fs-row-label">Custom Agents</div><div class="fs-row-desc">Add CLI agents. They appear in the agent picker alongside Claude Code and Codex.</div></div>
+          <div class="fs-row-ctrl"><button class="fs-btn" id="fs-add-agent">+ Add</button></div>
+        </div>
+        <div id="fs-agent-list"></div>
+      `;
+      body.appendChild(agentSection);
+
+      function getCustomAgents() {
+        return JSON.parse(localStorage.getItem('loom-custom-agents') || '[]');
+      }
+      function saveCustomAgents(agents) {
+        localStorage.setItem('loom-custom-agents', JSON.stringify(agents));
+      }
+      function renderAgentList() {
+        const list = document.getElementById('fs-agent-list');
+        const agents = getCustomAgents();
+        list.innerHTML = agents.map((a, i) => `
+          <div class="fs-row" style="padding:8px 32px">
+            <div class="fs-row-text" style="gap:2px">
+              <div style="font-weight:500;font-size:var(--fs-sm)">${a.name}</div>
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">${a.command}</div>
+            </div>
+            <div class="fs-row-ctrl">
+              <button class="fs-btn" data-del="${i}" style="font-size:10px;padding:2px 8px;color:var(--red)">Remove</button>
+            </div>
+          </div>
+        `).join('');
+        list.querySelectorAll('[data-del]').forEach(btn => {
+          btn.onclick = () => {
+            const agents = getCustomAgents();
+            agents.splice(parseInt(btn.dataset.del), 1);
+            saveCustomAgents(agents);
+            renderAgentList();
+          };
+        });
+      }
+      renderAgentList();
+
+      document.getElementById('fs-add-agent').onclick = () => {
+        const name = prompt('Agent name (e.g., "My Agent"):');
+        if (!name) return;
+        const command = prompt('Command to run (e.g., "my-agent" or "/path/to/agent"):');
+        if (!command) return;
+        const agents = getCustomAgents();
+        agents.push({ name, command, id: 'custom-' + name.toLowerCase().replace(/\s+/g, '-') });
+        saveCustomAgents(agents);
+        renderAgentList();
+      };
+
     } else if (tabId === 'privacy') {
       body.innerHTML = `
         <div class="fs-row">
@@ -7817,10 +7878,30 @@ const AGENT_LABELS = {
   'generic-cli': 'Agent',
 };
 
+function resolveAgentType(agentId) {
+  if (!agentId || agentId === 'claude-code' || agentId === 'codex' || agentId === 'generic-cli') return agentId || 'claude-code';
+  // Custom agents use the generic-cli adapter
+  return 'generic-cli';
+}
+
+function resolveAgentCommand(agentId) {
+  if (!agentId || agentId === 'claude-code' || agentId === 'codex' || agentId === 'generic-cli') return undefined;
+  const custom = JSON.parse(localStorage.getItem('loom-custom-agents') || '[]');
+  const found = custom.find(a => a.id === agentId);
+  return found?.command || undefined;
+}
+
+function getAgentLabel(agentId) {
+  if (AGENT_LABELS[agentId]) return AGENT_LABELS[agentId];
+  const custom = JSON.parse(localStorage.getItem('loom-custom-agents') || '[]');
+  const found = custom.find(a => a.id === agentId);
+  return found ? found.name : 'Agent';
+}
+
 function updateInputPlaceholder(panelId) {
   const panel = chatPanels.get(panelId) || activePanel;
   const agent = panel?.agentType || 'claude-code';
-  const label = AGENT_LABELS[agent] || 'Agent';
+  const label = getAgentLabel(agent);
   if (panelId === 'main' || !panelId) {
     const input = document.getElementById('chat-input');
     if (input) input.placeholder = `Message ${label}\u2026`;

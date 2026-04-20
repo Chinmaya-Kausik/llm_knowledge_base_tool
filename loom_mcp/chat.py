@@ -51,6 +51,7 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
                     "history": [],
                     "model": msg.get("model"),
                     "agent_type": msg.get("agent", "claude-code"),
+                    "agent_command": msg.get("agent_command"),
                     "permission_mode": msg.get("permission_mode", "auto"),
                 }
                 await websocket.send_json({"type": "init", "session_id": session_id})
@@ -605,6 +606,10 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         "system_prompt": system_prompt,
         "model": model,
     }
+    # Custom agent command (for generic-cli adapter)
+    agent_command = session.get("agent_command")
+    if agent_command:
+        config["command"] = agent_command
 
     if agent_type == "claude-code":
         # Claude-specific config

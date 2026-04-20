@@ -1598,10 +1598,10 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 .ctx-usage-fill {
   height: 100%;
+  width: 0;
   background: var(--green);
   border-radius: 2px;
   transition: width .3s;
-  min-width: 2px;
 }
 .ctx-usage-text {
   font-size: 10px;
