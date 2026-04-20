@@ -38,22 +38,53 @@
   <header id="toolbar">
     <!-- Left cluster: brand + endpoint + tabs -->
     <div class="tb-left">
-      <button id="sidebar-toggle" class="tb-brand" title="Toggle sidebar">Loom</button>
-      <div class="tb-divider"></div>
+      <button id="sidebar-toggle" class="tb-brand-btn" title="Toggle sidebar">
+        <svg class="tb-brand-mark" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+          <path d="M4 7 H20"/><path d="M4 12 H20"/><path d="M4 17 H20"/>
+          <path d="M9 4 V20" opacity=".7"/><path d="M15 4 V20" opacity=".7"/>
+        </svg>
+        <span class="tb-brand-text">Loom</span>
+      </button>
+
       <div id="target-selector">
-        <button id="target-btn" class="tb-chip" title="Switch between local and VM" data-endpoint-state="local">
-          <span class="tb-status-dot">&#9679;</span> Local <span class="target-caret">&#9662;</span>
+        <button id="target-btn" class="tb-target" title="Switch between local and VM" data-endpoint-state="local">
+          <span class="tb-target-dot"></span>
+          Local
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1L5 5L9 1"/></svg>
         </button>
         <div id="target-dropdown" class="hidden">
           <!-- Populated by JS -->
         </div>
       </div>
+
       <div class="tb-divider"></div>
-      <div class="tb-tabs">
-        <button class="view-tab active" data-view="graph">Canvas</button>
-        <button class="view-tab" data-view="files">Files</button>
-        <button class="view-tab" data-view="tags">Tags</button>
-        <button class="view-tab" data-view="health">Health</button>
+
+      <div class="tb-tab-group" role="tablist">
+        <button class="view-tab active" data-view="graph" aria-pressed="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="4" cy="4" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="7" cy="12" r="2"/>
+            <path d="M5.5 5 L10.5 5.5" opacity=".6"/><path d="M5 6 L6.5 10" opacity=".6"/>
+          </svg>
+          Canvas
+        </button>
+        <button class="view-tab" data-view="files">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M2 3h5l1.5 1.5H14V13H2z"/>
+          </svg>
+          Files
+        </button>
+        <button class="view-tab" data-view="tags">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M4 4h3v3H4zM9 4h3v3H9zM4 9h3v3H4zM9 9h3v3H9z"/>
+          </svg>
+          Tags
+        </button>
+        <button class="view-tab" data-view="health">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M2 13 L5 8 L8 11 L11 5 L14 9"/>
+          </svg>
+          Health
+        </button>
       </div>
     </div>
 

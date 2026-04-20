@@ -578,22 +578,89 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   flex-shrink: 0;
 }
 
-/* Brand — doubles as sidebar toggle */
-.tb-brand {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: -0.02em;
-  user-select: none;
+/* Brand — mark + text, doubles as sidebar toggle */
+.tb-brand-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-family: var(--font);
-  transition: background .12s, color .12s;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--r-sm, 4px);
+  transition: background .12s;
 }
-.tb-brand:hover { background: var(--bg-hover); color: var(--text-bright); }
+.tb-brand-btn:hover { background: var(--bg-hover); }
+.tb-brand-mark { color: var(--accent); flex-shrink: 0; }
+.tb-brand-text {
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--fs-lg, 15px);
+  font-weight: 600;
+  color: var(--text-bright, var(--text));
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+/* Target chip — dot + label + chevron */
+.tb-target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  padding: 5px 10px;
+  border-radius: var(--r-sm, 4px);
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--fs-sm, 12px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .12s;
+}
+.tb-target:hover { background: var(--bg-hover); }
+.tb-target svg { width: 10px; height: 6px; opacity: .6; }
+.tb-target-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green, #9ece6a);
+}
+[data-endpoint-state="tailscale"] .tb-target-dot { background: var(--cyan); }
+[data-endpoint-state="vm"] .tb-target-dot { background: var(--orange); }
+[data-endpoint-state="offline"] .tb-target-dot { background: var(--danger, var(--red)); }
+
+/* Tab group — sunken container with elevated active tab */
+.tb-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-md, 6px);
+  background: var(--bg-sunken, var(--bg));
+}
+.tb-tab-group .view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  padding: 5px 10px;
+  border-radius: var(--r-sm, 4px);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--fs-sm, 12px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .12s, color .12s, box-shadow .12s;
+  white-space: nowrap;
+}
+.tb-tab-group .view-tab:hover { color: var(--text); background: var(--bg-hover); }
+.tb-tab-group .view-tab.active {
+  color: var(--text-bright, var(--text));
+  background: var(--bg-surface2, var(--bg-surface));
+  box-shadow: var(--shadow, 0 1px 2px rgba(0,0,0,.3));
+}
+.tb-tab-group .view-tab svg { width: 14px; height: 14px; opacity: .6; flex-shrink: 0; }
+.tb-tab-group .view-tab.active svg { opacity: 1; }
 
 /* Icon buttons */
 .tb-icon-btn {
