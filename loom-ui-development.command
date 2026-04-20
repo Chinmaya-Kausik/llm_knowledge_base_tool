@@ -13,8 +13,11 @@ if [ "$current" != "ui" ]; then
   echo "Note: current branch is '$current', not 'ui'."
 fi
 
-echo "Starting Loom UI dev server..."
-echo "Open http://localhost:8420 in your browser"
-open "http://localhost:8420" &
+export LOOM_PORT="${LOOM_PORT:-8421}"
+export LOOM_ROOT="${LOOM_ROOT:-$(pwd)/demo}"
+
+echo "Starting Loom UI dev server on port $LOOM_PORT..."
+echo "Open http://localhost:$LOOM_PORT in your browser"
+open "http://localhost:$LOOM_PORT" &
 
 exec uv run --extra web python -m loom_mcp.web

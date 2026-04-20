@@ -755,6 +755,202 @@ html[data-density="roomy"] .tb-tabs .view-tab { padding: 7px 14px; font-size: 14
 html[data-density="roomy"] #chat-input { font-size: 15px; padding: 10px 12px; }
 html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 
+/* =============================================================
+   CARD CONTEXT MENU (right-click)
+   ============================================================= */
+.card-context-menu {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 6px);
+  box-shadow: var(--shadow-md, 0 4px 14px rgba(0,0,0,.4));
+  padding: 4px;
+  min-width: 180px;
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--fs-sm, 12px);
+}
+.ccm-item {
+  padding: 6px 10px;
+  border-radius: var(--r-sm, 4px);
+  cursor: pointer;
+  color: var(--text);
+  transition: background .1s;
+}
+.ccm-item:hover { background: var(--bg-hover); }
+.ccm-danger { color: var(--danger, var(--red)); }
+.ccm-danger:hover { background: var(--danger, var(--red)); color: #fff; }
+.ccm-sep { height: 1px; background: var(--border-soft, var(--border)); margin: 4px 6px; }
+
+/* =============================================================
+   PINBOARD — collapsible rail, top-right of canvas
+   ============================================================= */
+#pinboard {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 22px;
+  z-index: 20;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: var(--r-md, 6px);
+  padding: 6px 2px;
+  box-shadow: var(--shadow, 0 1px 2px rgba(0,0,0,.3));
+  transition: width .18s ease, padding .18s ease;
+}
+#pinboard:empty { display: none; }
+#pinboard .pin-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 2px 0;
+  user-select: none;
+  cursor: pointer;
+}
+#pinboard .pin-card { display: none; }
+#pinboard:hover, #pinboard.expanded {
+  width: 168px;
+  padding: 8px;
+  align-items: stretch;
+}
+#pinboard:hover .pin-label, #pinboard.expanded .pin-label {
+  writing-mode: horizontal-tb;
+  transform: none;
+  letter-spacing: .1em;
+  padding: 0 2px 4px;
+  display: flex;
+  justify-content: space-between;
+}
+#pinboard:hover .pin-card, #pinboard.expanded .pin-card { display: flex; }
+.pin-card {
+  width: 100%;
+  background: var(--bg-surface2, var(--bg-surface));
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: var(--r-sm, 4px);
+  padding: 5px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: pointer;
+  position: relative;
+  transition: border-color .15s, box-shadow .15s;
+}
+.pin-card:hover { border-color: var(--border); box-shadow: var(--shadow-md, 0 4px 14px rgba(0,0,0,.3)); }
+.pin-card .pin-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 14px;
+}
+.pin-card .pin-path {
+  font-family: var(--font-mono, monospace);
+  font-size: 8.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pin-card .pin-x {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 14px; height: 14px;
+  border-radius: 3px;
+  display: none;
+  align-items: center; justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: 11px; line-height: 1;
+  border: none; cursor: pointer; padding: 0;
+}
+.pin-card:hover .pin-x { display: flex; }
+.pin-card .pin-x:hover { color: var(--text); background: var(--border-soft, var(--border)); }
+
+/* =============================================================
+   MODEL PILL + HANDOFF DIVIDER
+   ============================================================= */
+.model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 1px 5px;
+  margin-left: 8px;
+  background: var(--bg-sunken, var(--bg));
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  vertical-align: 2px;
+}
+.model-pill .dot {
+  width: 5px; height: 5px; border-radius: 50%;
+}
+.model-pill[data-model="sonnet"] .dot { background: oklch(0.70 0.14 300); }
+.model-pill[data-model="haiku"] .dot { background: oklch(0.78 0.13 65); }
+.model-pill[data-model="opus"] .dot { background: oklch(0.70 0.14 340); }
+.model-pill[data-model="codex"] .dot { background: oklch(0.74 0.13 150); }
+
+.handoff-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 4px 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.handoff-marker::before, .handoff-marker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft, var(--border));
+}
+
+/* =============================================================
+   CONTEXT CHIP — token count in chat composer
+   ============================================================= */
+.chat-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  background: var(--bg-sunken, var(--bg));
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.chat-context-chip:hover { border-color: var(--accent); color: var(--text-bright, var(--text)); }
+.chat-context-chip .ctx-scope { color: var(--text); font-weight: 500; }
+.chat-context-chip .ctx-sep { color: var(--text-dim); }
+.chat-context-chip .ctx-bar {
+  width: 28px; height: 3px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chat-context-chip .ctx-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--green, #9ece6a);
+  transition: width .3s, background .2s;
+}
+.chat-context-chip[data-usage="mid"] .ctx-bar-fill { background: var(--orange, #ff9e64); }
+.chat-context-chip[data-usage="high"] .ctx-bar-fill { background: var(--danger, var(--red, #f7768e)); }
+
 /* Override old toolbar styles that conflict */
 .toolbar-left, .toolbar-right { display: contents; }
 .logo { display: none; }

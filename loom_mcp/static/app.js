@@ -489,6 +489,138 @@ function createVMTerminalPanel(vmId, vmLabel) {
   });
 }
 
+// --- Card Context Menu (right-click) ---
+let cardContextMenu = null;
+
+function showCardContextMenu(e, path, isFolder) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (cardContextMenu) cardContextMenu.remove();
+
+  const menu = document.createElement('div');
+  menu.className = 'card-context-menu';
+  menu.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;z-index:99999;`;
+
+  const items = [
+    { label: 'Open', action: () => { const nd = nodeById(path); if (nd) { const fakeCard = document.createElement('div'); fakeCard.dataset.path = path; fakeCard.dataset.isFolder = String(isFolder); expandCardFullPage(fakeCard); } }},
+    { label: 'Open in New Tab', action: () => window.open(`/media/${path}`, '_blank') },
+    { sep: true },
+    { label: 'Copy Path', action: () => navigator.clipboard.writeText(path) },
+    { label: 'Copy Name', action: () => navigator.clipboard.writeText(path.split('/').pop()) },
+    { sep: true },
+    { label: 'Pin to Board', action: () => pinCard(path) },
+    { sep: true },
+    { label: 'Ask Claude about this', action: () => {
+      const panel = chatPanels.get(chatFocusHistory[0] || 'main') || activePanel;
+      const input = document.getElementById('chat-input');
+      if (input) { input.value = `Tell me about \`${path}\``; input.focus(); }
+    }},
+    { sep: true },
+    { label: 'Rename...', action: () => {
+      const newName = prompt('New name:', path.split('/').pop());
+      if (newName && newName !== path.split('/').pop()) {
+        const newPath = path.split('/').slice(0, -1).concat(newName).join('/');
+        // TODO: implement rename API
+        console.log('Rename:', path, '→', newPath);
+      }
+    }},
+    { label: 'Delete', action: () => {
+      if (confirm(`Delete ${path}?`)) {
+        authFetch(`${getBaseUrl()}/api/delete`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ path }),
+        }).then(() => { initGraphView(); initSidebar(); });
+      }
+    }, danger: true },
+  ];
+
+  menu.innerHTML = items.map(item => {
+    if (item.sep) return '<div class="ccm-sep"></div>';
+    return `<div class="ccm-item${item.danger ? ' ccm-danger' : ''}">${item.label}</div>`;
+  }).join('');
+
+  // Wire click handlers
+  let itemIdx = 0;
+  menu.querySelectorAll('.ccm-item').forEach(el => {
+    while (items[itemIdx]?.sep) itemIdx++;
+    const action = items[itemIdx]?.action;
+    el.onclick = () => { menu.remove(); cardContextMenu = null; if (action) action(); };
+    itemIdx++;
+  });
+
+  document.body.appendChild(menu);
+  cardContextMenu = menu;
+
+  // Close on click outside
+  const closeMenu = () => { menu.remove(); cardContextMenu = null; document.removeEventListener('click', closeMenu); };
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+
+// Pinboard stub (will be expanded in pinboard feature)
+let pinnedCards = JSON.parse(localStorage.getItem('loom-pinned') || '[]');
+function pinCard(path) {
+  if (!pinnedCards.includes(path)) {
+    pinnedCards.push(path);
+    if (pinnedCards.length > 6) pinnedCards.shift();
+    localStorage.setItem('loom-pinned', JSON.stringify(pinnedCards));
+    renderPinboard();
+  }
+}
+function unpinCard(path) {
+  pinnedCards = pinnedCards.filter(p => p !== path);
+  localStorage.setItem('loom-pinned', JSON.stringify(pinnedCards));
+  renderPinboard();
+}
+function renderPinboard() {
+  let board = document.getElementById('pinboard');
+  if (!board) {
+    board = document.createElement('div');
+    board.id = 'pinboard';
+    const canvasContainer = document.getElementById('canvas-container');
+    if (canvasContainer) canvasContainer.appendChild(board);
+  }
+
+  if (pinnedCards.length === 0) {
+    board.innerHTML = '';
+    return;
+  }
+
+  const currentPath = currentLevel().parentPath || '';
+  let html = `<div class="pin-label"><span>PINNED</span><span>${pinnedCards.length}/6</span></div>`;
+
+  for (const path of pinnedCards) {
+    const name = path.split('/').pop();
+    const parentDir = path.split('/').slice(0, -1).join('/');
+    const isAway = parentDir !== currentPath && currentPath !== '';
+    html += `<div class="pin-card" data-pin-path="${path}" onclick="navigateToPinnedCard('${path}')">
+      <div class="pin-title">${name}</div>
+      ${isAway ? `<div class="pin-path">${parentDir}</div>` : ''}
+      <button class="pin-x" onclick="event.stopPropagation(); unpinCard('${path}')">&times;</button>
+    </div>`;
+  }
+
+  board.innerHTML = html;
+}
+
+function navigateToPinnedCard(path) {
+  // Navigate to the folder containing this card, then focus it
+  const parts = path.split('/');
+  if (parts.length > 1) {
+    const folderPath = parts.slice(0, -1).join('/');
+    if (currentLevel().parentPath !== folderPath) {
+      const nd = nodeById(folderPath);
+      if (nd) drillInto(folderPath);
+    }
+  }
+  // Focus the card
+  const card = cardElements.get(path);
+  if (card) {
+    setFocusedItem(path, card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
 // --- VM Add Modal ---
 function showAddVMModal() {
   const existing = document.getElementById('vm-modal');
@@ -1169,6 +1301,10 @@ function wireCardButtons(card, hasChildren) {
   const path = card.dataset.path;
   const category = card.dataset.category || 'misc';
   const isMarkdown = category === 'markdown' || category === 'folder';
+  const isFolder = card.dataset.isFolder === 'true';
+
+  // Right-click context menu
+  card.addEventListener('contextmenu', (e) => showCardContextMenu(e, path, isFolder));
 
   // Single-click title: toggle expand/collapse
   card.querySelector('.doc-handle').addEventListener('click', (e) => {
@@ -2389,6 +2525,7 @@ async function initGraphView() {
     renderCurrentLevel();
 
     console.log(`Loom: rendered ${cardElements.size} cards`);
+    renderPinboard();
   } catch (err) {
     console.error('Loom initGraphView error:', err);
     document.getElementById('world').innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">Error: ${err.message}</div>`;
@@ -4318,6 +4455,20 @@ function initChat() {
   activePanel.messagesContainer = document.getElementById('chat-messages');
   chatMessagesContainer = activePanel.messagesContainer;
 
+  // Context chip — click to cycle context level
+  const ctxChip = document.getElementById('chat-context-chip');
+  if (ctxChip) {
+    const levels = ['page', 'folder', 'global'];
+    ctxChip.onclick = () => {
+      const current = activePanel.contextLevel || 'page';
+      const next = levels[(levels.indexOf(current) + 1) % levels.length];
+      activePanel.contextLevel = next;
+      syncFromPanel(activePanel);
+      updateContextChip();
+    };
+    updateContextChip();
+  }
+
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
     'chat-bottom', 'chat-right', 'chat-float'];
   let chatDockMode = 'bottom'; // 'bottom', 'right', 'float'
@@ -4776,13 +4927,15 @@ function sendChatMessage() {
   document.getElementById('chat-stop').style.display = 'none'; // Hidden — Redirect handles stopping
   document.getElementById('chat-redirect').style.display = '';
 
-  // Show pondering + timer + tokens immediately at dispatch time
+  // Show pondering + timer + tokens + model pill immediately at dispatch time
   currentAssistantEl = document.createElement('div');
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+  const currentModel = activePanel.model || 'sonnet';
+  currentAssistantEl.dataset.model = currentModel;
   const statusBar = document.createElement('div');
   statusBar.className = 'chat-status-bar';
   statusBar.className = 'chat-status-bar chat-active-status';
-  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${currentModel}"><span class="dot"></span>${currentModel}</span>`;
   currentAssistantEl.appendChild(statusBar);
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
@@ -4799,6 +4952,22 @@ function sendChatMessage() {
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
   syncToPanel(chatPanels.get('main'));
+}
+
+function updateContextChip() {
+  const chip = document.getElementById('chat-context-chip');
+  if (!chip) return;
+  const level = activePanel.contextLevel || 'page';
+  chip.querySelector('.ctx-scope').textContent = level;
+  // Token estimate based on context level (rough)
+  const estimates = { page: '~1K', folder: '~4K', global: '~12K' };
+  const pcts = { page: 1, folder: 4, global: 12 };
+  const maxTokens = 200; // 200K context
+  const pct = Math.min(100, (pcts[level] / maxTokens) * 100 * 10);
+  chip.querySelector('.ctx-tokens').textContent = estimates[level] || '--';
+  const fill = chip.querySelector('.ctx-bar-fill');
+  if (fill) fill.style.width = pct + '%';
+  chip.dataset.usage = pct > 60 ? 'high' : pct > 30 ? 'mid' : '';
 }
 
 function sendQueuedMessage(text) {
@@ -4829,10 +4998,12 @@ function sendQueuedMessage(text) {
 
   currentAssistantEl = document.createElement('div');
   currentAssistantEl.className = 'chat-msg chat-msg-assistant';
+  const mdl = activePanel.model || 'sonnet';
+  currentAssistantEl.dataset.model = mdl;
   const statusBar = document.createElement('div');
   statusBar.className = 'chat-status-bar';
   statusBar.className = 'chat-status-bar chat-active-status';
-  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
+  statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${mdl}"><span class="dot"></span>${mdl}</span>`;
   currentAssistantEl.appendChild(statusBar);
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
