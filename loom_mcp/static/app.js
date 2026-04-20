@@ -1251,13 +1251,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
   const typeLabel = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== 'file' ? nodeData.type : (category !== 'folder' && category !== 'misc' ? category : '');
   const typeBadgeHtml = typeLabel ? `<span class="card-meta">${typeLabel}</span>` : '';
 
-  // Subtitle — only when frontmatter title is meaningfully different from the filename
   const meta = cardMeta.get(nodeData.id);
-  const fmTitle = meta?.frontmatter?.title;
-  // Skip subtitle if it's basically the same as the label (case-insensitive, ignoring hyphens/underscores)
-  const normalize = s => (s || '').toLowerCase().replace(/[-_\s.]/g, '');
-  const subtitle = fmTitle && normalize(fmTitle) !== normalize(nodeData.label) ? fmTitle : '';
-  const subtitleHtml = subtitle ? `<span class="card-filename">${subtitle}</span>` : '';
 
   // Path breadcrumb for footer
   const pathParts = nodeData.id.split('/');
@@ -1297,7 +1291,6 @@ function createDocCard(nodeData, content, pos, options = {}) {
       <span class="card-dot"></span>
       <div class="card-title-wrap">
         <span class="doc-title">${nodeData.label}</span>
-        ${subtitleHtml}
       </div>
       ${typeBadgeHtml}
       <div class="doc-controls">

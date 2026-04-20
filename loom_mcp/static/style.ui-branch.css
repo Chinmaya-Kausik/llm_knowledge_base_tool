@@ -361,7 +361,6 @@ pre, code, .doc-body pre, .doc-body code,
   gap: var(--sp-2, 6px);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-soft);
-  padding: 9px 12px 10px;
 }
 .card-dot {
   width: 8px; height: 8px;
@@ -408,11 +407,13 @@ html[data-accent="dot"] .doc-card[data-type="project"] .card-dot { background: v
 .doc-card:hover .doc-title,
 .doc-card.focused .doc-title { color: var(--text-bright); }
 
-/* Card body — uses --font-read so Paper theme's Newsreader works */
+/* Card body — sans-serif for prose, 14px for readability */
 .doc-body {
-  font-family: var(--font-read, var(--font-ui, system-ui));
+  font-family: var(--font-ui, system-ui);
+  font-size: 14px;
   line-height: 1.55;
 }
+.doc-body > :first-child { margin-top: 0; }
 .doc-body pre, .doc-body code {
   font-family: var(--font-mono, monospace);
 }
@@ -904,25 +905,7 @@ html[data-canvas="none"] #infinite-canvas {
    ============================================================= */
 /* Border mode (default) — already defined above in the card section */
 
-/* Dot mode — small colored circle in card handle */
-html[data-accent="dot"] .doc-card[data-type="concept"] .doc-handle::before,
-html[data-accent="dot"] .doc-card[data-type="summary"] .doc-handle::before,
-html[data-accent="dot"] .doc-card[data-type="index"] .doc-handle::before,
-html[data-accent="dot"] .doc-card[data-type="answer"] .doc-handle::before,
-html[data-accent="dot"] .doc-card[data-type="project"] .doc-handle::before {
-  content: "";
-  display: inline-block;
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-html[data-accent="dot"] .doc-card[data-type="concept"] .doc-handle::before { background: var(--accent); }
-html[data-accent="dot"] .doc-card[data-type="summary"] .doc-handle::before { background: var(--green); }
-html[data-accent="dot"] .doc-card[data-type="index"] .doc-handle::before { background: var(--orange); }
-html[data-accent="dot"] .doc-card[data-type="answer"] .doc-handle::before { background: var(--accent2); }
-html[data-accent="dot"] .doc-card[data-type="project"] .doc-handle::before { background: var(--cyan); }
+/* Dot mode — uses .card-dot element in card HTML (not ::before pseudo) */
 /* In dot mode, suppress left borders */
 html[data-accent="dot"] .doc-card:hover[data-type],
 html[data-accent="dot"] .doc-card.focused[data-type] {
@@ -947,14 +930,14 @@ html[data-density="roomy"] { --density: 1.15; }
 /* Apply density to key spacing */
 html[data-density="compact"] .doc-card .doc-handle { padding: 5px 8px; }
 html[data-density="compact"] .doc-card .doc-body { padding: 6px 8px; font-size: 11px; }
-html[data-density="compact"] .tree-item { padding: 3px 8px; min-height: 28px; }
+html[data-density="compact"] .tree-item { padding: 2px 6px 2px 0; font-size: 11px; }
 html[data-density="compact"] .tb-tab-group .view-tab { padding: 3px 7px; font-size: 11px; }
 html[data-density="compact"] #chat-input { font-size: 12px; padding: 6px 8px; }
 html[data-density="compact"] .chat-msg { font-size: 12px; }
 
 html[data-density="roomy"] .doc-card .doc-handle { padding: 12px 14px; }
 html[data-density="roomy"] .doc-card .doc-body { padding: 14px 14px; font-size: 14px; }
-html[data-density="roomy"] .tree-item { padding: 10px 14px; min-height: 44px; }
+html[data-density="roomy"] .tree-item { padding: 6px 10px 6px 0; font-size: 13px; }
 html[data-density="roomy"] .tb-tab-group .view-tab { padding: 7px 14px; font-size: 14px; }
 html[data-density="roomy"] #chat-input { font-size: 15px; padding: 10px 12px; }
 html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
