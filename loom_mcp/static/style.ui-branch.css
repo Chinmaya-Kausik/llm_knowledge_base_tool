@@ -1522,6 +1522,28 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 .fcp-send:hover { filter: brightness(1.1); color: var(--bg); }
 
+/* Tool call styling — Pass 11 */
+.tool-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.chat-tool-entry { opacity: 0.75; }
+.chat-tool-entry:hover { opacity: 1; }
+.chat-tool-entry.open {
+  opacity: 1;
+  background: var(--bg-sunken);
+  border-radius: var(--r-sm);
+  padding: 3px 6px;
+  margin: 2px -6px;
+}
+.tool-time { margin-left: auto; }
+.chat-activity-group {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+}
+
 /* Context chip icon — clock instead of gear */
 .chat-context-chip .ctx-icon { display: none; }
 

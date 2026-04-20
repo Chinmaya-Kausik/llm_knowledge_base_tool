@@ -5367,15 +5367,23 @@ function formatToolDesc(tool, input) {
 }
 
 function toolIcon(tool) {
-  // Icons matching Claude Code style
-  const icons = {
-    'Read': '📄', 'Write': '✏️', 'Edit': '✏️', 'Grep': '🔍', 'Glob': '📁',
-    'Bash': '⚡', 'WebSearch': '🌐', 'WebFetch': '🌐',
-    'ripgrep_search': '🔍', 'read_wiki_page': '📄', 'write_wiki_page': '✏️',
-    'validate_links': '🔗', 'generate_health_report': '🏥',
-    'ingest_url': '📥', 'ingest_text': '📥', 'auto_commit': '💾',
+  const svgs = {
+    'Read':  '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 1.5H9L11 3.5V12.5H3Z"/><path d="M9 1.5V3.5H11"/></svg>',
+    'Write': '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 1.5H9L11 3.5V12.5H3Z"/><path d="M5 8H9"/></svg>',
+    'Edit':  '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2.5L11.5 6L6 11.5H2.5V8Z"/></svg>',
+    'Grep':  '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M9 9L12.5 12.5"/></svg>',
+    'Glob':  '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1.5 4L4 2H8L9 3.5H12.5V12H1.5Z"/></svg>',
+    'Bash':  '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2" width="11" height="10" rx="1.5"/><path d="M4 6L6 7.5L4 9"/><path d="M7.5 9H10"/></svg>',
+    'WebSearch': '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="5.5"/><path d="M1.5 7H12.5"/><ellipse cx="7" cy="7" rx="2.5" ry="5.5"/></svg>',
+    'WebFetch': '<svg class="tool-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="5.5"/><path d="M1.5 7H12.5"/><ellipse cx="7" cy="7" rx="2.5" ry="5.5"/></svg>',
   };
-  return icons[tool] || '⚡';
+  // Also map MCP tool names
+  const aliases = {
+    'ripgrep_search': 'Grep', 'read_wiki_page': 'Read', 'write_wiki_page': 'Write',
+    'validate_links': 'Grep', 'generate_health_report': 'Read',
+    'ingest_url': 'WebFetch', 'ingest_text': 'Write', 'auto_commit': 'Bash',
+  };
+  return svgs[tool] || svgs[aliases[tool]] || svgs['Bash'];
 }
 
 // ========================================
