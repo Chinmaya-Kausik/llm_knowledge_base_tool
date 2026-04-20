@@ -3843,7 +3843,6 @@ function createPanelHeader(panelId, label = 'Chat') {
   header.className = 'panel-header';
   header.innerHTML = `
     <span class="panel-label" contenteditable="true">${label}</span>
-    <span class="panel-model-badge"></span>
     <span class="panel-status"></span>
     <span style="flex:1"></span>
     <button class="panel-menu-btn" title="Options">⋯</button>
@@ -4011,24 +4010,6 @@ function createPanelHeader(panelId, label = 'Chat') {
   labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); } });
   labelEl.addEventListener('focus', () => { labelEl.style.cursor = 'text'; });
 
-  // Model badge — click to cycle models
-  const modelBadge = header.querySelector('.panel-model-badge');
-  if (modelBadge) {
-    modelBadge.style.cursor = 'pointer';
-    modelBadge.title = 'Click to cycle model';
-    modelBadge.onclick = (e) => {
-      e.stopPropagation();
-      const panel = chatPanels.get(panelId) || activePanel;
-      const models = ['sonnet', 'opus', 'haiku'];
-      const current = panel.model || 'sonnet';
-      const next = models[(models.indexOf(current) + 1) % models.length];
-      panel.model = next;
-      modelBadge.textContent = next;
-      if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
-        panel.ws.send(JSON.stringify({ type: 'set_model', model: next }));
-      }
-    };
-  }
 
   // Minimize button + header click both toggle minimize
   function toggleMinimize() {
@@ -4772,7 +4753,6 @@ function initChat() {
       updateContextChip();
     };
     updateContextChip();
-    updatePanelSubtitle('main');
   }
 
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
@@ -5261,22 +5241,6 @@ function sendChatMessage() {
   syncToPanel(chatPanels.get('main'));
 }
 
-function updatePanelSubtitle(panelId) {
-  const panel = chatPanels.get(panelId || 'main') || activePanel;
-  const model = panel.model || 'sonnet';
-
-  // Update main panel model badge
-  if (!panelId || panelId === 'main') {
-    const el = document.querySelector('#chat-header .panel-model-badge');
-    if (el) el.textContent = model;
-  }
-  // Update floating panel model badge
-  if (panelId && panelId !== 'main' && panel.container) {
-    const el = panel.container.querySelector('.panel-model-badge');
-    if (el) el.textContent = model;
-  }
-}
-
 function updateContextChip() {
   const chip = document.getElementById('chat-context-chip');
   if (!chip) return;
@@ -5284,8 +5248,8 @@ function updateContextChip() {
   chip.querySelector('.ctx-scope').textContent = level;
   // Token estimate based on context level (rough)
   const estimates = { page: '~1K', folder: '~4K', global: '~12K' };
-  const fillPcts = { page: 8, folder: 25, global: 60 };
-  const pct = fillPcts[level] || 5;
+  const tokenK = { page: 1, folder: 4, global: 12 };
+  const pct = Math.min(100, (tokenK[level] / 200) * 100);
   chip.querySelector('.ctx-tokens').textContent = estimates[level] || '--';
   const fill = chip.querySelector('.ctx-bar-fill');
   if (fill) fill.style.width = pct + '%';
@@ -6046,8 +6010,7 @@ function handleChatEvent(msg) {
       }
       chatGenerating = false;
       clearInterval(chatTimerInterval);
-      updatePanelSubtitle('main');
-      // Only toggle main panel buttons when processing main panel events
+        // Only toggle main panel buttons when processing main panel events
       const isMainPanel = chatMessagesContainer === chatPanels.get('main')?.messagesContainer
         || chatMessagesContainer === null;
       if (isMainPanel) {

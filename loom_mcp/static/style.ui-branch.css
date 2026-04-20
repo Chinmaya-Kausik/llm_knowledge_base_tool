@@ -1174,6 +1174,7 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 .chat-context-chip .ctx-bar-fill {
   height: 100%;
+  min-width: 2px;
   border-radius: 2px;
   background: var(--green, #9ece6a);
   transition: width .3s, background .2s;
@@ -1424,17 +1425,6 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 /* =============================================================
    CHAT HEADER + INPUT — Pass 10
    ============================================================= */
-/* Header model badge — inline next to title */
-.panel-model-badge {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--text-dim);
-  padding: 1px 5px;
-  background: var(--bg);
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
 /* Chat input area restyle */
 #chat-input-area {
   display: flex;
