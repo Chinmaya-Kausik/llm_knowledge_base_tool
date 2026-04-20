@@ -1425,6 +1425,38 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 /* =============================================================
    CHAT HEADER + INPUT — Pass 10
    ============================================================= */
+/* Workspace browser */
+.ws-browse-item {
+  padding: 3px 12px;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-browse-item:hover { background: var(--bg-hover); }
+.ws-browse-parent { color: var(--text-muted); }
+.ws-browse-current {
+  padding: 3px 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 2px;
+}
+.ws-is-loom { color: var(--accent); font-weight: 500; }
+.ws-loom-badge {
+  font-size: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
 /* Chat input area restyle */
 #chat-input-area {
   display: flex;

@@ -7099,10 +7099,14 @@ function showWorkspaceInfo() {
     </div>
     <div class="keybinding-panel-body" style="padding:14px">
       <div style="margin-bottom:6px;font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Loom Root</div>
-      <input type="text" id="ws-loom-root" style="width:100%;padding:6px 8px;background:var(--bg-sunken);border:1px solid var(--border-soft);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-sm);margin-bottom:12px" placeholder="/path/to/loom">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input type="text" id="ws-loom-root" class="fs-input" style="flex:1" placeholder="/path/to/loom">
+        <button id="ws-browse-btn" class="fs-btn" title="Browse">Browse</button>
+      </div>
+      <div id="ws-browser" style="display:none;margin-bottom:10px;max-height:240px;overflow-y:auto;background:var(--bg-sunken);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:4px 0"></div>
       <div style="display:flex;gap:8px">
-        <button id="ws-save-btn" style="padding:6px 14px;background:var(--accent);color:var(--bg);border:none;border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-sm)">Save & Restart</button>
-        <button id="ws-restart-btn" style="padding:6px 14px;background:var(--bg-surface2);color:var(--text);border:1px solid var(--border-soft);border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-sm)">Restart Server</button>
+        <button id="ws-save-btn" class="fs-btn primary">Save & Restart</button>
+        <button id="ws-restart-btn" class="fs-btn">Restart Server</button>
       </div>
     </div>
   `;
@@ -7112,6 +7116,46 @@ function showWorkspaceInfo() {
     const rootEl = document.getElementById('ws-loom-root');
     if (rootEl) rootEl.value = resp.loom_root || '';
   }).catch(() => {});
+
+  // Directory browser
+  const browserEl = document.getElementById('ws-browser');
+  const rootInput = document.getElementById('ws-loom-root');
+  document.getElementById('ws-browse-btn').onclick = () => {
+    browserEl.style.display = browserEl.style.display === 'none' ? '' : 'none';
+    if (browserEl.style.display !== 'none') {
+      browseTo(rootInput.value || '~');
+    }
+  };
+
+  function browseTo(path) {
+    authFetch(`${getBaseUrl()}/api/browse?path=${encodeURIComponent(path)}`).then(r => r.json()).then(data => {
+      let html = '';
+      // Parent navigation
+      if (data.parent && data.parent !== data.path) {
+        html += `<div class="ws-browse-item ws-browse-parent" data-path="${data.parent}">↑ ..</div>`;
+      }
+      // Current path display
+      html += `<div class="ws-browse-current">${data.path}</div>`;
+      // Entries
+      for (const entry of (data.entries || [])) {
+        const loomBadge = entry.is_loom ? '<span class="ws-loom-badge">loom</span>' : '';
+        html += `<div class="ws-browse-item${entry.is_loom ? ' ws-is-loom' : ''}" data-path="${entry.path}">${entry.name} ${loomBadge}</div>`;
+      }
+      if ((data.entries || []).length === 0) {
+        html += `<div style="padding:4px 12px;color:var(--text-dim);font-size:var(--fs-xs)">Empty directory</div>`;
+      }
+      browserEl.innerHTML = html;
+
+      // Wire click handlers
+      browserEl.querySelectorAll('.ws-browse-item').forEach(item => {
+        item.onclick = () => browseTo(item.dataset.path);
+        item.ondblclick = () => {
+          rootInput.value = item.dataset.path;
+          browserEl.style.display = 'none';
+        };
+      });
+    }).catch(() => { browserEl.innerHTML = '<div style="padding:8px 12px;color:var(--red)">Could not browse</div>'; });
+  }
 
   document.getElementById('ws-save-btn').onclick = async () => {
     const newRoot = document.getElementById('ws-loom-root').value.trim();

@@ -868,6 +868,26 @@ async def api_claude_logout():
         return {"error": f"Failed: {e}"}
 
 
+@app.get("/api/browse")
+def api_browse(path: str = "~"):
+    """List directories at a given path for the workspace picker."""
+    target = Path(os.path.expanduser(path)).resolve()
+    if not target.is_dir():
+        return {"error": f"Not a directory: {target}", "path": str(target), "entries": []}
+    entries = []
+    try:
+        for item in sorted(target.iterdir()):
+            if item.name.startswith('.'):
+                continue
+            if item.is_dir():
+                # Check if it looks like a loom workspace
+                is_loom = (item / "wiki").is_dir() or (item / "CLAUDE.md").exists()
+                entries.append({"name": item.name, "path": str(item), "is_loom": is_loom})
+    except PermissionError:
+        return {"error": "Permission denied", "path": str(target), "entries": []}
+    return {"path": str(target), "parent": str(target.parent), "entries": entries}
+
+
 @app.put("/api/settings")
 async def api_update_settings(request: Request):
     body = await request.json()
