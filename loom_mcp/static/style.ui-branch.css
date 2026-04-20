@@ -359,6 +359,7 @@ pre, code, .doc-body pre, .doc-body code,
   display: flex;
   align-items: center;
   gap: var(--sp-2, 6px);
+  padding: 9px 12px 10px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-soft);
 }
