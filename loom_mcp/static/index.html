@@ -92,7 +92,7 @@
     <div class="tb-right">
       <div class="tb-search-wrap">
         <svg class="tb-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4.5"/><line x1="9.5" y1="9.5" x2="13" y2="13"/></svg>
-        <input type="search" id="search-input" placeholder="Search...">
+        <input type="search" id="search-input" placeholder="Search pages, files, chats...">
         <kbd class="tb-kbd" id="search-kbd">&#8984;F</kbd>
       </div>
       <div class="tb-divider"></div>
@@ -191,12 +191,30 @@
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 4H14M2 8H14M2 12H14"/></svg>
         </button>
         <div class="sm-dropdown hidden" id="settings-dropdown">
+          <div class="sm-group" id="settings-menu">
+            <button class="sm-item" onclick="closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="6" r="2.4"/><path d="M3 13 Q8 9 13 13"/></svg>
+              <span class="sm-label">Account</span>
+              <span class="sm-kbd"></span>
+            </button>
+            <button class="sm-item" onclick="closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 5L5 3H13V13H3V5Z"/><path d="M2.5 5H11V13"/></svg>
+              <span class="sm-label">Workspace</span>
+              <span class="sm-kbd" id="settings-workspace-badge">Local</span>
+            </button>
+          </div>
+          <div class="sm-divider"></div>
           <div class="sm-group">
             <div class="sm-group-label">Palettes</div>
             <button class="sm-item" onclick="openPalette('appearance'); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.2"/><path d="M8 2.8V8L11.5 11"/></svg>
               <span class="sm-label">Appearance<span class="sm-ellipsis">...</span></span>
               <span class="sm-kbd">&#8984;&#8679;A</span>
+            </button>
+            <button class="sm-item" onclick="openPalette('model'); closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="5" r="1.6"/><circle cx="11" cy="5" r="1.6"/><circle cx="8" cy="11" r="1.6"/><path d="M5 5L11 5M5 5L8 11M11 5L8 11" opacity=".5"/></svg>
+              <span class="sm-label">Model &amp; agent<span class="sm-ellipsis">...</span></span>
+              <span class="sm-kbd">&#8984;&#8679;M</span>
             </button>
             <button class="sm-item" onclick="openPermissionsPanel(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10 3L13 6L8 11L5 11L5 8Z"/><path d="M5 11L3 13"/></svg>
@@ -208,31 +226,29 @@
           <div class="sm-group">
             <button class="sm-item" onclick="openKeybindingPanel(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="5" width="11" height="6" rx="1.2"/><path d="M5 8H5.01M8 8H8.01M11 8H11.01"/></svg>
-              <span class="sm-label">Keyboard Shortcuts</span>
+              <span class="sm-label">Keyboard shortcuts</span>
               <span class="sm-kbd">?</span>
             </button>
           </div>
           <div class="sm-divider"></div>
           <div class="sm-group">
-            <div id="settings-menu">
-              <div class="settings-section">
-                <label class="settings-label">Loom Root</label>
-                <input type="text" id="settings-loom-root" class="settings-input" placeholder="/path/to/loom">
-                <button id="settings-save-root" class="settings-action">Save &amp; Restart</button>
-              </div>
-              <div class="sm-divider"></div>
-              <div class="settings-section">
-                <label class="settings-label">Claude Auth</label>
-                <span id="settings-auth-status" class="settings-value">Checking...</span>
-                <button id="settings-login" class="settings-action">Login</button>
-              </div>
-              <div class="sm-divider"></div>
-              <div class="settings-section">
-                <label class="settings-label">Code Font Size</label>
-                <input type="range" id="settings-code-font" min="10" max="20" value="13" class="settings-range">
-                <span id="settings-code-font-val">13px</span>
-              </div>
-            </div>
+            <button class="sm-item" onclick="closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2"/><path d="M8 2V3.5M8 12.5V14M2 8H3.5M12.5 8H14M3.8 3.8L4.8 4.8M11.2 11.2L12.2 12.2M3.8 12.2L4.8 11.2M11.2 4.8L12.2 3.8"/></svg>
+              <span class="sm-label">Open full settings<span class="sm-ellipsis">...</span></span>
+              <span class="sm-kbd">&#8984;,</span>
+            </button>
+            <button class="sm-item" onclick="closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M8 7V11M8 5H8.01"/></svg>
+              <span class="sm-label">About Loom</span>
+              <span class="sm-kbd">v0.1</span>
+            </button>
+          </div>
+          <!-- Hidden settings fields — loaded via JS, not visible in dropdown -->
+          <div style="display:none">
+            <input type="text" id="settings-loom-root" placeholder="/path/to/loom">
+            <button id="settings-save-root">Save</button>
+            <span id="settings-auth-status"></span>
+            <button id="settings-login">Login</button>
           </div>
         </div>
       </div>
@@ -303,6 +319,62 @@
       <div class="palette-row">
         <label>Accent Hue</label>
         <input type="range" id="accent-hue-slider" min="0" max="360" value="258" style="width:100%;accent-color:var(--accent)">
+      </div>
+    </div>
+    <div class="palette-foot">
+      <span class="palette-hint">Esc to dismiss</span>
+      <button class="palette-link" onclick="closePalette()">Open in full settings &#8594;</button>
+    </div>
+  </aside>
+
+  <!-- Model & Agent Palette (floating card) -->
+  <aside class="palette hidden" id="palette-model">
+    <div class="palette-head">
+      <div><span class="palette-eyebrow">Palette</span><h3 class="palette-title">Model &amp; agent</h3></div>
+      <button class="tb-icon-btn palette-close" onclick="closePalette()" title="Close">&#10005;</button>
+    </div>
+    <div class="palette-body">
+      <div class="palette-row">
+        <label>Active Model</label>
+        <div class="seg" data-setting="model">
+          <button data-val="sonnet">Sonnet</button>
+          <button data-val="haiku">Haiku</button>
+          <button data-val="opus">Opus</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Agent</label>
+        <div class="seg" data-setting="agent">
+          <button data-val="claude-code">Claude Code</button>
+          <button data-val="codex">Codex</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Temperature <span class="palette-desc" id="temp-val">· 0.4</span></label>
+        <input type="range" id="temperature-slider" min="0" max="100" value="40" style="width:100%;accent-color:var(--accent)">
+      </div>
+      <div class="palette-row">
+        <label>Reasoning Depth</label>
+        <div class="seg" data-setting="reasoning">
+          <button data-val="low">Low</button>
+          <button data-val="med">Med</button>
+          <button data-val="high">High</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>System Prompt Preset</label>
+        <div class="seg" data-setting="preset">
+          <button data-val="default">Default</button>
+          <button data-val="researcher">Researcher</button>
+          <button data-val="code">Code</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Stream Tokens</label>
+        <div class="seg" data-setting="stream">
+          <button data-val="on">On</button>
+          <button data-val="off">Off</button>
+        </div>
       </div>
     </div>
     <div class="palette-foot">
@@ -500,12 +572,28 @@
     }
     initSegmentedControls();
 
-    // Appearance settings — apply saved values on load
-    ['canvas', 'accent', 'density'].forEach(function(attr) {
+    // Appearance + model settings — apply saved values on load
+    ['canvas', 'accent', 'density', 'palette', 'typography', 'threads', 'model', 'agent', 'reasoning', 'preset', 'stream'].forEach(function(attr) {
       var saved = localStorage.getItem('loom-' + attr);
       if (saved) document.documentElement.setAttribute('data-' + attr, saved);
-      else document.documentElement.setAttribute('data-' + attr, attr === 'canvas' ? 'dots' : attr === 'density' ? 'standard' : 'border');
     });
+    // Defaults for required attributes
+    if (!localStorage.getItem('loom-canvas')) document.documentElement.setAttribute('data-canvas', 'dots');
+    if (!localStorage.getItem('loom-density')) document.documentElement.setAttribute('data-density', 'standard');
+    if (!localStorage.getItem('loom-accent')) document.documentElement.setAttribute('data-accent', 'border');
+
+    // Temperature slider
+    var tempSlider = document.getElementById('temperature-slider');
+    var tempVal = document.getElementById('temp-val');
+    if (tempSlider) {
+      var savedTemp = localStorage.getItem('loom-temperature') || '40';
+      tempSlider.value = savedTemp;
+      if (tempVal) tempVal.textContent = '· ' + (parseInt(savedTemp) / 100).toFixed(1);
+      tempSlider.oninput = function() {
+        localStorage.setItem('loom-temperature', tempSlider.value);
+        if (tempVal) tempVal.textContent = '· ' + (parseInt(tempSlider.value) / 100).toFixed(1);
+      };
+    }
   })();
   </script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>

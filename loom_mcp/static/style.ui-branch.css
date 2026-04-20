@@ -359,7 +359,7 @@ pre, code, .doc-body pre, .doc-body code,
   display: flex;
   align-items: center;
   gap: var(--sp-2, 6px);
-  padding: 9px 12px 10px;
+  padding: 8px 10px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-soft);
 }
@@ -623,9 +623,9 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 
 .tb-divider {
   width: 1px;
-  height: 20px;
-  background: var(--border-soft, var(--border));
-  margin: 0 6px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 var(--sp-1, 4px);
   flex-shrink: 0;
 }
 
@@ -650,6 +650,7 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   color: var(--text-bright, var(--text));
   letter-spacing: -0.01em;
   user-select: none;
+  padding-right: var(--sp-3, 8px);
 }
 
 /* Target chip — dot + label + chevron */
@@ -713,13 +714,13 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 .tb-tab-group .view-tab svg { width: 14px; height: 14px; opacity: .6; flex-shrink: 0; }
 .tb-tab-group .view-tab.active svg { opacity: 1; }
 
-/* Icon buttons */
+/* Icon buttons — 28x28 per prototype */
 .tb-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -1340,3 +1341,5 @@ html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 .toolbar-left, .toolbar-right { display: contents; }
 .logo { display: none; }
 .view-tabs { display: contents; }
+/* Hide standalone theme dropdown — theme is in Appearance palette */
+#theme-dropdown-wrap { display: none; }
