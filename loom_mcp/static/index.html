@@ -239,13 +239,20 @@
     </div>
   </header>
 
-  <!-- Appearance Palette (slide-in panel) -->
+  <!-- Appearance Palette (floating card) -->
   <aside class="palette hidden" id="palette-appearance">
     <div class="palette-head">
       <div><span class="palette-eyebrow">Palette</span><h3 class="palette-title">Appearance</h3></div>
-      <button class="tb-icon-btn palette-close" onclick="closePalette()">&#10005;</button>
+      <button class="tb-icon-btn palette-close" onclick="closePalette()" title="Close">&#10005;</button>
     </div>
     <div class="palette-body">
+      <div class="palette-row">
+        <label>Palette</label>
+        <div class="seg" data-setting="palette">
+          <button data-val="blue">Blue</button>
+          <button data-val="slate">Slate</button>
+        </div>
+      </div>
       <div class="palette-row">
         <label>Theme</label>
         <div class="seg" data-setting="theme">
@@ -255,21 +262,10 @@
         </div>
       </div>
       <div class="palette-row">
-        <label>Canvas Background</label>
-        <div class="seg" data-setting="canvas">
-          <button data-val="none">None</button>
-          <button data-val="dots">Dots</button>
-          <button data-val="grid">Grid</button>
-          <button data-val="paper">Paper</button>
-          <button data-val="constellation">Stars</button>
-        </div>
-      </div>
-      <div class="palette-row">
-        <label>Card Accent</label>
-        <div class="seg" data-setting="accent">
-          <button data-val="border">Border</button>
-          <button data-val="dot">Dot</button>
-          <button data-val="flat">Flat</button>
+        <label>Typography</label>
+        <div class="seg" data-setting="typography">
+          <button data-val="mixed">Mixed</button>
+          <button data-val="mono">All mono</button>
         </div>
       </div>
       <div class="palette-row">
@@ -280,9 +276,38 @@
           <button data-val="roomy">Roomy</button>
         </div>
       </div>
+      <div class="palette-row">
+        <label>Card Accent</label>
+        <div class="seg" data-setting="accent">
+          <button data-val="border">Left border</button>
+          <button data-val="dot">Dot</button>
+          <button data-val="flat">Flat</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Canvas Background</label>
+        <div class="seg" data-setting="canvas">
+          <button data-val="dots">Dots</button>
+          <button data-val="grid">Grid</button>
+          <button data-val="paper">Paper</button>
+          <button data-val="constellation">Stars</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Loom Threads <span class="palette-desc">· faint lines from chat to focused card</span></label>
+        <div class="seg" data-setting="threads">
+          <button data-val="off">Off</button>
+          <button data-val="on">On</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Accent Hue</label>
+        <input type="range" id="accent-hue-slider" min="0" max="360" value="258" style="width:100%;accent-color:var(--accent)">
+      </div>
     </div>
     <div class="palette-foot">
       <span class="palette-hint">Esc to dismiss</span>
+      <button class="palette-link" onclick="closePalette()">Open in full settings &#8594;</button>
     </div>
   </aside>
 
