@@ -1887,14 +1887,14 @@ function computeLayoutForce(nodes, saved) {
     }
   }
 
-  // Collision radius — tight, just enough to prevent overlap
-  const collideRadius = Math.max(cardW, cardH) / 2 + pad / 4;
+  // Collision radius — must cover the full card rectangle diagonal to prevent overlap
+  const collideRadius = Math.sqrt(cardW * cardW + cardH * cardH) / 2 + pad / 3;
 
-  // Run simulation — low repulsion for tight packing
+  // Run simulation — moderate repulsion, strong collision, tight linking
   const simulation = d3.forceSimulation(simNodes)
-    .force('collide', d3.forceCollide(collideRadius).strength(1).iterations(4))
-    .force('charge', d3.forceManyBody().strength(-80))
-    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.8).strength(0.5))
+    .force('collide', d3.forceCollide(collideRadius).strength(1).iterations(5))
+    .force('charge', d3.forceManyBody().strength(-150))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW + pad).strength(0.4))
     .force('center', d3.forceCenter(
       (cols * (cardW + pad)) / 2,
       (Math.ceil(nodes.length / cols) * (cardH + pad)) / 2
