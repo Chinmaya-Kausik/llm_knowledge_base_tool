@@ -1972,11 +1972,31 @@ function computeLayoutGrid(nodes, saved) {
 
 function autoLayout() {
   const level = currentLevel();
-  const nodes = level.parentPath === null ? (graphData?.top_nodes || []) :
-    graphData?.nodes.filter(n => n.data.parent_id === level.parentPath) || [];
+  const isSubCanvas = level.parentPath !== null;
+  const nodes = isSubCanvas
+    ? graphData?.nodes.filter(n => n.data.parent_id === level.parentPath) || []
+    : (graphData?.top_nodes || []);
   if (nodes.length === 0) return;
 
   const positions = computeLayout(nodes, {}); // Empty saved = layout all
+
+  // In sub-canvases, offset all positions below the parent card
+  if (isSubCanvas) {
+    const parentCard = cardElements.get(level.parentPath);
+    const parentBottom = parentCard ? (parentCard.offsetHeight || 300) + 50 : 400;
+    // Find the minimum y in computed positions
+    let minY = Infinity;
+    for (const pos of Object.values(positions)) {
+      if (pos.y < minY) minY = pos.y;
+    }
+    // Shift all positions so they start below the parent
+    const offset = parentBottom - minY;
+    if (offset > 0) {
+      for (const pos of Object.values(positions)) {
+        pos.y += offset;
+      }
+    }
+  }
 
   for (const [path, card] of cardElements) {
     if (positions[path]) {
