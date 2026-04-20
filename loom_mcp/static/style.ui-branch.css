@@ -919,36 +919,51 @@ html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 /* =============================================================
    CONTEXT CHIP — token count in chat composer
    ============================================================= */
-/* Pills row — between messages and textarea */
+/* Pills row — full-width strip above the textarea */
+#chat-input-area {
+  display: flex;
+  flex-direction: column;
+}
 .chat-input-pills {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 2px;
+  padding: 6px 12px 4px;
   flex-wrap: wrap;
-  min-height: 0;
+  border-bottom: 1px solid var(--border-soft, var(--border));
 }
 .chat-input-pills:empty { display: none; }
 
+/* Context chip — styled to match v3 prototype */
 .chat-context-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px 3px 6px;
+  padding: 4px 10px 4px 8px;
   background: var(--bg-sunken, var(--bg));
   border: 1px solid var(--border-soft, var(--border));
-  border-radius: 10px;
+  border-radius: 12px;
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color .15s;
+  transition: border-color .15s, background .15s;
+  user-select: none;
 }
-.chat-context-chip:hover { border-color: var(--accent); color: var(--text-bright, var(--text)); }
-.chat-context-chip .ctx-scope { color: var(--text); font-weight: 500; }
-.chat-context-chip .ctx-sep { color: var(--text-dim); }
+.chat-context-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft, rgba(122,162,247,0.1));
+  color: var(--text-bright, var(--text));
+}
+.chat-context-chip .ctx-scope {
+  color: var(--text-bright, var(--text));
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.chat-context-chip .ctx-sep { color: var(--text-dim); font-size: 9px; }
+.chat-context-chip .ctx-tokens { letter-spacing: .02em; }
 .chat-context-chip .ctx-bar {
-  width: 28px; height: 3px;
+  width: 32px; height: 4px;
   background: var(--bg-hover);
   border-radius: 2px;
   overflow: hidden;
