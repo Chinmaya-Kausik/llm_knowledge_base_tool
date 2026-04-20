@@ -1793,15 +1793,17 @@ function renderSubCanvas(world, parentPath) {
   world.appendChild(parentCard);
   cardElements.set(parentPath, parentCard);
 
-  // Layout children below
+  // Layout children below — offset by actual parent card height
   const cardW = 400, cardH = 340, gap = 40;
   const cols = Math.max(1, Math.ceil(Math.sqrt(childNodes.length)));
+  const parentHeight = parentCard.offsetHeight || 300;
+  const childStartY = parentHeight + gap + 20;
 
   childNodes.forEach((nd, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     const savedPos = layoutData[nd.id];
-    const pos = savedPos || { x: col * (cardW + gap), y: 450 + row * (cardH + gap) };
+    const pos = savedPos || { x: col * (cardW + gap), y: childStartY + row * (cardH + gap) };
     const meta = cardMeta.get(nd.id);
     const card = createDocCard(nd, meta?.content || '', pos);
     world.appendChild(card);
