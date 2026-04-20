@@ -6577,34 +6577,39 @@ function initActionMenu() {
 }
 
 function initSettings() {
-  const btn = document.getElementById('btn-toolbar-menu');
+  // Filter button — opens the filter dropdown (canvas-specific)
+  const filterBtn = document.getElementById('btn-filters');
   const toolbarMenu = document.getElementById('toolbar-menu');
 
-  btn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const wasOpen = toolbarMenu.classList.contains('open');
-    toolbarMenu.classList.toggle('open');
+  if (filterBtn && toolbarMenu) {
+    filterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toolbarMenu.classList.toggle('open');
+      updateFilterDot();
+    });
+    toolbarMenu.addEventListener('click', (e) => e.stopPropagation());
+    toolbarMenu.addEventListener('change', (e) => e.stopPropagation());
+    document.addEventListener('click', () => toolbarMenu.classList.remove('open'));
+  }
 
-    // Update filter active dot
-    updateFilterDot();
-
-    if (!wasOpen) {
-      // Load current settings
-      try {
-        const resp = await fetch('/api/settings').then(r => r.json());
-        document.getElementById('settings-loom-root').value = resp.loom_root || '';
-        document.getElementById('settings-auth-status').textContent =
-          resp.claude_authenticated ? 'Logged in' : 'Not logged in';
-        document.getElementById('settings-auth-status').style.color =
-          resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
-      } catch { }
-    }
-  });
-
-  // Keep toolbar menu open when interacting with its contents
-  toolbarMenu.addEventListener('click', (e) => e.stopPropagation());
-  toolbarMenu.addEventListener('change', (e) => e.stopPropagation());
-  document.addEventListener('click', () => toolbarMenu.classList.remove('open'));
+  // Settings dropdown — load settings when opened
+  const settingsDD = document.getElementById('settings-dropdown');
+  if (settingsDD) {
+    const observer = new MutationObserver(() => {
+      if (!settingsDD.classList.contains('hidden')) {
+        authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+          const rootEl = document.getElementById('settings-loom-root');
+          const authEl = document.getElementById('settings-auth-status');
+          if (rootEl) rootEl.value = resp.loom_root || '';
+          if (authEl) {
+            authEl.textContent = resp.claude_authenticated ? 'Logged in' : 'Not logged in';
+            authEl.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
+          }
+        }).catch(() => {});
+      }
+    });
+    observer.observe(settingsDD, { attributes: true, attributeFilter: ['class'] });
+  }
 
   // Save loom root
   document.getElementById('settings-save-root').addEventListener('click', async () => {

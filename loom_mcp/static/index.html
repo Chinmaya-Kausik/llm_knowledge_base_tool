@@ -97,8 +97,12 @@
           <div id="action-context-items"></div>
         </div>
       </div>
-      <div class="filter-dropdown" id="toolbar-menu-dropdown">
-        <button class="filter-btn" id="btn-toolbar-menu" title="Settings &amp; Filters"><span style="font-size:18px;line-height:1">&#9881;</span><span id="filter-active-dot" style="display:none">&#9679;</span></button>
+      <!-- Filter button (canvas-specific) -->
+      <div class="filter-dropdown" id="filter-dropdown">
+        <button class="tb-icon-btn" id="btn-filters" title="Filters">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 3h12L9 8.5V12l-2 1V8.5L2 3z"/></svg>
+          <span id="filter-active-dot" style="display:none;color:var(--accent);font-size:8px;position:absolute;top:2px;right:2px">&#9679;</span>
+        </button>
         <div class="filter-menu toolbar-menu" id="toolbar-menu">
           <div class="toolbar-menu-section">
             <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Canvas</div>
@@ -148,67 +152,107 @@
               <label><input type="checkbox" id="filter-show-hidden"> Build artifacts</label>
             </div>
           </div>
-          <hr>
-          <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label" onclick="this.nextElementSibling.classList.toggle('collapsed')">Appearance</div>
-            <div class="toolbar-menu-body collapsed" id="appearance-menu">
-              <label class="settings-label" style="margin-bottom:4px">Canvas Background</label>
-              <select id="setting-canvas-bg" class="settings-input" style="width:100%;margin-bottom:8px">
-                <option value="none">None</option>
-                <option value="dots" selected>Dots</option>
-                <option value="grid">Grid</option>
-                <option value="paper">Paper</option>
-                <option value="constellation">Constellation</option>
-              </select>
-              <label class="settings-label" style="margin-bottom:4px">Card Accent</label>
-              <select id="setting-card-accent" class="settings-input" style="width:100%;margin-bottom:8px">
-                <option value="border" selected>Border</option>
-                <option value="dot">Dot</option>
-                <option value="flat">Flat</option>
-              </select>
-              <label class="settings-label" style="margin-bottom:4px">Density</label>
-              <select id="setting-density" class="settings-input" style="width:100%">
-                <option value="compact">Compact</option>
-                <option value="standard" selected>Standard</option>
-                <option value="roomy">Roomy</option>
-              </select>
-            </div>
+        </div>
+      </div>
+      <!-- Settings button — opens structured dropdown -->
+      <div class="filter-dropdown" id="settings-dropdown-wrap">
+        <button class="tb-icon-btn" id="btn-toolbar-menu" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 4H14M2 8H14M2 12H14"/></svg>
+        </button>
+        <div class="sm-dropdown hidden" id="settings-dropdown">
+          <div class="sm-group">
+            <button class="sm-item" onclick="openPalette('appearance')">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.2"/><path d="M8 2.8V8L11.5 11"/></svg>
+              <span class="sm-label">Appearance...</span>
+              <span class="sm-kbd">&#8984;&#8679;A</span>
+            </button>
+            <button class="sm-item" onclick="openPermissionsPanel(); closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10 3L13 6L8 11L5 11L5 8Z"/><path d="M5 11L3 13"/></svg>
+              <span class="sm-label">Tools &amp; Permissions</span>
+              <span class="sm-kbd"></span>
+            </button>
           </div>
-          <hr>
-          <div class="toolbar-menu-section">
+          <div class="sm-divider"></div>
+          <div class="sm-group">
+            <button class="sm-item" onclick="openKeybindingPanel(); closeSettingsDropdown()">
+              <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="5" width="11" height="6" rx="1.2"/><path d="M5 8H5.01M8 8H8.01M11 8H11.01"/></svg>
+              <span class="sm-label">Keyboard Shortcuts</span>
+              <span class="sm-kbd">?</span>
+            </button>
+          </div>
+          <div class="sm-divider"></div>
+          <div class="sm-group">
             <div id="settings-menu">
-          <div class="settings-section">
-            <label class="settings-label">Loom Root</label>
-            <input type="text" id="settings-loom-root" class="settings-input" placeholder="/path/to/loom">
-            <button id="settings-save-root" class="settings-action">Save &amp; Restart</button>
-          </div>
-          <hr>
-          <div class="settings-section">
-            <label class="settings-label">Claude Auth</label>
-            <span id="settings-auth-status" class="settings-value">Checking...</span>
-            <button id="settings-login" class="settings-action">Login</button>
-          </div>
-          <hr>
-          <div class="settings-section">
-            <label class="settings-label">Code Font Size</label>
-            <input type="range" id="settings-code-font" min="10" max="20" value="13" class="settings-range">
-            <span id="settings-code-font-val">13px</span>
-          </div>
-          <hr>
-          <hr>
-          <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label" onclick="openPermissionsPanel(); document.getElementById('toolbar-menu').classList.remove('open');">Agent Permissions</div>
-          </div>
-          <div class="toolbar-menu-section">
-            <div class="toolbar-menu-label" onclick="openKeybindingPanel(); document.getElementById('toolbar-menu').classList.remove('open');">Keyboard Shortcuts (Cmd+K)</div>
-          </div>
+              <div class="settings-section">
+                <label class="settings-label">Loom Root</label>
+                <input type="text" id="settings-loom-root" class="settings-input" placeholder="/path/to/loom">
+                <button id="settings-save-root" class="settings-action">Save &amp; Restart</button>
+              </div>
+              <div class="sm-divider"></div>
+              <div class="settings-section">
+                <label class="settings-label">Claude Auth</label>
+                <span id="settings-auth-status" class="settings-value">Checking...</span>
+                <button id="settings-login" class="settings-action">Login</button>
+              </div>
+              <div class="sm-divider"></div>
+              <div class="settings-section">
+                <label class="settings-label">Code Font Size</label>
+                <input type="range" id="settings-code-font" min="10" max="20" value="13" class="settings-range">
+                <span id="settings-code-font-val">13px</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </header>
-  <!-- old toolbar-left/toolbar-right classes removed; using tb-left/tb-center/tb-right -->
+
+  <!-- Appearance Palette (slide-in panel) -->
+  <aside class="palette hidden" id="palette-appearance">
+    <div class="palette-head">
+      <div><span class="palette-eyebrow">Palette</span><h3 class="palette-title">Appearance</h3></div>
+      <button class="tb-icon-btn palette-close" onclick="closePalette()">&#10005;</button>
+    </div>
+    <div class="palette-body">
+      <div class="palette-row">
+        <label>Theme</label>
+        <div class="seg" data-setting="theme">
+          <button data-val="dark">Dark</button>
+          <button data-val="light">Light</button>
+          <button data-val="paper">Paper</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Canvas Background</label>
+        <div class="seg" data-setting="canvas">
+          <button data-val="none">None</button>
+          <button data-val="dots">Dots</button>
+          <button data-val="grid">Grid</button>
+          <button data-val="paper">Paper</button>
+          <button data-val="constellation">Stars</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Card Accent</label>
+        <div class="seg" data-setting="accent">
+          <button data-val="border">Border</button>
+          <button data-val="dot">Dot</button>
+          <button data-val="flat">Flat</button>
+        </div>
+      </div>
+      <div class="palette-row">
+        <label>Density</label>
+        <div class="seg" data-setting="density">
+          <button data-val="compact">Compact</button>
+          <button data-val="standard">Standard</button>
+          <button data-val="roomy">Roomy</button>
+        </div>
+      </div>
+    </div>
+    <div class="palette-foot">
+      <span class="palette-hint">Esc to dismiss</span>
+    </div>
+  </aside>
 
   <!-- Main content area -->
   <div id="main">
@@ -349,21 +393,62 @@
       }
     });
 
-    // Appearance settings: canvas bg, card accent, density
-    function initAppearance(id, attr, defaultVal) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      var saved = localStorage.getItem('loom-' + attr) || defaultVal;
-      el.value = saved;
-      document.documentElement.setAttribute('data-' + attr, saved);
-      el.onchange = function() {
-        localStorage.setItem('loom-' + attr, el.value);
-        document.documentElement.setAttribute('data-' + attr, el.value);
-      };
+    // Settings dropdown
+    var settingsBtn = document.getElementById('btn-toolbar-menu');
+    var settingsDD = document.getElementById('settings-dropdown');
+    if (settingsBtn && settingsDD) {
+      settingsBtn.onclick = function(e) { e.stopPropagation(); settingsDD.classList.toggle('hidden'); };
+      document.addEventListener('click', function(e) {
+        if (!settingsDD.contains(e.target) && e.target !== settingsBtn) settingsDD.classList.add('hidden');
+      });
     }
-    initAppearance('setting-canvas-bg', 'canvas', 'dots');
-    initAppearance('setting-card-accent', 'accent', 'border');
-    initAppearance('setting-density', 'density', 'standard');
+
+    // Palette open/close
+    window.openPalette = function(name) {
+      closeSettingsDropdown();
+      var palette = document.getElementById('palette-' + name);
+      if (palette) { palette.classList.remove('hidden'); initSegmentedControls(); }
+    };
+    window.closePalette = function() {
+      document.querySelectorAll('.palette').forEach(function(p) { p.classList.add('hidden'); });
+    };
+    window.closeSettingsDropdown = function() {
+      if (settingsDD) settingsDD.classList.add('hidden');
+    };
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closePalette();
+    });
+
+    // Segmented controls — wire all .seg elements
+    function initSegmentedControls() {
+      document.querySelectorAll('.seg[data-setting]').forEach(function(seg) {
+        var setting = seg.dataset.setting;
+        var attrMap = { theme: 'theme', canvas: 'canvas', accent: 'accent', density: 'density' };
+        var attr = attrMap[setting] || setting;
+        var saved = localStorage.getItem('loom-' + attr) || (setting === 'theme' ? getTheme() : null);
+
+        // Set initial active state
+        seg.querySelectorAll('button').forEach(function(btn) {
+          btn.classList.toggle('on', btn.dataset.val === saved);
+          btn.onclick = function() {
+            seg.querySelectorAll('button').forEach(function(b) { b.classList.remove('on'); });
+            btn.classList.add('on');
+            var val = btn.dataset.val;
+            localStorage.setItem('loom-' + attr, val);
+            document.documentElement.setAttribute('data-' + attr, val);
+            if (setting === 'theme') applyTheme(val);
+          };
+        });
+      });
+    }
+    initSegmentedControls();
+
+    // Appearance settings — apply saved values on load
+    ['canvas', 'accent', 'density'].forEach(function(attr) {
+      var saved = localStorage.getItem('loom-' + attr);
+      if (saved) document.documentElement.setAttribute('data-' + attr, saved);
+      else document.documentElement.setAttribute('data-' + attr, attr === 'canvas' ? 'dots' : attr === 'density' ? 'standard' : 'border');
+    });
   })();
   </script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
