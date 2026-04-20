@@ -192,15 +192,16 @@
         </button>
         <div class="sm-dropdown hidden" id="settings-dropdown">
           <div class="sm-group">
-            <button class="sm-item" onclick="openPalette('appearance')">
+            <div class="sm-group-label">Palettes</div>
+            <button class="sm-item" onclick="openPalette('appearance'); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.2"/><path d="M8 2.8V8L11.5 11"/></svg>
-              <span class="sm-label">Appearance...</span>
+              <span class="sm-label">Appearance<span class="sm-ellipsis">...</span></span>
               <span class="sm-kbd">&#8984;&#8679;A</span>
             </button>
             <button class="sm-item" onclick="openPermissionsPanel(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10 3L13 6L8 11L5 11L5 8Z"/><path d="M5 11L3 13"/></svg>
-              <span class="sm-label">Tools &amp; Permissions</span>
-              <span class="sm-kbd"></span>
+              <span class="sm-label">Tools &amp; permissions<span class="sm-ellipsis">...</span></span>
+              <span class="sm-kbd">&#8984;&#8679;T</span>
             </button>
           </div>
           <div class="sm-divider"></div>
