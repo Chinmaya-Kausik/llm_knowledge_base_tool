@@ -1245,16 +1245,31 @@ function createDocCard(nodeData, content, pos, options = {}) {
   card.style.top = pos.y + 'px';
 
   const childCount = (nodeData.children || []).length;
-  const catBadge = !isFolder ? `<span class="badge badge-cat-${category}">${category}</span>` : '';
-  const typeBadge = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== category ? `<span class="badge badge-${nodeData.type}">${nodeData.type}</span>` : '';
   const childBadge = isFolder ? `<button class="btn-children" title="Drill into subpages">${childCount > 0 ? childCount + ' sub' : '▶'}</button>` : '';
+
+  // Type/category badge — right-aligned in header
+  const typeLabel = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== 'file' ? nodeData.type : (category !== 'folder' && category !== 'misc' ? category : '');
+  const typeBadgeHtml = typeLabel ? `<span class="card-meta">${typeLabel}</span>` : '';
+
+  // Subtitle — from frontmatter title or page title (different from filename)
+  const meta = cardMeta.get(nodeData.id);
+  const fmTitle = meta?.frontmatter?.title;
+  const subtitle = fmTitle && fmTitle !== nodeData.label ? fmTitle : '';
+  const subtitleHtml = subtitle ? `<span class="card-filename">${subtitle}</span>` : '';
+
+  // Path breadcrumb for footer
+  const pathParts = nodeData.id.split('/');
+  const pathBreadcrumb = pathParts.length > 1 ? pathParts.slice(0, -1).join(' / ') : '';
+
+  // Tags from frontmatter
+  const tags = meta?.frontmatter?.tags || [];
+  const tagChips = tags.map(t => `<span class="chip">${t}</span>`).join('');
 
   // Body content: markdown gets full render, files get summary initially
   let bodyHTML;
   if (isMarkdown && content) {
     bodyHTML = marked.parse(content);
   } else if (!isFolder && !isMarkdown) {
-    // File: show code preview if content available, otherwise summary
     if (content && (category === 'code' || category === 'data')) {
       const preview = content.slice(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;');
       bodyHTML = `<pre><code>${preview}${content.length > 500 ? '\n...' : ''}</code></pre>`;
@@ -1266,16 +1281,30 @@ function createDocCard(nodeData, content, pos, options = {}) {
     bodyHTML = content ? marked.parse(content) : '<em>Empty</em>';
   }
 
+  // Footer — path breadcrumb + tags (only if we have either)
+  const hasFooter = pathBreadcrumb || tagChips;
+  const footerHtml = hasFooter ? `
+    <div class="card-foot">
+      ${pathBreadcrumb ? `<span class="card-foot-path">${pathBreadcrumb}</span>` : ''}
+      ${pathBreadcrumb && tagChips ? '<span class="card-foot-sep">·</span>' : ''}
+      ${tagChips}
+    </div>` : '';
+
   card.innerHTML = `
     <div class="doc-handle">
-      <span class="doc-title">${nodeData.label}</span>
-      <span class="doc-badges">${catBadge}${typeBadge}</span>
+      <span class="card-dot"></span>
+      <div class="card-title-wrap">
+        <span class="doc-title">${nodeData.label}</span>
+        ${subtitleHtml}
+      </div>
+      ${typeBadgeHtml}
       <div class="doc-controls">
         ${childBadge}
         <button class="btn-collapse" title="Collapse">-</button>
       </div>
     </div>
     <div class="doc-body">${bodyHTML}</div>
+    ${footerHtml}
   `;
 
   card.addEventListener('pointerdown', () => bringToFront(card), true);
@@ -1789,12 +1818,20 @@ function updateBreadcrumb() {
   const bar = document.getElementById('breadcrumb-bar');
   let html = '';
   // Root crumb
-  html += `<span class="crumb${canvasStack.length <= 1 ? ' crumb-current' : ''}" onclick="navigateToLevel(0)">Root</span>`;
+  html += `<span class="crumb${canvasStack.length <= 1 ? ' crumb-current' : ''}" onclick="navigateToLevel(0)">loom</span>`;
   for (let i = 1; i < canvasStack.length; i++) {
-    html += `<span class="crumb crumb-sep">/</span>`;
+    html += `<span class="crumb crumb-sep">›</span>`;
     const isCurrent = i === canvasStack.length - 1;
     html += `<span class="crumb${isCurrent ? ' crumb-current' : ''}" onclick="navigateToLevel(${i})">${canvasStack[i].label}</span>`;
   }
+  if (canvasStack.length <= 1) {
+    html += `<span class="crumb crumb-sep">›</span><span class="crumb crumb-current">root canvas</span>`;
+  }
+  // Right-aligned stats
+  const pageCount = cardElements.size;
+  const edgeCount = graphData?.edges?.length || 0;
+  const zoomPct = Math.round((currentTransform.k || 1) * 100);
+  html += `<span class="breadcrumb-stats">${pageCount} pages · ${edgeCount} edges · zoom ${zoomPct}%</span>`;
   bar.innerHTML = html;
 }
 

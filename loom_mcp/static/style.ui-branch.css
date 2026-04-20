@@ -232,6 +232,22 @@ pre, code, .doc-body pre, .doc-body code,
 }
 
 /* =============================================================
+   BREADCRUMB — stats + styling
+   ============================================================= */
+#breadcrumb-bar {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm, 12px);
+  display: flex;
+  align-items: center;
+}
+.breadcrumb-stats {
+  margin-left: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* =============================================================
    CANVAS — cursor states
    ============================================================= */
 #infinite-canvas { cursor: grab; }
@@ -290,18 +306,105 @@ pre, code, .doc-body pre, .doc-body code,
 .doc-card:hover[data-category="data"],
 .doc-card.focused[data-category="data"]   { border-left: 3px solid var(--yellow); }
 
-/* Handle / title bar — soft tonal step. */
+/* Handle / title bar — structured layout */
 .doc-handle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-soft);
+  padding: 9px 12px 10px;
 }
+.card-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+  display: none;
+}
+html[data-accent="dot"] .card-dot { display: inline-block; }
+html[data-accent="dot"] .doc-card[data-type="concept"] .card-dot { background: var(--accent); }
+html[data-accent="dot"] .doc-card[data-type="summary"] .card-dot { background: var(--green); }
+html[data-accent="dot"] .doc-card[data-type="index"] .card-dot { background: var(--orange); }
+html[data-accent="dot"] .doc-card[data-type="answer"] .card-dot { background: var(--accent2); }
+html[data-accent="dot"] .doc-card[data-type="project"] .card-dot { background: var(--cyan); }
+
+.card-title-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .doc-title {
+  font-family: var(--font-mono, monospace);
   font-weight: 600;
-  color: var(--text);
+  font-size: var(--fs-md, 13px);
+  color: var(--text-bright, var(--text));
   letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-filename {
+  font-family: var(--font-ui, system-ui);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+.card-meta {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: lowercase;
+  letter-spacing: .04em;
+  flex-shrink: 0;
 }
 .doc-card:hover .doc-title,
 .doc-card.focused .doc-title { color: var(--text-bright); }
+
+/* Card body — sans-serif for prose */
+.doc-body {
+  font-family: var(--font-ui, system-ui);
+  line-height: 1.55;
+}
+.doc-body pre, .doc-body code {
+  font-family: var(--font-mono, monospace);
+}
+
+/* Card footer — path breadcrumb + tag chips */
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-soft, var(--border));
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.card-foot-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-foot-sep { opacity: .5; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-surface, var(--bg-hover));
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+/* Folder card title — folder icon via CSS mask */
+.doc-card[data-category="folder"] .doc-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px; height: 11px;
+  background: var(--text-muted);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1.5 3.5 A1 1 0 0 1 2.5 2.5 H6 L7.5 4 H13.5 A1 1 0 0 1 14.5 5 V12.5 A1 1 0 0 1 13.5 13.5 H2.5 A1 1 0 0 1 1.5 12.5 Z' fill='black'/></svg>") center/contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1.5 3.5 A1 1 0 0 1 2.5 2.5 H6 L7.5 4 H13.5 A1 1 0 0 1 14.5 5 V12.5 A1 1 0 0 1 13.5 13.5 H2.5 A1 1 0 0 1 1.5 12.5 Z' fill='black'/></svg>") center/contain no-repeat;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
 
 /* =============================================================
    SVG EDGES — whisper at rest
