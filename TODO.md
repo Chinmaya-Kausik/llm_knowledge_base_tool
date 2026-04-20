@@ -92,11 +92,43 @@ Multiple tabs/windows like VS Code — need git tracking with visual diffs:
 - Single-project memories managed autonomously by Claude
 
 ## In Progress
-- PWA manifest + service worker for mobile (phone) access
+- ~~PWA manifest + service worker~~ — done (manifest, sw.js, icons, iOS meta tags)
+- ~~Ntfy notifications~~ — done (agent done, job done, sync complete)
+- ~~Laptop↔VM sync daemon~~ — done (auto rsync, wake detection, git safety commits)
+- ~~Endpoint switcher~~ — done (multi-backend fallback, auth injection, offline overlay)
 - Responsive CSS for mobile layout (iterating in Claude Design)
-- Ntfy notifications (job done, agent done, sync complete)
-- Laptop↔VM sync daemon (auto rsync on change, pull on wake)
-- Endpoint switcher (phone tries local → Tailscale → VM → "turn on your laptop")
+- UI visual refresh (3 themes, surface hierarchy, card accents — Phase 1 done on `ui` branch)
+
+## Design Features — This Session
+- Agent activity system: quote-trail lines (read from card, write to card), folder dot (1.5s decay)
+- Time machine: wiki-only git-based diff view inside card header
+- Right-click context menu on canvas cards (summarize, link to, move, rename, delete, copy path)
+- Search within chat session
+- Pinboard: vertical strip, 6-card limit, collapsible rail mode, sidebar mode
+- Canvas backgrounds: dots/grid/paper/constellation (switchable in settings)
+- Card accent modes: border/dot/flat (switchable in settings)
+- Density multiplier: compact (0.85x) / standard (1x) / roomy (1.15x)
+- Command palette: Cmd+Shift+P, searches pages/files/commands/chats/settings
+- Context chip with token count (workshop UI)
+- Model handoff labels: per-message model pill, handoff divider
+- Redirect-as-hover (workshop UI)
+- Context-level visualization (workshop UI)
+- Canvas file drag/move (workshop UI)
+- Logo: interwoven L wordmark, crossing as favicon, pure woven mark variants
+
+## Priority Shelved
+- Speech input (mic button in composer) — Web Speech API first, Whisper later
+- Tool-call playback — click completed tool call to replay. Requires snapshot system.
+
+## Future Ideas (Low Priority)
+- Ghost cards for unresolved wiki-links — dotted outline for dangling `[[links]]`, click to create
+- Canvas minimap — Figma-style overview, cards as dots, viewport as rectangle
+- Memory management UI — searchable panel for viewing/editing/pruning memories
+- Inline diff context on hover — hover diff line shows surrounding 6 lines from actual file
+- Ntfy-as-breadcrumbs — attention trail on canvas connecting notification destinations
+- Re-ingest suggester — daily scheduled job checking for stale summaries
+- Claude-in-sidebar — on-demand observer in fullpage view ("what am I missing?")
+- TTS / speakable anywhere — Cmd+D on selection reads aloud via Web Speech API
 
 ## Known Issues
 - System prompt not updated when adapter is reused mid-session (chat.py _get_or_create_adapter). Context changes don't take effect until next session.
