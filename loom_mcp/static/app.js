@@ -6996,10 +6996,7 @@ function showAccountInfo() {
     <div class="keybinding-panel-body" style="padding:14px">
       <div style="font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Claude Code</div>
       <div id="account-auth-status" style="margin-bottom:12px;font-size:var(--fs-sm)">Checking...</div>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button id="account-login-btn" class="fs-btn primary">Login</button>
-        <button id="account-logout-btn" class="fs-btn" style="display:none">Logout</button>
-      </div>
+      <div id="account-actions" style="display:flex;gap:8px;margin-bottom:16px"></div>
       <div style="font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Codex (OpenAI)</div>
       <div id="account-codex-status" style="margin-bottom:8px;font-size:var(--fs-sm);color:var(--text-dim)">Requires OPENAI_API_KEY env var</div>
     </div>
@@ -7009,15 +7006,19 @@ function showAccountInfo() {
   function refreshAuthStatus() {
     authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
       const statusEl = document.getElementById('account-auth-status');
-      const logoutBtn = document.getElementById('account-logout-btn');
-      const loginBtn = document.getElementById('account-login-btn');
+      const actions = document.getElementById('account-actions');
       if (statusEl) {
         statusEl.textContent = resp.claude_authenticated ? '✓ Logged in' : '✗ Not logged in';
         statusEl.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
       }
-      if (logoutBtn) logoutBtn.style.display = resp.claude_authenticated ? '' : 'none';
-      if (loginBtn) loginBtn.textContent = resp.claude_authenticated ? 'Re-authenticate' : 'Login';
-      // Update dropdown badge
+      if (actions) {
+        if (resp.claude_authenticated) {
+          actions.innerHTML = '<button class="fs-btn" id="account-logout-btn">Logout</button><button class="fs-btn" id="account-reauth-btn" style="color:var(--text-dim)">Re-authenticate</button>';
+        } else {
+          actions.innerHTML = '<button class="fs-btn primary" id="account-login-btn">Login</button>';
+        }
+        wireAuthButtons();
+      }
       const badge = document.getElementById('sm-auth-badge');
       if (badge) {
         badge.textContent = resp.claude_authenticated ? '✓' : '';
@@ -7028,31 +7029,37 @@ function showAccountInfo() {
       if (el) { el.textContent = 'Could not reach server'; el.style.color = 'var(--red)'; }
     });
   }
-  refreshAuthStatus();
 
-  document.getElementById('account-login-btn').onclick = async () => {
-    const btn = document.getElementById('account-login-btn');
-    btn.textContent = 'Starting...';
+  function wireAuthButtons() {
+    const loginBtn = document.getElementById('account-login-btn');
+    const reauthBtn = document.getElementById('account-reauth-btn');
+    const logoutBtn = document.getElementById('account-logout-btn');
+    if (loginBtn) loginBtn.onclick = doLogin;
+    if (reauthBtn) reauthBtn.onclick = doLogin;
+    if (logoutBtn) logoutBtn.onclick = doLogout;
+  }
+
+  async function doLogin() {
+    const statusEl = document.getElementById('account-auth-status');
+    if (statusEl) statusEl.textContent = 'Opening browser...';
     try {
       const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
-      const statusEl = document.getElementById('account-auth-status');
       if (statusEl) statusEl.textContent = result.message || result.error || '';
       setTimeout(refreshAuthStatus, 3000);
     } catch { }
-    btn.textContent = 'Login';
-  };
+  }
 
-  document.getElementById('account-logout-btn').onclick = async () => {
-    const btn = document.getElementById('account-logout-btn');
-    btn.textContent = 'Logging out...';
+  async function doLogout() {
+    const statusEl = document.getElementById('account-auth-status');
+    if (statusEl) { statusEl.textContent = 'Logging out...'; statusEl.style.color = 'var(--text-muted)'; }
     try {
       const result = await fetch('/api/claude-logout', { method: 'POST' }).then(r => r.json());
-      const statusEl = document.getElementById('account-auth-status');
       if (statusEl) statusEl.textContent = result.message || result.error || '';
       refreshAuthStatus();
     } catch { }
-    btn.textContent = 'Logout';
-  };
+  }
+
+  refreshAuthStatus();
 
   function onKey(e) {
     if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
