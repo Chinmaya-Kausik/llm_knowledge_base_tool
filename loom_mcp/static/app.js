@@ -4744,16 +4744,45 @@ function initChat() {
   activePanel.messagesContainer = document.getElementById('chat-messages');
   chatMessagesContainer = activePanel.messagesContainer;
 
-  // Context chip — click to cycle context level
+  // Context chip — click to open dropdown
   const ctxChip = document.getElementById('chat-context-chip');
   if (ctxChip) {
-    const levels = ['page', 'folder', 'global'];
-    ctxChip.onclick = () => {
+    ctxChip.onclick = (e) => {
+      e.stopPropagation();
+      let dropdown = document.getElementById('ctx-dropdown');
+      if (dropdown) { dropdown.remove(); return; }
+      dropdown = document.createElement('div');
+      dropdown.id = 'ctx-dropdown';
+      dropdown.className = 'ctx-dropdown';
+      const levels = [
+        { val: 'page', label: 'Page', desc: 'Current page only (~1K tokens)' },
+        { val: 'folder', label: 'Folder', desc: 'Current folder tree (~4K tokens)' },
+        { val: 'global', label: 'Global', desc: 'Full loom context (~12K tokens)' },
+      ];
       const current = activePanel.contextLevel || 'page';
-      const next = levels[(levels.indexOf(current) + 1) % levels.length];
-      activePanel.contextLevel = next;
-      syncFromPanel(activePanel);
-      updateContextChip();
+      dropdown.innerHTML = levels.map(l =>
+        `<div class="ctx-dropdown-item${l.val === current ? ' active' : ''}" data-val="${l.val}">
+          <span class="ctx-dropdown-label">${l.label}</span>
+          <span class="ctx-dropdown-desc">${l.desc}</span>
+        </div>`
+      ).join('');
+      ctxChip.parentElement.appendChild(dropdown);
+      dropdown.querySelectorAll('.ctx-dropdown-item').forEach(item => {
+        item.onclick = (ev) => {
+          ev.stopPropagation();
+          activePanel.contextLevel = item.dataset.val;
+          syncFromPanel(activePanel);
+          updateContextChip();
+          dropdown.remove();
+        };
+      });
+      // Close on outside click
+      setTimeout(() => {
+        const close = (ev) => {
+          if (!dropdown.contains(ev.target)) { dropdown.remove(); document.removeEventListener('click', close); }
+        };
+        document.addEventListener('click', close);
+      });
     };
     updateContextChip();
   }
@@ -6006,10 +6035,18 @@ function handleChatEvent(msg) {
         finalizeActivityGroup(currentActivityGroup);
         currentActivityGroup = null;
       }
-      // Track assistant response
+      // Track assistant response + append inline model pill
       if (currentResponseText) {
         chatMessages.push({ role: 'assistant', content: currentResponseText });
         currentResponseText = '';
+        if (currentAssistantEl) {
+          const model = activePanel?.model || 'sonnet';
+          const pill = document.createElement('span');
+          pill.className = 'model-pill model-pill-inline';
+          pill.dataset.model = model;
+          pill.innerHTML = `<span class="dot"></span>${model}`;
+          currentAssistantEl.appendChild(pill);
+        }
       }
       chatGenerating = false;
       clearInterval(chatTimerInterval);

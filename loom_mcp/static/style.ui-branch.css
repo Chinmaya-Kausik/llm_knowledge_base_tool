@@ -1105,6 +1105,13 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 .model-pill[data-model="haiku"] .dot { background: oklch(0.78 0.13 65); }
 .model-pill[data-model="opus"] .dot { background: oklch(0.70 0.14 340); }
 .model-pill[data-model="codex"] .dot { background: oklch(0.74 0.13 150); }
+.model-pill[data-model="gpt-4"] .dot, .model-pill[data-model="gpt-4o"] .dot { background: oklch(0.74 0.13 160); }
+.model-pill[data-model="qwen"] .dot { background: oklch(0.70 0.12 250); }
+.model-pill-inline {
+  display: inline-flex;
+  margin: 8px 0 0;
+  float: right;
+}
 
 .handoff-marker {
   display: flex;
@@ -1133,6 +1140,7 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   gap: 6px;
   padding: 4px 10px 2px;
   flex-wrap: wrap;
+  position: relative;
 }
 .chat-input-pills:empty { display: none; }
 
@@ -1561,8 +1569,42 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   border-radius: var(--r-sm);
 }
 
-/* Context chip icon — clock instead of gear */
+/* Context chip icon — hidden (text only) */
 .chat-context-chip .ctx-icon { display: none; }
+
+/* Context level dropdown */
+.ctx-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  min-width: 220px;
+  padding: 4px 0;
+}
+.ctx-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px;
+  cursor: pointer;
+  gap: 1px;
+}
+.ctx-dropdown-item:hover { background: var(--bg-hover); }
+.ctx-dropdown-item.active { background: var(--accent-soft); }
+.ctx-dropdown-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.ctx-dropdown-item.active .ctx-dropdown-label { color: var(--accent); }
+.ctx-dropdown-desc {
+  font-size: 10px;
+  color: var(--text-dim);
+}
 
 /* =============================================================
    CHAT CODE — inherits chat text size, not independently controlled
