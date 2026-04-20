@@ -1167,7 +1167,7 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 .chat-context-chip .ctx-sep { color: var(--text-dim); }
 .chat-context-chip .ctx-tokens { color: var(--text-muted); }
 .chat-context-chip .ctx-bar {
-  width: 28px; height: 3px;
+  width: 40px; height: 3px;
   background: var(--bg-hover);
   border-radius: 2px;
   overflow: hidden;

@@ -4011,6 +4011,25 @@ function createPanelHeader(panelId, label = 'Chat') {
   labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); } });
   labelEl.addEventListener('focus', () => { labelEl.style.cursor = 'text'; });
 
+  // Model badge — click to cycle models
+  const modelBadge = header.querySelector('.panel-model-badge');
+  if (modelBadge) {
+    modelBadge.style.cursor = 'pointer';
+    modelBadge.title = 'Click to cycle model';
+    modelBadge.onclick = (e) => {
+      e.stopPropagation();
+      const panel = chatPanels.get(panelId) || activePanel;
+      const models = ['sonnet', 'opus', 'haiku'];
+      const current = panel.model || 'sonnet';
+      const next = models[(models.indexOf(current) + 1) % models.length];
+      panel.model = next;
+      modelBadge.textContent = next;
+      if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
+        panel.ws.send(JSON.stringify({ type: 'set_model', model: next }));
+      }
+    };
+  }
+
   // Minimize button + header click both toggle minimize
   function toggleMinimize() {
     const panel = chatPanels.get(panelId);
@@ -5265,9 +5284,8 @@ function updateContextChip() {
   chip.querySelector('.ctx-scope').textContent = level;
   // Token estimate based on context level (rough)
   const estimates = { page: '~1K', folder: '~4K', global: '~12K' };
-  const pcts = { page: 1, folder: 4, global: 12 };
-  const maxTokens = 200; // 200K context
-  const pct = Math.min(100, (pcts[level] / maxTokens) * 100 * 10);
+  const fillPcts = { page: 8, folder: 25, global: 60 };
+  const pct = fillPcts[level] || 5;
   chip.querySelector('.ctx-tokens').textContent = estimates[level] || '--';
   const fill = chip.querySelector('.ctx-bar-fill');
   if (fill) fill.style.width = pct + '%';
