@@ -817,6 +817,23 @@ async def api_claude_auth():
         return {"error": f"Failed: {e}"}
 
 
+@app.post("/api/claude-logout")
+async def api_claude_logout():
+    """Log out of Claude Code."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["claude", "auth", "logout"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            return {"message": "Logged out successfully."}
+        return {"error": result.stderr.strip() or "Logout failed."}
+    except FileNotFoundError:
+        return {"error": "Claude CLI not found."}
+    except Exception as e:
+        return {"error": f"Failed: {e}"}
+
+
 @app.put("/api/settings")
 async def api_update_settings(request: Request):
     body = await request.json()

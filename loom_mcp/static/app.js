@@ -3939,6 +3939,16 @@ function createPanelHeader(panelId, label = 'Chat') {
     let closeMenu = true;
 
     if (action === 'agent') {
+      // Check auth before switching to claude-code
+      if (value === 'claude-code') {
+        authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+          if (!resp.claude_authenticated) {
+            if (confirm('Claude Code is not authenticated. Open login?')) {
+              showAccountInfo();
+            }
+          }
+        }).catch(() => {});
+      }
       panel.agentType = value;
       // Disconnect current WS so next message creates a fresh adapter
       if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
@@ -6971,7 +6981,6 @@ function sendPermissionsToBackend(rules) {
 }
 
 function showAccountInfo() {
-  // Fetch auth status and show in a floating panel
   const existing = document.getElementById('account-info-panel');
   if (existing) { existing.remove(); return; }
 
@@ -6985,29 +6994,41 @@ function showAccountInfo() {
       <button onclick="document.getElementById('account-info-panel').remove()" title="Close">✕</button>
     </div>
     <div class="keybinding-panel-body" style="padding:14px">
-      <div style="margin-bottom:10px;color:var(--text-muted)">Claude Code authentication</div>
-      <div id="account-auth-status" style="margin-bottom:12px">Checking...</div>
-      <button id="account-login-btn" class="seg-btn" style="padding:6px 14px;background:var(--accent);color:var(--bg);border:none;border-radius:var(--r-sm);cursor:pointer">Login / Re-authenticate</button>
+      <div style="font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Claude Code</div>
+      <div id="account-auth-status" style="margin-bottom:12px;font-size:var(--fs-sm)">Checking...</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button id="account-login-btn" class="fs-btn primary">Login</button>
+        <button id="account-logout-btn" class="fs-btn" style="display:none">Logout</button>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Codex (OpenAI)</div>
+      <div id="account-codex-status" style="margin-bottom:8px;font-size:var(--fs-sm);color:var(--text-dim)">Requires OPENAI_API_KEY env var</div>
     </div>
   `;
   document.getElementById('canvas-container').appendChild(panel);
 
-  authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
-    const statusEl = document.getElementById('account-auth-status');
-    if (statusEl) {
-      statusEl.textContent = resp.claude_authenticated ? '✓ Logged in' : '✗ Not logged in';
-      statusEl.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
-    }
-    // Update badge
-    const badge = document.getElementById('sm-auth-badge');
-    if (badge) {
-      badge.textContent = resp.claude_authenticated ? '✓' : '';
-      badge.style.color = 'var(--green)';
-    }
-  }).catch(() => {
-    const el = document.getElementById('account-auth-status');
-    if (el) { el.textContent = 'Could not reach server'; el.style.color = 'var(--red)'; }
-  });
+  function refreshAuthStatus() {
+    authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+      const statusEl = document.getElementById('account-auth-status');
+      const logoutBtn = document.getElementById('account-logout-btn');
+      const loginBtn = document.getElementById('account-login-btn');
+      if (statusEl) {
+        statusEl.textContent = resp.claude_authenticated ? '✓ Logged in' : '✗ Not logged in';
+        statusEl.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
+      }
+      if (logoutBtn) logoutBtn.style.display = resp.claude_authenticated ? '' : 'none';
+      if (loginBtn) loginBtn.textContent = resp.claude_authenticated ? 'Re-authenticate' : 'Login';
+      // Update dropdown badge
+      const badge = document.getElementById('sm-auth-badge');
+      if (badge) {
+        badge.textContent = resp.claude_authenticated ? '✓' : '';
+        badge.style.color = 'var(--green)';
+      }
+    }).catch(() => {
+      const el = document.getElementById('account-auth-status');
+      if (el) { el.textContent = 'Could not reach server'; el.style.color = 'var(--red)'; }
+    });
+  }
+  refreshAuthStatus();
 
   document.getElementById('account-login-btn').onclick = async () => {
     const btn = document.getElementById('account-login-btn');
@@ -7016,8 +7037,21 @@ function showAccountInfo() {
       const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
       const statusEl = document.getElementById('account-auth-status');
       if (statusEl) statusEl.textContent = result.message || result.error || '';
+      setTimeout(refreshAuthStatus, 3000);
     } catch { }
-    btn.textContent = 'Login / Re-authenticate';
+    btn.textContent = 'Login';
+  };
+
+  document.getElementById('account-logout-btn').onclick = async () => {
+    const btn = document.getElementById('account-logout-btn');
+    btn.textContent = 'Logging out...';
+    try {
+      const result = await fetch('/api/claude-logout', { method: 'POST' }).then(r => r.json());
+      const statusEl = document.getElementById('account-auth-status');
+      if (statusEl) statusEl.textContent = result.message || result.error || '';
+      refreshAuthStatus();
+    } catch { }
+    btn.textContent = 'Logout';
   };
 
   function onKey(e) {
@@ -7608,6 +7642,16 @@ function applyModelSetting(model) {
 }
 
 function applyAgentSetting(agent) {
+  // Check auth before switching to claude-code
+  if (agent === 'claude-code') {
+    authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+      if (!resp.claude_authenticated) {
+        if (confirm('Claude Code is not authenticated. Open login?')) {
+          showAccountInfo();
+        }
+      }
+    }).catch(() => {});
+  }
   // Update active panel agent type — takes effect on next session init
   const panel = chatPanels.get(chatFocusHistory[0] || 'main');
   if (panel) {
