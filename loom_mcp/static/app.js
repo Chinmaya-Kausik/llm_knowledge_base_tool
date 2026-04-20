@@ -1888,22 +1888,50 @@ function computeLayoutForce(nodes, saved) {
     }
   }
 
-  // Collision radius — must cover the full card rectangle diagonal to prevent overlap
-  const collideRadius = Math.sqrt(cardW * cardW + cardH * cardH) / 2 + pad / 3;
+  // Custom rectangular collision force — prevents actual card overlap
+  function forceRectCollide() {
+    let nodes;
+    function force(alpha) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i], b = nodes[j];
+          if (a.fx != null && b.fx != null) continue; // both fixed
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const overlapX = (cardW + pad) / 2 - Math.abs(dx);
+          const overlapY = (cardH + pad) / 2 - Math.abs(dy);
+          if (overlapX > 0 && overlapY > 0) {
+            // Push apart along the axis with less overlap
+            const str = alpha * 0.8;
+            if (overlapX < overlapY) {
+              const shift = overlapX * str / 2;
+              if (a.fx == null) a.x -= Math.sign(dx) * shift;
+              if (b.fx == null) b.x += Math.sign(dx) * shift;
+            } else {
+              const shift = overlapY * str / 2;
+              if (a.fx == null) a.y -= Math.sign(dy) * shift;
+              if (b.fx == null) b.y += Math.sign(dy) * shift;
+            }
+          }
+        }
+      }
+    }
+    force.initialize = function(n) { nodes = n; };
+    return force;
+  }
 
-  // Run simulation — gentle repulsion, strong collision, tight linking
+  // Run simulation — gentle repulsion, rectangular collision
   const simulation = d3.forceSimulation(simNodes)
-    .force('collide', d3.forceCollide(collideRadius).strength(1).iterations(5))
-    .force('charge', d3.forceManyBody().strength(-50))
-    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.9).strength(0.5))
+    .force('rectCollide', forceRectCollide())
+    .force('charge', d3.forceManyBody().strength(-30))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.8).strength(0.5))
     .force('center', d3.forceCenter(
       (cols * (cardW + pad)) / 2,
       (Math.ceil(nodes.length / cols) * (cardH + pad)) / 2
     ))
     .stop();
 
-  // Run 120 ticks synchronously
-  for (let i = 0; i < 120; i++) simulation.tick();
+  // Run 150 ticks synchronously (rect collision needs more iterations)
+  for (let i = 0; i < 150; i++) simulation.tick();
 
   // Extract positions (simulation gives center, we need top-left)
   for (const sn of simNodes) {
