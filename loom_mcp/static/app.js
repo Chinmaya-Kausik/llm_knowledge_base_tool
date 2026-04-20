@@ -4002,7 +4002,31 @@ function createFloatingPanel(options = {}) {
   const attachBar = document.createElement('div');
   attachBar.className = 'chat-attachments';
   attachBar.style.display = 'none';
+
+  // Pills row with context chip (matching main panel structure)
+  const pillsRow = document.createElement('div');
+  pillsRow.className = 'chat-input-pills';
+  const ctxChip = document.createElement('span');
+  ctxChip.className = 'chat-context-chip';
+  ctxChip.title = 'Click to cycle context level';
+  ctxChip.innerHTML = `<svg class="ctx-icon" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
+    <span class="ctx-label">ctx:</span>
+    <span class="ctx-scope">${panel.contextLevel || 'page'}</span>
+    <span class="ctx-sep">&middot;</span>
+    <span class="ctx-tokens">~1K</span>
+    <span class="ctx-sep">/</span>
+    <span class="ctx-max">200K</span>
+    <span class="ctx-bar"><span class="ctx-bar-fill" style="width:0%"></span></span>`;
+  ctxChip.onclick = () => {
+    const levels = ['page', 'folder', 'global'];
+    const cur = panel.contextLevel || 'page';
+    panel.contextLevel = levels[(levels.indexOf(cur) + 1) % levels.length];
+    ctxChip.querySelector('.ctx-scope').textContent = panel.contextLevel;
+  };
+  pillsRow.appendChild(ctxChip);
+
   inputArea.appendChild(attachBar);
+  inputArea.appendChild(pillsRow);
   inputArea.appendChild(input);
   inputArea.appendChild(sendBtn);
   card.appendChild(inputArea);
@@ -4131,9 +4155,11 @@ function createFloatingPanel(options = {}) {
 
     const assistantEl = document.createElement('div');
     assistantEl.className = 'chat-msg chat-msg-assistant';
+    const fpModel = panel.model || 'sonnet';
+    assistantEl.dataset.model = fpModel;
     const sb = document.createElement('div');
     sb.className = 'chat-status-bar chat-active-status';
-    sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span>`;
+    sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${fpModel}"><span class="dot"></span>${fpModel}</span>`;
     assistantEl.appendChild(sb);
     messagesEl.appendChild(assistantEl);
     panel.assistantEl = assistantEl;

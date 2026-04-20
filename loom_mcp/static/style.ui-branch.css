@@ -181,7 +181,7 @@ body {
 /* UI elements get sans-serif */
 #toolbar, #sidebar, .view-tab, .filter-menu, .toolbar-menu,
 .action-menu, .settings-section, .settings-label,
-.vm-modal, .target-item, .tb-brand, .tb-chip,
+.vm-modal, .target-item, .tb-brand-btn, .tb-target,
 .fcp-label, .panel-menu-item, .panel-menu-label,
 .breadcrumb-item, .crumb {
   font-family: var(--font-ui);
@@ -680,22 +680,7 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 }
 .tb-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 
-/* Target chip */
-.tb-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--bg-surface2, var(--bg-surface));
-  border: 1px solid var(--border-soft, var(--border));
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color .12s, background .12s;
-}
-.tb-chip:hover { border-color: var(--accent); }
+/* Target chip (old .tb-chip rules — kept for backward compat, .tb-target defined below) */
 .tb-status-dot { font-size: 8px; }
 [data-endpoint-state="local"] .tb-status-dot { color: var(--green); }
 [data-endpoint-state="tailscale"] .tb-status-dot { color: var(--cyan); }
@@ -705,7 +690,7 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* View tabs — sunken container */
-.tb-tabs {
+.tb-tab-group {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -713,7 +698,7 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   border-radius: 8px;
   padding: 2px;
 }
-.tb-tabs .view-tab {
+.tb-tab-group .view-tab {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -728,14 +713,14 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   transition: background .12s, color .12s, box-shadow .12s;
   white-space: nowrap;
 }
-.tb-tabs .view-tab:hover { color: var(--text); background: var(--bg-hover); }
-.tb-tabs .view-tab.active {
+.tb-tab-group .view-tab:hover { color: var(--text); background: var(--bg-hover); }
+.tb-tab-group .view-tab.active {
   background: var(--bg-surface2, var(--bg-surface));
   color: var(--text-bright, var(--text));
   box-shadow: var(--shadow);
 }
-.tb-tabs .view-tab svg { opacity: 0.6; flex-shrink: 0; }
-.tb-tabs .view-tab.active svg { opacity: 1; }
+.tb-tab-group .view-tab svg { opacity: 0.6; flex-shrink: 0; }
+.tb-tab-group .view-tab.active svg { opacity: 1; }
 
 /* Search — sunken well */
 .tb-search-wrap {
@@ -914,14 +899,14 @@ html[data-density="roomy"] { --density: 1.15; }
 html[data-density="compact"] .doc-card .doc-handle { padding: 5px 8px; }
 html[data-density="compact"] .doc-card .doc-body { padding: 6px 8px; font-size: 11px; }
 html[data-density="compact"] .tree-item { padding: 3px 8px; min-height: 28px; }
-html[data-density="compact"] .tb-tabs .view-tab { padding: 3px 7px; font-size: 11px; }
+html[data-density="compact"] .tb-tab-group .view-tab { padding: 3px 7px; font-size: 11px; }
 html[data-density="compact"] #chat-input { font-size: 12px; padding: 6px 8px; }
 html[data-density="compact"] .chat-msg { font-size: 12px; }
 
 html[data-density="roomy"] .doc-card .doc-handle { padding: 12px 14px; }
 html[data-density="roomy"] .doc-card .doc-body { padding: 14px 14px; font-size: 14px; }
 html[data-density="roomy"] .tree-item { padding: 10px 14px; min-height: 44px; }
-html[data-density="roomy"] .tb-tabs .view-tab { padding: 7px 14px; font-size: 14px; }
+html[data-density="roomy"] .tb-tab-group .view-tab { padding: 7px 14px; font-size: 14px; }
 html[data-density="roomy"] #chat-input { font-size: 15px; padding: 10px 12px; }
 html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 
