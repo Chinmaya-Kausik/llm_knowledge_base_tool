@@ -1393,6 +1393,28 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   transform: rotate(45deg);
 }
 
+/* Sidebar resize handle — 8px wide, straddles the sidebar/canvas border */
+.sidebar-resize {
+  width: 8px;
+  margin-left: -4px;
+  margin-right: -4px;
+  cursor: ew-resize;
+  z-index: 10;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.sidebar-resize:hover { background: rgba(122,162,247,0.15); }
+
+/* Sidebar counts */
+.sb-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
 /* =============================================================
    CHAT CODE — inherits chat text size, not independently controlled
    ============================================================= */

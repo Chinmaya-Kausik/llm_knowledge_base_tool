@@ -1885,10 +1885,11 @@ function renderSubCanvas(world, parentPath) {
   world.appendChild(parentCard);
   cardElements.set(parentPath, parentCard);
 
-  // Layout children below parent
+  // Layout children below parent — measure parent height to avoid overlap
   const cardW = 400, cardH = 280, gap = 30;
   const cols = Math.max(2, Math.ceil(Math.sqrt(childNodes.length * 1.5)));
-  const childStartY = 400;
+  const parentHeight = parentCard.offsetHeight || 300;
+  const childStartY = parentHeight + gap;
 
   childNodes.forEach((nd, i) => {
     const col = i % cols;
@@ -2786,6 +2787,17 @@ async function initSidebar() {
                   children: [], category: c.data.category,
                 }));
                 ch.innerHTML = renderTree(items, parseInt(item.style.paddingLeft || '8') / 14);
+                // Update parent folder's count after lazy-load
+                const count = items.length;
+                let countEl = item.querySelector('.sb-count');
+                if (count > 0) {
+                  if (!countEl) {
+                    countEl = document.createElement('span');
+                    countEl.className = 'sb-count';
+                    item.appendChild(countEl);
+                  }
+                  countEl.textContent = count;
+                }
               }
             }).catch(() => {});
         }
@@ -2827,12 +2839,18 @@ async function initSidebar() {
   });
 }
 
+function countChildren(item) {
+  return item.children ? item.children.length : 0;
+}
+
 function renderTree(items, depth) {
   return items.map(item => {
     const indent = `padding-left:${8+depth*14}px`;
     if (item.type === 'folder') {
       const kids = item.children ? renderTree(item.children, depth+1) : '';
-      return `<div class="tree-item folder" style="${indent}" data-id="${item.id || ''}"><span class="tree-icon">+</span>${item.name}</div>
+      const count = countChildren(item);
+      const countHtml = count > 0 ? `<span class="sb-count">${count}</span>` : '';
+      return `<div class="tree-item folder" style="${indent}" data-id="${item.id || ''}"><span class="tree-icon">+</span><span class="tree-label">${item.name}</span>${countHtml}</div>
               <div class="tree-children${depth===0?' open':''}">${kids}</div>`;
     }
     return `<div class="tree-item file" style="${indent}" data-id="${item.id}"><span class="tree-icon">~</span>${item.title||item.name}</div>`;
@@ -7733,6 +7751,40 @@ async function init() {
   document.getElementById('sidebar-toggle').onclick = () => {
     document.getElementById('sidebar').classList.toggle('collapsed');
   };
+
+  // Sidebar resize handle — placed as sibling after sidebar so it isn't clipped
+  const sidebar = document.getElementById('sidebar');
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'sidebar-resize';
+  sidebar.parentNode.insertBefore(resizeHandle, sidebar.nextSibling);
+  const savedWidth = localStorage.getItem('loom-sidebar-width');
+  if (savedWidth) sidebar.style.width = savedWidth + 'px';
+
+  let resizing = false;
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    resizing = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    const w = Math.max(140, Math.min(480, e.clientX));
+    sidebar.style.width = w + 'px';
+    sidebar.style.transition = 'none';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    sidebar.style.transition = '';
+    localStorage.setItem('loom-sidebar-width', parseInt(sidebar.style.width));
+  });
+  resizeHandle.addEventListener('dblclick', () => {
+    sidebar.style.width = '200px';
+    localStorage.removeItem('loom-sidebar-width');
+  });
   initSettings();
   initTargetSelector();
   initActionMenu();
