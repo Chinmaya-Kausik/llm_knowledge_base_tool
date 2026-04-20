@@ -3939,17 +3939,10 @@ function createPanelHeader(panelId, label = 'Chat') {
     let closeMenu = true;
 
     if (action === 'agent') {
-      // Check auth before switching to claude-code
-      if (value === 'claude-code') {
-        authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
-          if (!resp.claude_authenticated) {
-            if (confirm('Claude Code is not authenticated. Open login?')) {
-              showAccountInfo();
-            }
-          }
-        }).catch(() => {});
-      }
+      // Check auth before switching
+      checkAgentAuth(value);
       panel.agentType = value;
+      updateInputPlaceholder(panelId);
       // Disconnect current WS so next message creates a fresh adapter
       if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
         panel.ws.close();
@@ -6998,7 +6991,8 @@ function showAccountInfo() {
       <div id="account-auth-status" style="margin-bottom:12px;font-size:var(--fs-sm)">Checking...</div>
       <div id="account-actions" style="display:flex;gap:8px;margin-bottom:16px"></div>
       <div style="font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Codex (OpenAI)</div>
-      <div id="account-codex-status" style="margin-bottom:8px;font-size:var(--fs-sm);color:var(--text-dim)">Requires OPENAI_API_KEY env var</div>
+      <div id="account-codex-status" style="margin-bottom:8px;font-size:var(--fs-sm)">Checking...</div>
+      <div id="account-codex-actions" style="display:flex;gap:8px;margin-bottom:8px"></div>
     </div>
   `;
   document.getElementById('canvas-container').appendChild(panel);
@@ -7013,11 +7007,34 @@ function showAccountInfo() {
       }
       if (actions) {
         if (resp.claude_authenticated) {
-          actions.innerHTML = '<button class="fs-btn" id="account-logout-btn">Logout</button><button class="fs-btn" id="account-reauth-btn" style="color:var(--text-dim)">Re-authenticate</button>';
+          actions.innerHTML = '<button class="fs-btn" id="account-reauth-btn">Re-authenticate</button><button class="fs-btn" id="account-logout-btn">Logout</button>';
         } else {
           actions.innerHTML = '<button class="fs-btn primary" id="account-login-btn">Login</button>';
         }
         wireAuthButtons();
+      }
+      // Codex status
+      const codexStatus = document.getElementById('account-codex-status');
+      const codexActions = document.getElementById('account-codex-actions');
+      if (codexStatus) {
+        if (resp.codex_available) {
+          codexStatus.textContent = '✓ Codex CLI installed';
+          codexStatus.style.color = 'var(--green)';
+          if (codexActions) codexActions.innerHTML = '<button class="fs-btn" id="account-codex-login">Login with OpenAI</button>';
+        } else {
+          codexStatus.textContent = '✗ Not installed';
+          codexStatus.style.color = 'var(--red)';
+          if (codexActions) codexActions.innerHTML = '<span style="font-size:var(--fs-xs);color:var(--text-dim)">npm install -g @openai/codex</span>';
+        }
+        const codexLoginBtn = document.getElementById('account-codex-login');
+        if (codexLoginBtn) codexLoginBtn.onclick = async () => {
+          codexLoginBtn.textContent = 'Opening browser...';
+          try {
+            const result = await fetch('/api/codex-auth', { method: 'POST' }).then(r => r.json());
+            codexStatus.textContent = result.message || result.error || '';
+          } catch {}
+          codexLoginBtn.textContent = 'Login with OpenAI';
+        };
       }
       const badge = document.getElementById('sm-auth-badge');
       if (badge) {
@@ -7648,21 +7665,41 @@ function applyModelSetting(model) {
   }
 }
 
-function applyAgentSetting(agent) {
-  // Check auth before switching to claude-code
-  if (agent === 'claude-code') {
-    authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
-      if (!resp.claude_authenticated) {
-        if (confirm('Claude Code is not authenticated. Open login?')) {
-          showAccountInfo();
-        }
-      }
-    }).catch(() => {});
+function checkAgentAuth(agent) {
+  authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+    if (agent === 'claude-code' && !resp.claude_authenticated) {
+      if (confirm('Claude Code is not authenticated. Open login?')) showAccountInfo();
+    } else if (agent === 'codex' && !resp.codex_available) {
+      alert('Codex CLI is not installed. Run: npm install -g @openai/codex');
+    }
+  }).catch(() => {});
+}
+
+const AGENT_LABELS = {
+  'claude-code': 'Claude',
+  'codex': 'Codex',
+  'generic-cli': 'Agent',
+};
+
+function updateInputPlaceholder(panelId) {
+  const panel = chatPanels.get(panelId) || activePanel;
+  const agent = panel?.agentType || 'claude-code';
+  const label = AGENT_LABELS[agent] || 'Agent';
+  if (panelId === 'main' || !panelId) {
+    const input = document.getElementById('chat-input');
+    if (input) input.placeholder = `Message ${label}\u2026`;
+  } else if (panel?.container) {
+    const input = panel.container.querySelector('.fcp-input');
+    if (input) input.placeholder = `Message ${label}\u2026`;
   }
-  // Update active panel agent type — takes effect on next session init
+}
+
+function applyAgentSetting(agent) {
+  checkAgentAuth(agent);
   const panel = chatPanels.get(chatFocusHistory[0] || 'main');
   if (panel) {
     panel.agentType = agent;
+    updateInputPlaceholder(chatFocusHistory[0] || 'main');
   }
 }
 

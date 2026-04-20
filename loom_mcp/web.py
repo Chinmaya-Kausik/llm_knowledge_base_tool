@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import shutil
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -796,7 +797,40 @@ def api_get_settings():
     # Check Claude auth status
     auth_check = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True)
     authenticated = auth_check.returncode == 0
-    return {"loom_root": str(LOOM_ROOT), "claude_authenticated": authenticated}
+    # Check Codex availability
+    codex_available = shutil.which("codex") is not None
+    return {"loom_root": str(LOOM_ROOT), "claude_authenticated": authenticated, "codex_available": codex_available}
+
+
+@app.post("/api/codex-auth")
+async def api_codex_auth():
+    """Trigger Codex auth login."""
+    import subprocess
+    if not shutil.which("codex"):
+        return {"error": "Codex CLI not found. Install it with: npm install -g @openai/codex"}
+    try:
+        subprocess.Popen(["codex", "login"])
+        return {"message": "Browser opened for OpenAI login. Complete auth there."}
+    except Exception as e:
+        return {"error": f"Failed: {e}"}
+
+
+@app.post("/api/set-api-key")
+async def api_set_api_key(request: Request):
+    """Set an API key as an environment variable for the server process."""
+    body = await request.json()
+    key_name = body.get("key_name", "")
+    key_value = body.get("key_value", "")
+    allowed_keys = {"OPENAI_API_KEY", "ANTHROPIC_API_KEY"}
+    if key_name not in allowed_keys:
+        return {"error": f"Key '{key_name}' not allowed. Allowed: {allowed_keys}"}
+    if key_value:
+        os.environ[key_name] = key_value
+        return {"ok": True, "message": f"{key_name} set for this session."}
+    elif key_name in os.environ:
+        del os.environ[key_name]
+        return {"ok": True, "message": f"{key_name} removed."}
+    return {"ok": True, "message": "No change."}
 
 
 @app.post("/api/claude-auth")
