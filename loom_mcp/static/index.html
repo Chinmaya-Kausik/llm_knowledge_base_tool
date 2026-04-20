@@ -32,6 +32,8 @@
   <script src="/static/vendor/d3-drag.min.js"></script>
   <script src="/static/vendor/d3-zoom.min.js"></script>
   <script src="/static/vendor/cola.min.js"></script>
+  <script src="/static/vendor/d3-quadtree.min.js"></script>
+  <script src="/static/vendor/d3-force.min.js"></script>
 </head>
 <body>
   <!-- Toolbar -->
@@ -319,6 +321,10 @@
         </div>
       </div>
       <div class="palette-row">
+        <label>Font Size <span class="palette-desc" id="font-size-val">· 13px</span></label>
+        <input type="range" id="global-font-size" min="11" max="18" value="13" style="width:100%;accent-color:var(--accent)">
+      </div>
+      <div class="palette-row">
         <label>Accent Hue</label>
         <input type="range" id="accent-hue-slider" min="0" max="360" value="258" style="width:100%;accent-color:var(--accent)">
       </div>
@@ -583,6 +589,21 @@
     if (!localStorage.getItem('loom-canvas')) document.documentElement.setAttribute('data-canvas', 'dots');
     if (!localStorage.getItem('loom-density')) document.documentElement.setAttribute('data-density', 'standard');
     if (!localStorage.getItem('loom-accent')) document.documentElement.setAttribute('data-accent', 'border');
+
+    // Global font size slider
+    var fontSlider = document.getElementById('global-font-size');
+    var fontVal = document.getElementById('font-size-val');
+    if (fontSlider) {
+      var savedFont = localStorage.getItem('loom-font-size') || '13';
+      fontSlider.value = savedFont;
+      if (fontVal) fontVal.textContent = '· ' + savedFont + 'px';
+      document.documentElement.style.setProperty('--fs-md', savedFont + 'px');
+      fontSlider.oninput = function() {
+        localStorage.setItem('loom-font-size', fontSlider.value);
+        if (fontVal) fontVal.textContent = '· ' + fontSlider.value + 'px';
+        document.documentElement.style.setProperty('--fs-md', fontSlider.value + 'px');
+      };
+    }
 
     // Temperature slider
     var tempSlider = document.getElementById('temperature-slider');

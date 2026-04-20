@@ -1343,3 +1343,39 @@ html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 .view-tabs { display: contents; }
 /* Hide standalone theme dropdown — theme is in Appearance palette */
 #theme-dropdown-wrap { display: none; }
+
+/* Sleeker checkboxes in filter menus */
+.toolbar-menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--fs-sm, 12px);
+  cursor: pointer;
+}
+.toolbar-menu input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-sunken, var(--bg));
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .12s, border-color .12s;
+}
+.toolbar-menu input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.toolbar-menu input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px; top: 1px;
+  width: 4px; height: 7px;
+  border: solid var(--bg);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}

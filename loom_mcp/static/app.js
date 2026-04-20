@@ -1836,7 +1836,7 @@ function updateBreadcrumb() {
 // ========================================
 function computeLayout(nodes, saved) {
   const positions = {};
-  const cardW = 400, cardH = 280, pad = 30;
+  const cardW = 400, cardH = 280, pad = 40;
 
   // Use saved positions where available
   const unsaved = [];
@@ -1849,57 +1849,105 @@ function computeLayout(nodes, saved) {
   }
   if (unsaved.length === 0) return positions;
 
-  // If WebCoLa not available, fall back to grid
-  if (typeof cola === 'undefined') return computeLayoutGrid(nodes, saved);
+  // Try d3-force layout first (organic, non-overlapping)
+  if (typeof d3.forceSimulation === 'function') {
+    return computeLayoutForce(nodes, saved);
+  }
+  // Fall back to CoLa if d3-force not available
+  if (typeof cola !== 'undefined') {
+    return computeLayoutCola(nodes, saved);
+  }
+  return computeLayoutGrid(nodes, saved);
+}
 
-  // Build CoLa node and edge arrays
+function computeLayoutForce(nodes, saved) {
+  const positions = {};
+  const cardW = 400, cardH = 280, pad = 40;
+
+  // Build simulation nodes
+  const cols = Math.max(2, Math.ceil(Math.sqrt(nodes.length * 1.8)));
+  const simNodes = nodes.map((node, i) => {
+    const s = saved[node.data.id];
+    return {
+      id: node.data.id,
+      x: s ? s.x + cardW/2 : (i % cols) * (cardW + pad) + cardW/2 + (Math.random() - 0.5) * 50,
+      y: s ? s.y + cardH/2 : Math.floor(i / cols) * (cardH + pad) + cardH/2 + (Math.random() - 0.5) * 50,
+      fx: s ? s.x + cardW/2 : null,  // Fix saved positions
+      fy: s ? s.y + cardH/2 : null,
+    };
+  });
+
+  // Build links from edges
+  const idSet = new Set(nodes.map(n => n.data.id));
+  const edges = (graphData?.top_edges || graphData?.edges || []);
+  const links = [];
+  for (const e of edges) {
+    if (idSet.has(e.data.source) && idSet.has(e.data.target)) {
+      links.push({ source: e.data.source, target: e.data.target });
+    }
+  }
+
+  // Collision radius — tight, just enough to prevent overlap
+  const collideRadius = Math.max(cardW, cardH) / 2 + pad / 4;
+
+  // Run simulation — low repulsion for tight packing
+  const simulation = d3.forceSimulation(simNodes)
+    .force('collide', d3.forceCollide(collideRadius).strength(1).iterations(4))
+    .force('charge', d3.forceManyBody().strength(-80))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.8).strength(0.5))
+    .force('center', d3.forceCenter(
+      (cols * (cardW + pad)) / 2,
+      (Math.ceil(nodes.length / cols) * (cardH + pad)) / 2
+    ))
+    .stop();
+
+  // Run 120 ticks synchronously
+  for (let i = 0; i < 120; i++) simulation.tick();
+
+  // Extract positions (simulation gives center, we need top-left)
+  for (const sn of simNodes) {
+    positions[sn.id] = {
+      x: Math.round(sn.x - cardW / 2),
+      y: Math.round(sn.y - cardH / 2),
+    };
+  }
+  return positions;
+}
+
+function computeLayoutCola(nodes, saved) {
+  const positions = {};
+  const cardW = 400, cardH = 280, pad = 40;
   const idToIndex = {};
+  const cols = Math.max(2, Math.ceil(Math.sqrt(nodes.length * 1.5)));
   const colaNodes = nodes.map((node, i) => {
     idToIndex[node.data.id] = i;
     const s = saved[node.data.id];
     return {
-      x: s ? s.x + cardW/2 : (i % 5) * (cardW + pad) + cardW/2,
-      y: s ? s.y + cardH/2 : Math.floor(i / 5) * (cardH + pad) + cardH/2,
-      width: cardW + pad,
-      height: cardH + pad,
-      fixed: !!saved[node.data.id],  // Don't move saved nodes
+      x: s ? s.x + cardW/2 : (i % cols) * (cardW + pad) + cardW/2,
+      y: s ? s.y + cardH/2 : Math.floor(i / cols) * (cardH + pad) + cardH/2,
+      width: cardW + pad, height: cardH + pad,
+      fixed: !!saved[node.data.id],
     };
   });
-
   const edges = (graphData?.top_edges || graphData?.edges || []);
-  const nodeSet = new Set(nodes.map(n => n.data.id));
   const colaLinks = [];
   for (const e of edges) {
     const si = idToIndex[e.data.source], ti = idToIndex[e.data.target];
-    if (si !== undefined && ti !== undefined) {
-      colaLinks.push({ source: si, target: ti });
-    }
+    if (si !== undefined && ti !== undefined) colaLinks.push({ source: si, target: ti });
   }
-
-  // Run CoLa layout (synchronous, fixed iterations)
   try {
-    const layout = new cola.Layout()
+    new cola.Layout()
       .size([nodes.length * (cardW + pad), nodes.length * (cardH + pad)])
-      .nodes(colaNodes)
-      .links(colaLinks)
-      .avoidOverlaps(true)
-      .linkDistance(cardW + pad)
-      .start(30, 20, 10, 0, false);  // 30 unconstrained, 20 overlap removal, 10 user constraints, no async
-
-    // Extract positions (CoLa gives center coords, we need top-left)
+      .nodes(colaNodes).links(colaLinks)
+      .avoidOverlaps(true).linkDistance(cardW + pad)
+      .start(30, 20, 10, 0, false);
     for (const node of nodes) {
-      const i = idToIndex[node.data.id];
-      const cn = colaNodes[i];
-      positions[node.data.id] = {
-        x: Math.round(cn.x - cardW/2),
-        y: Math.round(cn.y - cardH/2),
-      };
+      const cn = colaNodes[idToIndex[node.data.id]];
+      positions[node.data.id] = { x: Math.round(cn.x - cardW/2), y: Math.round(cn.y - cardH/2) };
     }
   } catch (e) {
-    console.warn('CoLa layout failed, falling back to grid:', e);
     return computeLayoutGrid(nodes, saved);
   }
-
   return positions;
 }
 
