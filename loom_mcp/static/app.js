@@ -1879,23 +1879,34 @@ function renderSubCanvas(world, parentPath) {
   const childIds = getChildIds(parentPath);
   const childNodes = childIds.map(id => nodeById(id)).filter(Boolean);
 
-  // Pinned parent at top center
+  // Pinned parent at top-left
   const parentMeta = cardMeta.get(parentPath);
-  const parentCard = createDocCard(parentNode, parentMeta?.content || '', { x: 200, y: 0 }, { pinned: true });
+  const parentCard = createDocCard(parentNode, parentMeta?.content || '', { x: 0, y: 0 }, { pinned: true });
   world.appendChild(parentCard);
   cardElements.set(parentPath, parentCard);
 
-  // Layout children below parent — measure parent height to avoid overlap
+  // Layout children to the right and below the parent
   const cardW = 400, cardH = 280, gap = 30;
-  const cols = Math.max(2, Math.ceil(Math.sqrt(childNodes.length * 1.5)));
+  const parentWidth = parentCard.offsetWidth || cardW;
   const parentHeight = parentCard.offsetHeight || 300;
-  const childStartY = parentHeight + gap;
+  const startX = parentWidth + gap;
+  const startY = 0;
+  // Fill column to the right first, then wrap below
+  const rightCols = Math.max(1, Math.ceil(Math.sqrt(childNodes.length)));
+  const rightRows = Math.ceil(childNodes.length / rightCols);
+  // If too many rows would extend far below, also use space below parent
+  const maxRightRows = Math.max(2, Math.ceil(parentHeight / (cardH + gap)) + 1);
 
   childNodes.forEach((nd, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
     const savedPos = layoutData[nd.id];
-    const pos = savedPos || { x: col * (cardW + gap), y: childStartY + row * (cardH + gap) };
+    let pos;
+    if (savedPos) {
+      pos = savedPos;
+    } else {
+      const col = Math.floor(i / maxRightRows);
+      const row = i % maxRightRows;
+      pos = { x: startX + col * (cardW + gap), y: startY + row * (cardH + gap) };
+    }
     const meta = cardMeta.get(nd.id);
     const card = createDocCard(nd, meta?.content || '', pos);
     world.appendChild(card);

@@ -301,6 +301,12 @@ pre, code, .doc-body pre, .doc-body code,
   display: flex;
   align-items: center;
 }
+/* Breadcrumb bar polish */
+#breadcrumb-bar {
+  min-height: 30px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-soft);
+}
 .breadcrumb-stats {
   margin-left: auto;
   font-family: var(--font-mono, monospace);
