@@ -194,12 +194,12 @@
         </button>
         <div class="sm-dropdown hidden" id="settings-dropdown">
           <div class="sm-group" id="settings-menu">
-            <button class="sm-item" onclick="closeSettingsDropdown()">
+            <button class="sm-item" onclick="showAccountInfo(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="6" r="2.4"/><path d="M3 13 Q8 9 13 13"/></svg>
               <span class="sm-label">Account</span>
-              <span class="sm-kbd"></span>
+              <span class="sm-kbd" id="sm-auth-badge"></span>
             </button>
-            <button class="sm-item" onclick="closeSettingsDropdown()">
+            <button class="sm-item" onclick="showWorkspaceInfo(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 5L5 3H13V13H3V5Z"/><path d="M2.5 5H11V13"/></svg>
               <span class="sm-label">Workspace</span>
               <span class="sm-kbd" id="settings-workspace-badge">Local</span>
@@ -234,12 +234,12 @@
           </div>
           <div class="sm-divider"></div>
           <div class="sm-group">
-            <button class="sm-item" onclick="closeSettingsDropdown()">
+            <button class="sm-item" onclick="openFullSettings(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2"/><path d="M8 2V3.5M8 12.5V14M2 8H3.5M12.5 8H14M3.8 3.8L4.8 4.8M11.2 11.2L12.2 12.2M3.8 12.2L4.8 11.2M11.2 4.8L12.2 3.8"/></svg>
               <span class="sm-label">Open full settings<span class="sm-ellipsis">...</span></span>
               <span class="sm-kbd">&#8984;,</span>
             </button>
-            <button class="sm-item" onclick="closeSettingsDropdown()">
+            <button class="sm-item" onclick="showAboutPanel(); closeSettingsDropdown()">
               <svg class="sm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M8 7V11M8 5H8.01"/></svg>
               <span class="sm-label">About Loom</span>
               <span class="sm-kbd">v0.1</span>
@@ -324,14 +324,10 @@
         <label>Font Size <span class="palette-desc" id="font-size-val">· 13px</span></label>
         <input type="range" id="global-font-size" min="11" max="18" value="13" style="width:100%;accent-color:var(--accent)">
       </div>
-      <div class="palette-row">
-        <label>Accent Hue</label>
-        <input type="range" id="accent-hue-slider" min="0" max="360" value="258" style="width:100%;accent-color:var(--accent)">
-      </div>
     </div>
     <div class="palette-foot">
       <span class="palette-hint">Esc to dismiss</span>
-      <button class="palette-link" onclick="closePalette()">Open in full settings &#8594;</button>
+      <button class="palette-link" onclick="closePalette(); openFullSettings('appearance')">Full settings &#8594;</button>
     </div>
   </aside>
 
@@ -370,14 +366,6 @@
         </div>
       </div>
       <div class="palette-row">
-        <label>System Prompt Preset</label>
-        <div class="seg" data-setting="preset">
-          <button data-val="default">Default</button>
-          <button data-val="researcher">Researcher</button>
-          <button data-val="code">Code</button>
-        </div>
-      </div>
-      <div class="palette-row">
         <label>Stream Tokens</label>
         <div class="seg" data-setting="stream">
           <button data-val="on">On</button>
@@ -387,7 +375,7 @@
     </div>
     <div class="palette-foot">
       <span class="palette-hint">Esc to dismiss</span>
-      <button class="palette-link" onclick="closePalette()">Open in full settings &#8594;</button>
+      <button class="palette-link" onclick="closePalette(); openFullSettings('model')">Full settings &#8594;</button>
     </div>
   </aside>
 
@@ -553,7 +541,16 @@
       if (settingsDD) settingsDD.classList.add('hidden');
     };
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closePalette();
+      if (e.key === 'Escape') {
+        var anyOpen = document.querySelector('.palette:not(.hidden)');
+        var ddOpen = settingsDD && !settingsDD.classList.contains('hidden');
+        if (anyOpen || ddOpen) {
+          e.stopImmediatePropagation();
+          closePalette();
+          closeSettingsDropdown();
+          return;
+        }
+      }
     });
 
     // Segmented controls — wire all .seg elements
@@ -574,6 +571,8 @@
             localStorage.setItem('loom-' + attr, val);
             document.documentElement.setAttribute('data-' + attr, val);
             if (setting === 'theme') applyTheme(val);
+            if (setting === 'model' && typeof applyModelSetting === 'function') applyModelSetting(val);
+            if (setting === 'agent' && typeof applyAgentSetting === 'function') applyAgentSetting(val);
           };
         });
       });
@@ -597,13 +596,41 @@
       var savedFont = localStorage.getItem('loom-font-size') || '13';
       fontSlider.value = savedFont;
       if (fontVal) fontVal.textContent = '· ' + savedFont + 'px';
-      document.documentElement.style.setProperty('--fs-md', savedFont + 'px');
+      document.documentElement.style.setProperty('--fs-base', savedFont + 'px');
       fontSlider.oninput = function() {
         localStorage.setItem('loom-font-size', fontSlider.value);
         if (fontVal) fontVal.textContent = '· ' + fontSlider.value + 'px';
-        document.documentElement.style.setProperty('--fs-md', fontSlider.value + 'px');
+        document.documentElement.style.setProperty('--fs-base', fontSlider.value + 'px');
       };
     }
+
+    // Restore saved font choices
+    var fontMap = {
+      'font-ui': {
+        'inter': "'Inter', system-ui, sans-serif",
+        'system': "system-ui, -apple-system, sans-serif",
+        'mono': "var(--font-mono)"
+      },
+      'font-read': {
+        'inter': "'Inter', system-ui, sans-serif",
+        'newsreader': "'Newsreader', Georgia, serif",
+        'system': "system-ui, -apple-system, sans-serif",
+        'mono': "var(--font-mono)"
+      },
+      'font-code': {
+        'jetbrains': "'JetBrains Mono', 'Fira Code', monospace",
+        'sf-mono': "'SF Mono', 'Menlo', monospace",
+        'fira': "'Fira Code', monospace",
+        'system': "monospace"
+      }
+    };
+    var fontProps = { 'font-ui': '--font-ui', 'font-read': '--font-read', 'font-code': '--font-mono' };
+    Object.keys(fontMap).forEach(function(key) {
+      var saved = localStorage.getItem('loom-' + key);
+      if (saved && fontMap[key][saved]) {
+        document.documentElement.style.setProperty(fontProps[key], fontMap[key][saved]);
+      }
+    });
 
     // Temperature slider
     var tempSlider = document.getElementById('temperature-slider');

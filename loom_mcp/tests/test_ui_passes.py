@@ -118,12 +118,12 @@ class TestPass3AppearancePalette:
         assert 'data-setting="canvas"' in html
         assert 'data-setting="threads"' in html
 
-    def test_palette_has_hue_slider(self, html):
-        assert 'accent-hue-slider' in html
+    def test_palette_has_font_size_slider(self, html):
+        assert 'global-font-size' in html
 
     def test_palette_footer(self, html):
         assert 'Esc to dismiss' in html
-        assert 'Open in full settings' in html
+        assert 'Full settings' in html
 
     def test_dotted_row_separators(self, css):
         assert '1px dotted' in css

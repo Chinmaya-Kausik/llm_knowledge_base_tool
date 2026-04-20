@@ -6855,12 +6855,17 @@ function initSettings() {
     document.getElementById('settings-login').textContent = 'Login';
   });
 
-  // Code font size slider
+  // Code font size slider — restore saved value on load
   const slider = document.getElementById('settings-code-font');
   const valDisplay = document.getElementById('settings-code-font-val');
+  const savedCodeFont = localStorage.getItem('loom-code-font-size') || '13';
+  slider.value = savedCodeFont;
+  valDisplay.textContent = savedCodeFont + 'px';
+  document.documentElement.style.setProperty('--code-font-size', savedCodeFont + 'px');
   slider.addEventListener('input', () => {
     const size = slider.value + 'px';
     valDisplay.textContent = size;
+    localStorage.setItem('loom-code-font-size', slider.value);
     document.documentElement.style.setProperty('--code-font-size', size);
   });
 
@@ -6923,6 +6928,651 @@ function sendPermissionsToBackend(rules) {
     if (id !== 'main' && panel.ws?.readyState === WebSocket.OPEN) {
       panel.ws.send(JSON.stringify({ type: 'set_permissions', rules }));
     }
+  }
+}
+
+function showAccountInfo() {
+  // Fetch auth status and show in a floating panel
+  const existing = document.getElementById('account-info-panel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'account-info-panel';
+  panel.className = 'keybinding-panel';
+  panel.innerHTML = `
+    <div class="keybinding-panel-header">
+      <span>Account</span>
+      <span style="flex:1"></span>
+      <button onclick="document.getElementById('account-info-panel').remove()" title="Close">✕</button>
+    </div>
+    <div class="keybinding-panel-body" style="padding:14px">
+      <div style="margin-bottom:10px;color:var(--text-muted)">Claude Code authentication</div>
+      <div id="account-auth-status" style="margin-bottom:12px">Checking...</div>
+      <button id="account-login-btn" class="seg-btn" style="padding:6px 14px;background:var(--accent);color:var(--bg);border:none;border-radius:var(--r-sm);cursor:pointer">Login / Re-authenticate</button>
+    </div>
+  `;
+  document.getElementById('canvas-container').appendChild(panel);
+
+  authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+    const statusEl = document.getElementById('account-auth-status');
+    if (statusEl) {
+      statusEl.textContent = resp.claude_authenticated ? '✓ Logged in' : '✗ Not logged in';
+      statusEl.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
+    }
+    // Update badge
+    const badge = document.getElementById('sm-auth-badge');
+    if (badge) {
+      badge.textContent = resp.claude_authenticated ? '✓' : '';
+      badge.style.color = 'var(--green)';
+    }
+  }).catch(() => {
+    const el = document.getElementById('account-auth-status');
+    if (el) { el.textContent = 'Could not reach server'; el.style.color = 'var(--red)'; }
+  });
+
+  document.getElementById('account-login-btn').onclick = async () => {
+    const btn = document.getElementById('account-login-btn');
+    btn.textContent = 'Starting...';
+    try {
+      const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+      const statusEl = document.getElementById('account-auth-status');
+      if (statusEl) statusEl.textContent = result.message || result.error || '';
+    } catch { }
+    btn.textContent = 'Login / Re-authenticate';
+  };
+
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+}
+
+function showWorkspaceInfo() {
+  const existing = document.getElementById('workspace-info-panel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'workspace-info-panel';
+  panel.className = 'keybinding-panel';
+  panel.innerHTML = `
+    <div class="keybinding-panel-header">
+      <span>Workspace</span>
+      <span style="flex:1"></span>
+      <button onclick="document.getElementById('workspace-info-panel').remove()" title="Close">✕</button>
+    </div>
+    <div class="keybinding-panel-body" style="padding:14px">
+      <div style="margin-bottom:6px;font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Loom Root</div>
+      <input type="text" id="ws-loom-root" style="width:100%;padding:6px 8px;background:var(--bg-sunken);border:1px solid var(--border-soft);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-sm);margin-bottom:12px" placeholder="/path/to/loom">
+      <div style="display:flex;gap:8px">
+        <button id="ws-save-btn" style="padding:6px 14px;background:var(--accent);color:var(--bg);border:none;border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-sm)">Save & Restart</button>
+        <button id="ws-restart-btn" style="padding:6px 14px;background:var(--bg-surface2);color:var(--text);border:1px solid var(--border-soft);border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-sm)">Restart Server</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('canvas-container').appendChild(panel);
+
+  authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+    const rootEl = document.getElementById('ws-loom-root');
+    if (rootEl) rootEl.value = resp.loom_root || '';
+  }).catch(() => {});
+
+  document.getElementById('ws-save-btn').onclick = async () => {
+    const newRoot = document.getElementById('ws-loom-root').value.trim();
+    if (!newRoot) return;
+    const btn = document.getElementById('ws-save-btn');
+    btn.textContent = 'Saving...';
+    const result = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loom_root: newRoot }),
+    }).then(r => r.json());
+    if (result.ok) {
+      btn.textContent = 'Restarting...';
+      await restartServer();
+    } else {
+      btn.textContent = 'Save & Restart';
+      alert(result.error || 'Failed to save settings');
+    }
+  };
+
+  document.getElementById('ws-restart-btn').onclick = async () => {
+    const btn = document.getElementById('ws-restart-btn');
+    btn.textContent = 'Restarting...';
+    await restartServer();
+  };
+
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+}
+
+function showAboutPanel() {
+  const existing = document.getElementById('about-panel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'about-panel';
+  panel.className = 'keybinding-panel';
+  panel.style.maxWidth = '340px';
+  panel.innerHTML = `
+    <div class="keybinding-panel-header">
+      <span>About Loom</span>
+      <span style="flex:1"></span>
+      <button onclick="document.getElementById('about-panel').remove()" title="Close">✕</button>
+    </div>
+    <div class="keybinding-panel-body" style="padding:18px;text-align:center">
+      <div style="font-size:28px;margin-bottom:4px">✦</div>
+      <div style="font-weight:600;font-size:var(--fs-lg);margin-bottom:2px">Loom</div>
+      <div style="color:var(--text-muted);font-size:var(--fs-sm);margin-bottom:12px">v0.1 · Knowledge base on an infinite canvas</div>
+      <div style="color:var(--text-dim);font-size:var(--fs-xs);line-height:1.5">
+        Local-first workspace with Claude Code as the built-in agent.<br>
+        Markdown on disk, git-versioned.
+      </div>
+    </div>
+  `;
+  document.getElementById('canvas-container').appendChild(panel);
+
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+}
+
+function openFullSettings(initialTab) {
+  const existing = document.getElementById('full-settings-panel');
+  if (existing) { existing.remove(); return; }
+
+  const sections = [
+    { id: 'account', label: 'Account' },
+    { id: 'workspace', label: 'Workspace' },
+    { id: 'storage', label: 'Storage & sync' },
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'model', label: 'Model & agent' },
+    { id: 'permissions', label: 'Tools & permissions' },
+    { id: 'memory', label: 'Memory' },
+    { id: 'indexing', label: 'Indexing' },
+    { id: 'keyboard', label: 'Keyboard' },
+    { id: 'integrations', label: 'Integrations' },
+    { id: 'privacy', label: 'Privacy' },
+    { id: 'about', label: 'About' },
+  ];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'full-settings-panel';
+  overlay.className = 'fs-panel';
+  overlay.innerHTML = `
+    <div class="fs-card">
+      <nav class="fs-nav">
+        <div class="fs-nav-title">SETTINGS</div>
+        ${sections.map(s => `<button class="fs-nav-item" data-tab="${s.id}">${s.label}</button>`).join('')}
+      </nav>
+      <div class="fs-content">
+        <div class="fs-content-header">
+          <div>
+            <div class="fs-content-eyebrow">Settings</div>
+            <h2 class="fs-content-title" id="fs-title">Appearance</h2>
+            <p class="fs-content-desc" id="fs-desc"></p>
+          </div>
+          <button class="fs-close" onclick="document.getElementById('full-settings-panel').remove()" title="Close">✕</button>
+        </div>
+        <div class="fs-content-body" id="fs-body"></div>
+      </div>
+    </div>
+  `;
+  // Click overlay background to close
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  const panel = overlay;
+
+  const body = panel.querySelector('#fs-body');
+  const title = panel.querySelector('#fs-title');
+  const desc = panel.querySelector('#fs-desc');
+
+  const sectionDescriptions = {
+    account: 'Claude Code authentication status.',
+    workspace: 'Loom root directory and server controls.',
+    storage: 'VM sync, transcript saving, and backup.',
+    appearance: 'Set-and-forget visual preferences. For in-session overlays, use the Appearance palette (\u2318\u21E7A) or keyboard shortcuts.',
+    model: 'Active model, agent backend, and inference parameters.',
+    permissions: 'Control what the agent can do without asking.',
+    memory: 'Memory injection and context pipeline configuration.',
+    indexing: 'Wiki page stats and search configuration.',
+    keyboard: 'Rebind shortcuts to your preference.',
+    integrations: 'Endpoint switcher, VM targets, and notifications.',
+    privacy: 'Control what data is sent and stored.',
+    about: '',
+  };
+
+  function switchTab(tabId) {
+    panel.querySelectorAll('.fs-nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tabId));
+    title.textContent = sections.find(s => s.id === tabId)?.label || '';
+    desc.textContent = sectionDescriptions[tabId] || '';
+    body.innerHTML = '';
+
+    if (tabId === 'account') {
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Claude Code</div><div class="fs-row-desc">Authentication status for the built-in agent.</div></div>
+          <div class="fs-row-ctrl"><span id="fs-auth-status" style="color:var(--text-muted)">Checking...</span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Re-authenticate</div><div class="fs-row-desc">Run the Claude Code login flow.</div></div>
+          <div class="fs-row-ctrl"><button id="fs-login-btn" class="fs-btn">Login</button></div>
+        </div>
+      `;
+      authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+        const el = document.getElementById('fs-auth-status');
+        if (el) {
+          el.textContent = resp.claude_authenticated ? '✓ Logged in' : '✗ Not logged in';
+          el.style.color = resp.claude_authenticated ? 'var(--green)' : 'var(--red)';
+        }
+      }).catch(() => {
+        const el = document.getElementById('fs-auth-status');
+        if (el) { el.textContent = 'Server unreachable'; el.style.color = 'var(--red)'; }
+      });
+      const loginBtn = document.getElementById('fs-login-btn');
+      if (loginBtn) loginBtn.onclick = async () => {
+        loginBtn.textContent = 'Starting...';
+        try {
+          const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+          const el = document.getElementById('fs-auth-status');
+          if (el) el.textContent = result.message || result.error || '';
+        } catch {}
+        loginBtn.textContent = 'Login';
+      };
+
+    } else if (tabId === 'workspace') {
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Loom root</div><div class="fs-row-desc">Base directory for wiki, raw, projects, and outputs.</div></div>
+          <div class="fs-row-ctrl" style="flex:1;max-width:340px">
+            <input type="text" id="fs-loom-root" class="fs-input" placeholder="/path/to/loom">
+          </div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Save & restart</div><div class="fs-row-desc">Apply the new root and restart the server.</div></div>
+          <div class="fs-row-ctrl"><button id="fs-save-root" class="fs-btn">Save & Restart</button></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Restart server</div><div class="fs-row-desc">Restart without changing settings.</div></div>
+          <div class="fs-row-ctrl"><button id="fs-restart-btn" class="fs-btn">Restart</button></div>
+        </div>
+      `;
+      authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+        const el = document.getElementById('fs-loom-root');
+        if (el) el.value = resp.loom_root || '';
+      }).catch(() => {});
+      document.getElementById('fs-save-root').onclick = async () => {
+        const newRoot = document.getElementById('fs-loom-root').value.trim();
+        if (!newRoot) return;
+        const btn = document.getElementById('fs-save-root');
+        btn.textContent = 'Saving...';
+        const result = await fetch('/api/settings', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loom_root: newRoot }),
+        }).then(r => r.json());
+        if (result.ok) { btn.textContent = 'Restarting...'; await restartServer(); }
+        else { btn.textContent = 'Save & Restart'; alert(result.error || 'Failed'); }
+      };
+      document.getElementById('fs-restart-btn').onclick = async () => {
+        const btn = document.getElementById('fs-restart-btn');
+        btn.textContent = 'Restarting...';
+        await restartServer();
+      };
+
+    } else if (tabId === 'appearance') {
+      const settings = [
+        { key: 'theme', label: 'Theme', desc: 'Base surface colors. System follows OS appearance.', opts: ['dark','light','paper'] },
+        { key: 'palette', label: 'Palette', desc: 'Neutral family underneath the accent.', opts: ['blue','slate'] },
+        { key: 'typography', label: 'Typography', desc: 'Content stack — switch to all-mono for a more terminal feel.', opts: ['mixed','mono'] },
+        { key: 'density', label: 'Density', desc: 'Vertical rhythm across cards and lists.', opts: ['compact','standard','roomy'] },
+        { key: 'accent', label: 'Card accent', desc: 'Visual indicator on the left edge of cards.', opts: ['border','dot','flat'] },
+        { key: 'canvas', label: 'Canvas background', desc: 'Pattern drawn behind the infinite canvas.', opts: ['dots','grid','paper','constellation'] },
+        { key: 'threads', label: 'Loom threads', desc: 'Faint lines from chat to focused card.', opts: ['off','on'] },
+        { key: 'font-size', label: 'Font size', desc: 'Scales the entire type scale — content, sidebar, chat.', type: 'slider', min: 11, max: 18, prop: '--fs-base', suffix: 'px' },
+        { key: 'code-font-size', label: 'Code font size', desc: 'Size of code blocks in wiki cards.', type: 'slider', min: 10, max: 18, prop: '--code-font-size', suffix: 'px' },
+        { key: 'font-ui', label: 'UI font', desc: 'Toolbar, sidebar, labels, settings.', type: 'font', prop: '--font-ui',
+          fonts: [
+            { val: 'inter', label: 'Inter', stack: "'Inter', system-ui, sans-serif" },
+            { val: 'system', label: 'System', stack: "system-ui, -apple-system, sans-serif" },
+            { val: 'mono', label: 'Mono', stack: "var(--font-mono)" },
+          ]},
+        { key: 'font-read', label: 'Reading font', desc: 'Card body text, long-form content.', type: 'font', prop: '--font-read',
+          fonts: [
+            { val: 'inter', label: 'Inter', stack: "'Inter', system-ui, sans-serif" },
+            { val: 'newsreader', label: 'Newsreader', stack: "'Newsreader', Georgia, serif" },
+            { val: 'system', label: 'System', stack: "system-ui, -apple-system, sans-serif" },
+            { val: 'mono', label: 'Mono', stack: "var(--font-mono)" },
+          ]},
+        { key: 'font-code', label: 'Code font', desc: 'Code blocks, terminal output, mono elements.', type: 'font', prop: '--font-mono',
+          fonts: [
+            { val: 'jetbrains', label: 'JetBrains', stack: "'JetBrains Mono', 'Fira Code', monospace" },
+            { val: 'sf-mono', label: 'SF Mono', stack: "'SF Mono', 'Menlo', monospace" },
+            { val: 'fira', label: 'Fira Code', stack: "'Fira Code', monospace" },
+            { val: 'system', label: 'System', stack: "monospace" },
+          ]},
+      ];
+      renderSettingsRows(body, settings);
+
+    } else if (tabId === 'model') {
+      const settings = [
+        { key: 'model', label: 'Active model', desc: 'Which Claude model to use for chat.', opts: ['sonnet','haiku','opus'], action: 'model' },
+        { key: 'agent', label: 'Agent', desc: 'Backend agent for code generation. Takes effect on next session.', opts: ['claude-code','codex'], action: 'agent' },
+        { key: 'temperature', label: 'Temperature', desc: 'Sampling temperature (0 = deterministic, 1 = creative).', type: 'slider', min: 0, max: 100, divisor: 100 },
+        { key: 'reasoning', label: 'Reasoning depth', desc: 'How deeply the model should reason before answering.', opts: ['low','med','high'] },
+        { key: 'stream', label: 'Stream tokens', desc: 'Show tokens as they arrive vs. all at once.', opts: ['on','off'] },
+      ];
+      renderSettingsRows(body, settings);
+
+    } else if (tabId === 'permissions') {
+      const categories = [
+        { cat: 'file_read', label: 'File read', desc: 'Allow agent to read files from disk.' },
+        { cat: 'file_write', label: 'File write', desc: 'Allow agent to create and modify files.' },
+        { cat: 'shell', label: 'Shell commands', desc: 'Allow agent to run shell commands.' },
+        { cat: 'destructive_git', label: 'Destructive git', desc: 'Force push, hard reset, branch delete.' },
+        { cat: 'mcp_tools', label: 'MCP tools', desc: 'Allow agent to call MCP server tools.' },
+      ];
+      const saved = getPermissionRules();
+      const values = ['allow', 'ask', 'deny'];
+      for (const { cat, label, desc: d } of categories) {
+        const current = saved[cat] || (cat === 'destructive_git' ? 'ask' : 'allow');
+        const row = document.createElement('div');
+        row.className = 'fs-row';
+        row.innerHTML = `
+          <div class="fs-row-text"><div class="fs-row-label">${label}</div><div class="fs-row-desc">${d}</div></div>
+          <div class="fs-row-ctrl"></div>
+        `;
+        const seg = document.createElement('div');
+        seg.className = 'seg';
+        values.forEach(v => {
+          const btn = document.createElement('button');
+          btn.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+          btn.dataset.val = v;
+          btn.classList.toggle('on', v === current);
+          btn.onclick = () => {
+            seg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+            btn.classList.add('on');
+            const rules = {};
+            body.querySelectorAll('.seg').forEach((s, i) => {
+              const active = s.querySelector('button.on');
+              if (active) rules[categories[i].cat] = active.dataset.val;
+            });
+            localStorage.setItem('loom-permissions', JSON.stringify(rules));
+            sendPermissionsToBackend(rules);
+          };
+          seg.appendChild(btn);
+        });
+        row.querySelector('.fs-row-ctrl').appendChild(seg);
+        body.appendChild(row);
+      }
+
+    } else if (tabId === 'storage') {
+      const storageSettings = [
+        { key: 'vm-sync', label: 'VM sync', desc: 'Automatically rsync wiki, memory, and transcripts to a remote VM.', opts: ['off', 'on'] },
+        { key: 'sync-interval', label: 'Sync interval', desc: 'Seconds between automatic syncs.', type: 'slider', min: 30, max: 300, suffix: 's' },
+        { key: 'transcript-autosave', label: 'Auto-save transcripts', desc: 'Save chat transcripts to raw/ when a session ends.', opts: ['on', 'off'] },
+      ];
+      renderSettingsRows(body, storageSettings);
+
+    } else if (tabId === 'memory') {
+      const memSettings = [
+        { key: 'memory-injection', label: 'Inject memories at session start', desc: 'Include memory index one-liners in the system prompt.', opts: ['on', 'off'] },
+        { key: 'memory-cap', label: 'Memory cap', desc: 'Maximum number of memory entries injected.', type: 'slider', min: 5, max: 50 },
+        { key: 'page-content-limit', label: 'Page content limit', desc: 'Max characters of page content included in context.', type: 'slider', min: 500, max: 10000, suffix: ' chars' },
+      ];
+      renderSettingsRows(body, memSettings);
+
+    } else if (tabId === 'indexing') {
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Wiki pages</div><div class="fs-row-desc">Total compiled wiki pages.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat" id="fs-wiki-count">...</span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Raw sources</div><div class="fs-row-desc">Ingested documents in raw/.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat" id="fs-raw-count">...</span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Search scope default</div><div class="fs-row-desc">Default scope for search queries.</div></div>
+          <div class="fs-row-ctrl"></div>
+        </div>
+      `;
+      const searchSeg = document.createElement('div');
+      searchSeg.className = 'seg';
+      ['wiki', 'all'].forEach(v => {
+        const btn = document.createElement('button');
+        btn.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+        btn.dataset.val = v;
+        btn.classList.toggle('on', v === (localStorage.getItem('loom-search-scope') || 'all'));
+        btn.onclick = () => {
+          searchSeg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+          btn.classList.add('on');
+          localStorage.setItem('loom-search-scope', v);
+        };
+        searchSeg.appendChild(btn);
+      });
+      body.querySelector('.fs-row:last-child .fs-row-ctrl').appendChild(searchSeg);
+      // Fetch stats
+      authFetch(`${getBaseUrl()}/api/tree`).then(r => r.json()).then(data => {
+        const count = data.children ? data.children.length : 0;
+        const el = document.getElementById('fs-wiki-count');
+        if (el) el.textContent = count + ' pages';
+      }).catch(() => {});
+      authFetch(`${getBaseUrl()}/api/raw-sources`).then(r => r.json()).then(data => {
+        const el = document.getElementById('fs-raw-count');
+        if (el) el.textContent = (data.sources?.length || 0) + ' sources';
+      }).catch(() => {
+        const el = document.getElementById('fs-raw-count');
+        if (el) el.textContent = '—';
+      });
+
+    } else if (tabId === 'integrations') {
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Backends</div><div class="fs-row-desc">Endpoint switcher — tries backends in order. Edit the list in localStorage.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat" id="fs-backend-count"></span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Ntfy topic</div><div class="fs-row-desc">Push notifications for agent done, job done, sync complete.</div></div>
+          <div class="fs-row-ctrl"><input type="text" class="fs-input" id="fs-ntfy-topic" style="width:160px" placeholder="my-loom-topic"></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Ntfy server</div><div class="fs-row-desc">Default: ntfy.sh</div></div>
+          <div class="fs-row-ctrl"><input type="text" class="fs-input" id="fs-ntfy-server" style="width:160px" placeholder="https://ntfy.sh"></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">MCP server</div><div class="fs-row-desc">Local MCP server status.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat" id="fs-mcp-status">Checking...</span></div>
+        </div>
+      `;
+      // Populate
+      const backends = getBackends();
+      const bcEl = document.getElementById('fs-backend-count');
+      if (bcEl) bcEl.textContent = backends.length + ' configured' + (activeBackend ? ' · active: ' + activeBackend.label : ' · using same-origin');
+      const ntfyTopic = document.getElementById('fs-ntfy-topic');
+      const ntfyServer = document.getElementById('fs-ntfy-server');
+      if (ntfyTopic) { ntfyTopic.value = localStorage.getItem('loom-ntfy-topic') || ''; ntfyTopic.onchange = () => localStorage.setItem('loom-ntfy-topic', ntfyTopic.value); }
+      if (ntfyServer) { ntfyServer.value = localStorage.getItem('loom-ntfy-server') || 'https://ntfy.sh'; ntfyServer.onchange = () => localStorage.setItem('loom-ntfy-server', ntfyServer.value); }
+      authFetch(`${getBaseUrl()}/api/tree`).then(() => {
+        const el = document.getElementById('fs-mcp-status');
+        if (el) { el.textContent = 'Connected'; el.style.color = 'var(--green)'; }
+      }).catch(() => {
+        const el = document.getElementById('fs-mcp-status');
+        if (el) { el.textContent = 'Unreachable'; el.style.color = 'var(--red)'; }
+      });
+
+    } else if (tabId === 'privacy') {
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Context sent to Claude</div><div class="fs-row-desc">System prompt includes: permissions, memory index, location context, page content.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat">All local</span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Transcript storage</div><div class="fs-row-desc">Chat transcripts are saved to raw/ in your loom directory.</div></div>
+          <div class="fs-row-ctrl"><span class="fs-stat">On disk</span></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Clear chat history</div><div class="fs-row-desc">Remove all saved chat sessions from this browser.</div></div>
+          <div class="fs-row-ctrl"><button class="fs-btn" id="fs-clear-chats">Clear</button></div>
+        </div>
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Reset all settings</div><div class="fs-row-desc">Clear all localStorage preferences and reload.</div></div>
+          <div class="fs-row-ctrl"><button class="fs-btn" id="fs-clear-storage" style="color:var(--red)">Reset</button></div>
+        </div>
+      `;
+      document.getElementById('fs-clear-chats').onclick = () => {
+        if (confirm('Clear all saved chat sessions?')) {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k.startsWith('loom-chat-')) keys.push(k);
+          }
+          keys.forEach(k => localStorage.removeItem(k));
+          document.getElementById('fs-clear-chats').textContent = 'Cleared ' + keys.length;
+        }
+      };
+      document.getElementById('fs-clear-storage').onclick = () => {
+        if (confirm('Reset ALL Loom settings to defaults? This will reload the page.')) {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k.startsWith('loom-')) keys.push(k);
+          }
+          keys.forEach(k => localStorage.removeItem(k));
+          window.location.reload();
+        }
+      };
+
+    } else if (tabId === 'keyboard') {
+      renderKeybindingEditor(body);
+
+    } else if (tabId === 'about') {
+      body.innerHTML = `
+        <div style="padding:30px 0;text-align:center">
+          <div style="font-size:36px;margin-bottom:6px">✦</div>
+          <div style="font-weight:600;font-size:var(--fs-xl);margin-bottom:4px">Loom</div>
+          <div style="color:var(--text-muted);font-size:var(--fs-md);margin-bottom:16px">v0.1</div>
+          <div style="color:var(--text-dim);font-size:var(--fs-sm);line-height:1.6;max-width:320px;margin:0 auto">
+            A local-first knowledge base and workspace on an infinite canvas.<br><br>
+            Claude Code as the built-in agent via the Agent SDK.<br>
+            Markdown on disk, git-versioned.
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Render rows for appearance/model tabs
+  function renderSettingsRows(container, settings) {
+    for (const s of settings) {
+      const row = document.createElement('div');
+      row.className = 'fs-row';
+      row.innerHTML = `<div class="fs-row-text"><div class="fs-row-label">${s.label}</div><div class="fs-row-desc">${s.desc}</div></div><div class="fs-row-ctrl"></div>`;
+      const ctrl = row.querySelector('.fs-row-ctrl');
+
+      if (s.type === 'slider') {
+        const saved = localStorage.getItem('loom-' + s.key) || String(s.key === 'font-size' ? 13 : s.key === 'code-font-size' ? 13 : s.key === 'temperature' ? 40 : s.min);
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = s.min;
+        slider.max = s.max;
+        slider.value = saved;
+        slider.style.cssText = 'width:180px;accent-color:var(--accent)';
+        const valLabel = document.createElement('span');
+        valLabel.style.cssText = 'font-size:var(--fs-xs);color:var(--text-muted);margin-left:8px;min-width:32px';
+        valLabel.textContent = s.divisor ? (parseInt(saved) / s.divisor).toFixed(1) : saved + (s.suffix || '');
+        slider.oninput = () => {
+          localStorage.setItem('loom-' + s.key, slider.value);
+          valLabel.textContent = s.divisor ? (parseInt(slider.value) / s.divisor).toFixed(1) : slider.value + (s.suffix || '');
+          if (s.prop) document.documentElement.style.setProperty(s.prop, slider.value + (s.suffix || ''));
+          // Sync original sliders
+          const origSlider = s.key === 'font-size' ? document.getElementById('global-font-size')
+            : s.key === 'temperature' ? document.getElementById('temperature-slider') : null;
+          if (origSlider) { origSlider.value = slider.value; origSlider.dispatchEvent(new Event('input')); }
+        };
+        ctrl.appendChild(slider);
+        ctrl.appendChild(valLabel);
+      } else if (s.type === 'font') {
+        // Font picker — segmented with font-family preview
+        const seg = document.createElement('div');
+        seg.className = 'seg';
+        const saved = localStorage.getItem('loom-' + s.key);
+        for (const f of s.fonts) {
+          const btn = document.createElement('button');
+          btn.textContent = f.label;
+          btn.dataset.val = f.val;
+          btn.style.fontFamily = f.stack.replace("var(--font-mono)", "'JetBrains Mono', monospace");
+          btn.classList.toggle('on', f.val === saved || (!saved && f === s.fonts[0]));
+          btn.onclick = () => {
+            seg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+            btn.classList.add('on');
+            localStorage.setItem('loom-' + s.key, f.val);
+            document.documentElement.style.setProperty(s.prop, f.stack);
+          };
+          seg.appendChild(btn);
+        }
+        ctrl.appendChild(seg);
+      } else {
+        // Segmented control
+        const seg = document.createElement('div');
+        seg.className = 'seg';
+        const attr = s.key;
+        const saved = localStorage.getItem('loom-' + attr) || (s.key === 'theme' ? (document.documentElement.getAttribute('data-theme') || 'dark') : null);
+        for (const opt of s.opts) {
+          const btn = document.createElement('button');
+          btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1).replace('-', ' ');
+          btn.dataset.val = opt;
+          btn.classList.toggle('on', opt === saved);
+          btn.onclick = () => {
+            seg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+            btn.classList.add('on');
+            localStorage.setItem('loom-' + attr, opt);
+            document.documentElement.setAttribute('data-' + attr, opt);
+            if (s.key === 'theme') applyTheme(opt);
+            if (s.action === 'model') applyModelSetting(opt);
+            if (s.action === 'agent') applyAgentSetting(opt);
+            // Sync the palette segmented controls
+            document.querySelectorAll(`.palette .seg[data-setting="${attr}"] button`).forEach(b => {
+              b.classList.toggle('on', b.dataset.val === opt);
+            });
+          };
+          seg.appendChild(btn);
+        }
+        ctrl.appendChild(seg);
+      }
+      container.appendChild(row);
+    }
+  }
+
+  // Nav click handlers
+  panel.querySelectorAll('.fs-nav-item').forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+
+  switchTab(initialTab || 'appearance');
+
+  function onKey(e) {
+    if (e.key === 'Escape') { panel.remove(); document.removeEventListener('keydown', onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+}
+
+function applyModelSetting(model) {
+  // Update active panel model and send to WebSocket
+  const panel = chatPanels.get(chatFocusHistory[0] || 'main');
+  if (panel) {
+    panel.model = model;
+    if (panel.ws && panel.ws.readyState === WebSocket.OPEN) {
+      panel.ws.send(JSON.stringify({ type: 'set_model', model }));
+    }
+  }
+}
+
+function applyAgentSetting(agent) {
+  // Update active panel agent type — takes effect on next session init
+  const panel = chatPanels.get(chatFocusHistory[0] || 'main');
+  if (panel) {
+    panel.agentType = agent;
   }
 }
 
@@ -7139,7 +7789,7 @@ async function init() {
     if (matchesBinding(e, 'new-chat') && !inInput) { e.preventDefault(); createFloatingPanel(); return; }
     if (matchesBinding(e, 'fork-chat')) { e.preventDefault(); createFloatingPanel({ fork: true }); return; }
     if (matchesBinding(e, 'background-agent')) { e.preventDefault(); backgroundCurrentAgent(chatFocusHistory[0] || 'main'); return; }
-    if (matchesBinding(e, 'settings')) { e.preventDefault(); document.getElementById('btn-toolbar-menu')?.click(); return; }
+    if (matchesBinding(e, 'settings')) { e.preventDefault(); openFullSettings(); return; }
     if (matchesBinding(e, 'show-shortcuts')) { e.preventDefault(); openKeybindingPanel(); return; }
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
     if (matchesBinding(e, 'restart-server')) { e.preventDefault(); restartServer(); return; }
