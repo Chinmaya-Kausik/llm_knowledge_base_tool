@@ -919,6 +919,17 @@ html[data-density="roomy"] .chat-msg { font-size: 14px; line-height: 1.6; }
 /* =============================================================
    CONTEXT CHIP — token count in chat composer
    ============================================================= */
+/* Pills row — between messages and textarea */
+.chat-input-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 2px;
+  flex-wrap: wrap;
+  min-height: 0;
+}
+.chat-input-pills:empty { display: none; }
+
 .chat-context-chip {
   display: inline-flex;
   align-items: center;
