@@ -1424,35 +1424,32 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 /* =============================================================
    CHAT HEADER + INPUT — Pass 10
    ============================================================= */
-/* Header subtitle line */
-.panel-header-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 0 1 auto;
-  max-width: calc(100% - 120px);
-}
-.panel-header-text .panel-label {
-  max-width: none;
-  flex: none;
-}
-.panel-subtitle {
+/* Header model badge — inline next to title */
+.panel-model-badge {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
+  padding: 1px 5px;
+  background: var(--bg);
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
 /* Chat input area restyle */
 #chat-input-area {
-  padding: 8px 10px;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 8px;
+  gap: 4px;
   border-top: 1px solid var(--border-soft);
 }
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
 #chat-input {
+  flex: 1;
   background: var(--bg-sunken);
   border: 1px solid transparent;
   font-size: var(--fs-sm);
@@ -1487,11 +1484,9 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   flex-shrink: 0;
 }
 #chat-send:hover { filter: brightness(1.1); color: var(--bg); border-color: transparent; }
-#chat-stop {
+#chat-stop, #chat-redirect {
   font-size: 10px;
   padding: 3px 8px;
-}
-#chat-input-controls {
   align-self: flex-end;
 }
 

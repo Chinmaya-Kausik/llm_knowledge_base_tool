@@ -3842,10 +3842,8 @@ function createPanelHeader(panelId, label = 'Chat') {
   const header = document.createElement('div');
   header.className = 'panel-header';
   header.innerHTML = `
-    <div class="panel-header-text">
-      <span class="panel-label" contenteditable="true">${label}</span>
-      <span class="panel-subtitle"></span>
-    </div>
+    <span class="panel-label" contenteditable="true">${label}</span>
+    <span class="panel-model-badge"></span>
     <span class="panel-status"></span>
     <span style="flex:1"></span>
     <button class="panel-menu-btn" title="Options">⋯</button>
@@ -5247,23 +5245,16 @@ function sendChatMessage() {
 function updatePanelSubtitle(panelId) {
   const panel = chatPanels.get(panelId || 'main') || activePanel;
   const model = panel.model || 'sonnet';
-  const msgs = panel.messages?.length || chatMessages?.length || 0;
-  const ctx = panel.contextPath || currentLevel()?.parentPath || '';
-  const pageName = ctx ? ctx.split('/').pop() : '';
 
-  const parts = [model];
-  if (msgs > 0) parts.push(msgs + ' msg' + (msgs !== 1 ? 's' : ''));
-  if (pageName) parts.push(pageName);
-
-  // Update main panel subtitle
+  // Update main panel model badge
   if (!panelId || panelId === 'main') {
-    const el = document.querySelector('#chat-header .panel-subtitle');
-    if (el) el.textContent = parts.join(' · ');
+    const el = document.querySelector('#chat-header .panel-model-badge');
+    if (el) el.textContent = model;
   }
-  // Update floating panel subtitle
+  // Update floating panel model badge
   if (panelId && panelId !== 'main' && panel.container) {
-    const el = panel.container.querySelector('.panel-subtitle');
-    if (el) el.textContent = parts.join(' · ');
+    const el = panel.container.querySelector('.panel-model-badge');
+    if (el) el.textContent = model;
   }
 }
 
