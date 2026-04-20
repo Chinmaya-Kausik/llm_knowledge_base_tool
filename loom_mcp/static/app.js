@@ -3842,7 +3842,10 @@ function createPanelHeader(panelId, label = 'Chat') {
   const header = document.createElement('div');
   header.className = 'panel-header';
   header.innerHTML = `
-    <span class="panel-label" contenteditable="true">${label}</span>
+    <div class="panel-header-text">
+      <span class="panel-label" contenteditable="true">${label}</span>
+      <span class="panel-subtitle"></span>
+    </div>
     <span class="panel-status"></span>
     <span style="flex:1"></span>
     <button class="panel-menu-btn" title="Options">⋯</button>
@@ -4210,11 +4213,12 @@ function createFloatingPanel(options = {}) {
   inputArea.className = 'fcp-input-area';
   const input = document.createElement('textarea');
   input.className = 'fcp-input';
-  input.placeholder = 'Message Claude...';
+  input.placeholder = 'Message Claude\u2026';
   input.rows = 1;
   const sendBtn = document.createElement('button');
   sendBtn.className = 'fcp-send';
-  sendBtn.textContent = 'Send';
+  sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12V4M4 7L8 3L12 7"/></svg>';
+  sendBtn.title = 'Send (Enter)';
   input.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
@@ -4751,6 +4755,7 @@ function initChat() {
       updateContextChip();
     };
     updateContextChip();
+    updatePanelSubtitle('main');
   }
 
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
@@ -5048,7 +5053,7 @@ function exitCheckpointMode() {
   document.getElementById('chat-messages').classList.remove('checkpoint-mode');
   document.querySelectorAll('.checkpoint-marker.selected').forEach(m => m.classList.remove('selected'));
   document.getElementById('chat-context-preview').style.display = 'none';
-  document.getElementById('chat-input').placeholder = 'Message Claude... (Enter to send)';
+  document.getElementById('chat-input').placeholder = 'Message Claude\u2026';
   pendingSelection = null;
 }
 
@@ -5166,6 +5171,7 @@ function sendChatMessage() {
 
   chatMessages.push({ role: 'user', content: fullText });
   currentResponseText = '';
+  updatePanelSubtitle('main');
   const userMsgEl = appendChatMessage('user', text || '', isRedirect ? 'redirect' : null);
   // Show sent images inline in the message
   if (sentImages.length > 0) {
@@ -5236,6 +5242,29 @@ function sendChatMessage() {
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
   syncToPanel(chatPanels.get('main'));
+}
+
+function updatePanelSubtitle(panelId) {
+  const panel = chatPanels.get(panelId || 'main') || activePanel;
+  const model = panel.model || 'sonnet';
+  const msgs = panel.messages?.length || chatMessages?.length || 0;
+  const ctx = panel.contextPath || currentLevel()?.parentPath || '';
+  const pageName = ctx ? ctx.split('/').pop() : '';
+
+  const parts = [model];
+  if (msgs > 0) parts.push(msgs + ' msg' + (msgs !== 1 ? 's' : ''));
+  if (pageName) parts.push(pageName);
+
+  // Update main panel subtitle
+  if (!panelId || panelId === 'main') {
+    const el = document.querySelector('#chat-header .panel-subtitle');
+    if (el) el.textContent = parts.join(' · ');
+  }
+  // Update floating panel subtitle
+  if (panelId && panelId !== 'main' && panel.container) {
+    const el = panel.container.querySelector('.panel-subtitle');
+    if (el) el.textContent = parts.join(' · ');
+  }
 }
 
 function updateContextChip() {
@@ -6000,6 +6029,7 @@ function handleChatEvent(msg) {
       }
       chatGenerating = false;
       clearInterval(chatTimerInterval);
+      updatePanelSubtitle('main');
       // Only toggle main panel buttons when processing main panel events
       const isMainPanel = chatMessagesContainer === chatPanels.get('main')?.messagesContainer
         || chatMessagesContainer === null;
