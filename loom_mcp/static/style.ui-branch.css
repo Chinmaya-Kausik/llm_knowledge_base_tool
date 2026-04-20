@@ -40,6 +40,7 @@
   --fs-sm: 12px;
   --fs-md: 13px;
   --fs-lg: 15px;
+  --fs-xl: 18px;
 
   /* Spacing */
   --sp-1: 4px;
@@ -47,11 +48,19 @@
   --sp-3: 8px;
   --sp-4: 12px;
   --sp-5: 16px;
+  --sp-6: 24px;
 
   /* Radius */
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 8px;
+
+  /* Density */
+  --density: 1;
+
+  /* Tweak dimensions */
+  --card-accent-mode: border;
+  --canvas-bg: dots;
   --bg:          oklch(0.19 0.035 258);
   --bg-surface:  oklch(0.25 0.038 258);
   --bg-surface2: oklch(0.30 0.040 258);
@@ -77,8 +86,13 @@
   --yellow:  oklch(0.80 0.13 85);
   --cyan:    oklch(0.76 0.12 200);
 
+  /* Semantic hues for tool categories */
+  --c-method: oklch(0.70 0.13 150);   /* write tools — green */
+  --c-signal: oklch(0.70 0.13 30);    /* dangerous tools — red-orange */
+
   --shadow:    0 1px 2px rgba(0,0,0,.3);
   --shadow-md: 0 4px 14px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.55);
   --glow:      0 0 0 2px oklch(0.74 0.15 258 / 0.28);
 
   /* Semantic — diff highlights, danger */
@@ -171,12 +185,20 @@ html[data-theme="paper"] {
 }
 
 /* =============================================================
-   GLOBAL TYPOGRAPHY — Inter for UI, mono for code only
+   GLOBAL RESETS + TYPOGRAPHY
    ============================================================= */
 body {
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
 }
+
+/* Scoped SVG block reset — only in content areas, not toolbar/sidebar icons */
+.doc-body svg, .chat-msg-content svg { display: block; }
+
+/* Scrollbar — inset border trick */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { border: 2px solid var(--bg); border-radius: 5px; }
 
 /* UI elements get sans-serif */
 #toolbar, #sidebar, .view-tab, .filter-menu, .toolbar-menu,
@@ -549,16 +571,17 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
 /* =============================================================
    TOOLBAR — Phase 2 three-cluster layout
    ============================================================= */
-:root { --toolbar-height: 44px; }
+:root { --toolbar-height: calc(44px * var(--density, 1)); }
 
 #toolbar {
   display: flex;
   align-items: center;
   height: var(--toolbar-height);
-  padding: 0 12px;
+  padding: 0 var(--sp-4, 12px);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
-  gap: 0;
+  gap: var(--sp-4, 12px);
+  flex-shrink: 0;
   z-index: 100;
 }
 
