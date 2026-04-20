@@ -7128,11 +7128,15 @@ function showWorkspaceInfo() {
   };
 
   function browseTo(path) {
-    authFetch(`${getBaseUrl()}/api/browse?path=${encodeURIComponent(path)}`).then(r => r.json()).then(data => {
+    authFetch(`${getBaseUrl()}/api/browse?path=${encodeURIComponent(path)}`).then(r => {
+      if (!r.ok) throw new Error('Not found — restart server to enable browsing');
+      return r.json();
+    }).then(data => {
+      if (!data.path) throw new Error(data.error || data.detail || 'Invalid response');
       let html = '';
       // Parent navigation
       if (data.parent && data.parent !== data.path) {
-        html += `<div class="ws-browse-item ws-browse-parent" data-path="${data.parent}">↑ ..</div>`;
+        html += `<div class="ws-browse-item ws-browse-parent" data-path="${data.parent}">\u2191 ..</div>`;
       }
       // Current path display
       html += `<div class="ws-browse-current">${data.path}</div>`;
@@ -7154,7 +7158,7 @@ function showWorkspaceInfo() {
           browserEl.style.display = 'none';
         };
       });
-    }).catch(() => { browserEl.innerHTML = '<div style="padding:8px 12px;color:var(--red)">Could not browse</div>'; });
+    }).catch(err => { browserEl.innerHTML = `<div style="padding:8px 12px;color:var(--red);font-size:var(--fs-xs)">${err.message || 'Could not browse'}</div>`; });
   }
 
   document.getElementById('ws-save-btn').onclick = async () => {
