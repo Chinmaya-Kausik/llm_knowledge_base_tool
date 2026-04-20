@@ -868,6 +868,55 @@ async def api_claude_logout():
         return {"error": f"Failed: {e}"}
 
 
+@app.get("/api/context-info")
+def api_context_info(session_id: str = "", level: str = "page"):
+    """Return context assembly breakdown with token estimates."""
+    from loom_mcp.chat import sessions, _permissions_block, _memory_block, _load_context_config
+    session = sessions.get(session_id, {})
+    page_path = session.get("page_path", "")
+    config = _load_context_config(LOOM_ROOT)
+
+    perm = _permissions_block(LOOM_ROOT)
+    mem = _memory_block(LOOM_ROOT, page_path, config) or ""
+
+    # Estimate location block size by level
+    loc_estimates = {"page": 1000, "folder": 4000, "global": 12000}
+    loc_chars = loc_estimates.get(level, 1000)
+
+    # Build file list from page_path
+    files = []
+    if page_path and not page_path.startswith("vm:"):
+        target = LOOM_ROOT / page_path
+        if target.is_file():
+            try:
+                content = target.read_text(encoding="utf-8", errors="replace")
+                files.append({"path": page_path, "type": "page", "tokens": len(content) // 4})
+            except Exception:
+                pass
+        elif target.is_dir():
+            about = target / "ABOUT.md"
+            if about.exists():
+                try:
+                    content = about.read_text(encoding="utf-8", errors="replace")
+                    files.append({"path": page_path + "/ABOUT.md", "type": "page", "tokens": len(content) // 4})
+                except Exception:
+                    pass
+
+    total_chars = len(perm) + len(mem) + loc_chars
+    return {
+        "level": level,
+        "page_path": page_path,
+        "blocks": [
+            {"name": "Permissions", "chars": len(perm), "tokens": len(perm) // 4},
+            {"name": "Memory", "chars": len(mem), "tokens": len(mem) // 4},
+            {"name": "Location", "chars": loc_chars, "tokens": loc_chars // 4, "estimated": True},
+        ],
+        "files": files,
+        "total_tokens": total_chars // 4,
+        "max_tokens": 200000,
+    }
+
+
 @app.get("/api/browse")
 def api_browse(path: str = "~"):
     """List directories at a given path for the workspace picker."""

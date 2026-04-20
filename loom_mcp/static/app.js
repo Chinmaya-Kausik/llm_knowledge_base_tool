@@ -4749,37 +4749,88 @@ function initChat() {
   if (ctxChip) {
     ctxChip.onclick = (e) => {
       e.stopPropagation();
-      let dropdown = document.getElementById('ctx-dropdown');
-      if (dropdown) { dropdown.remove(); return; }
-      dropdown = document.createElement('div');
-      dropdown.id = 'ctx-dropdown';
-      dropdown.className = 'ctx-dropdown';
-      const levels = [
-        { val: 'page', label: 'Page', desc: 'Current page only (~1K tokens)' },
-        { val: 'folder', label: 'Folder', desc: 'Current folder tree (~4K tokens)' },
-        { val: 'global', label: 'Global', desc: 'Full loom context (~12K tokens)' },
-      ];
+      let popover = document.getElementById('ctx-popover');
+      if (popover) { popover.remove(); return; }
+      popover = document.createElement('div');
+      popover.id = 'ctx-popover';
+      popover.className = 'ctx-popover';
+
       const current = activePanel.contextLevel || 'page';
-      dropdown.innerHTML = levels.map(l =>
-        `<div class="ctx-dropdown-item${l.val === current ? ' active' : ''}" data-val="${l.val}">
-          <span class="ctx-dropdown-label">${l.label}</span>
-          <span class="ctx-dropdown-desc">${l.desc}</span>
-        </div>`
-      ).join('');
-      ctxChip.parentElement.appendChild(dropdown);
-      dropdown.querySelectorAll('.ctx-dropdown-item').forEach(item => {
-        item.onclick = (ev) => {
+      const levels = [
+        { val: 'page', label: 'Page' },
+        { val: 'folder', label: 'Folder' },
+        { val: 'global', label: 'Global' },
+      ];
+
+      popover.innerHTML = `
+        <div class="ctx-popover-section">
+          <div class="ctx-popover-label">Scope</div>
+          <div class="seg ctx-scope-seg">
+            ${levels.map(l => `<button data-val="${l.val}"${l.val === current ? ' class="on"' : ''}>${l.label}</button>`).join('')}
+          </div>
+        </div>
+        <div class="ctx-popover-section">
+          <div class="ctx-popover-label">Context breakdown</div>
+          <div id="ctx-breakdown" class="ctx-breakdown"><span style="color:var(--text-dim)">Loading...</span></div>
+        </div>
+        <div class="ctx-popover-footer">
+          <div class="ctx-usage-bar"><div class="ctx-usage-fill" id="ctx-usage-fill"></div></div>
+          <span class="ctx-usage-text" id="ctx-usage-text"></span>
+        </div>
+      `;
+      ctxChip.parentElement.appendChild(popover);
+
+      // Wire scope buttons
+      popover.querySelectorAll('.ctx-scope-seg button').forEach(btn => {
+        btn.onclick = (ev) => {
           ev.stopPropagation();
-          activePanel.contextLevel = item.dataset.val;
+          popover.querySelectorAll('.ctx-scope-seg button').forEach(b => b.classList.remove('on'));
+          btn.classList.add('on');
+          activePanel.contextLevel = btn.dataset.val;
           syncFromPanel(activePanel);
           updateContextChip();
-          dropdown.remove();
+          loadContextBreakdown(btn.dataset.val);
         };
       });
+
+      // Load context breakdown from backend
+      function loadContextBreakdown(level) {
+        const sessionId = activePanel.sessionId || chatSessionId || '';
+        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data) { document.getElementById('ctx-breakdown').innerHTML = '<span style="color:var(--text-dim)">Unavailable</span>'; return; }
+            const bd = document.getElementById('ctx-breakdown');
+            let html = '';
+            for (const block of (data.blocks || [])) {
+              const est = block.estimated ? ' <span style="opacity:.5">est.</span>' : '';
+              html += `<div class="ctx-block-row"><span>${block.name}</span><span class="ctx-block-tokens">~${block.tokens.toLocaleString()} tokens${est}</span></div>`;
+            }
+            if (data.files?.length > 0) {
+              html += '<div class="ctx-popover-label" style="margin-top:6px">Files in context</div>';
+              for (const f of data.files) {
+                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>`;
+              }
+            }
+            bd.innerHTML = html;
+            // Update footer
+            const pct = Math.min(100, (data.total_tokens / data.max_tokens) * 100);
+            const fill = document.getElementById('ctx-usage-fill');
+            const text = document.getElementById('ctx-usage-text');
+            if (fill) fill.style.width = pct + '%';
+            if (text) text.textContent = `~${(data.total_tokens / 1000).toFixed(1)}K / ${(data.max_tokens / 1000).toFixed(0)}K tokens`;
+          })
+          .catch(() => {
+            const bd = document.getElementById('ctx-breakdown');
+            if (bd) bd.innerHTML = '<span style="color:var(--text-dim)">Restart server for context info</span>';
+          });
+      }
+      loadContextBreakdown(current);
+
       // Close on outside click
       setTimeout(() => {
         const close = (ev) => {
-          if (!dropdown.contains(ev.target)) { dropdown.remove(); document.removeEventListener('click', close); }
+          if (!popover.contains(ev.target) && ev.target !== ctxChip) { popover.remove(); document.removeEventListener('click', close); }
         };
         document.addEventListener('click', close);
       });
