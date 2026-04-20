@@ -1251,10 +1251,12 @@ function createDocCard(nodeData, content, pos, options = {}) {
   const typeLabel = nodeData.type && nodeData.type !== 'folder' && nodeData.type !== 'file' ? nodeData.type : (category !== 'folder' && category !== 'misc' ? category : '');
   const typeBadgeHtml = typeLabel ? `<span class="card-meta">${typeLabel}</span>` : '';
 
-  // Subtitle — from frontmatter title or page title (different from filename)
+  // Subtitle — only when frontmatter title is meaningfully different from the filename
   const meta = cardMeta.get(nodeData.id);
   const fmTitle = meta?.frontmatter?.title;
-  const subtitle = fmTitle && fmTitle !== nodeData.label ? fmTitle : '';
+  // Skip subtitle if it's basically the same as the label (case-insensitive, ignoring hyphens/underscores)
+  const normalize = s => (s || '').toLowerCase().replace(/[-_\s.]/g, '');
+  const subtitle = fmTitle && normalize(fmTitle) !== normalize(nodeData.label) ? fmTitle : '';
   const subtitleHtml = subtitle ? `<span class="card-filename">${subtitle}</span>` : '';
 
   // Path breadcrumb for footer
@@ -1765,6 +1767,7 @@ function renderCurrentLevel() {
 
   scheduleEdgeUpdate();
   populateTagFilter();
+  updateBreadcrumb(); // Update again after cards are rendered for accurate stats
   requestAnimationFrame(() => requestAnimationFrame(fitView));
 }
 
