@@ -511,9 +511,7 @@ function showCardContextMenu(e, path, isFolder) {
     { label: 'Pin to Board', action: () => pinCard(path) },
     { sep: true },
     { label: 'Ask Claude about this', action: () => {
-      const panel = chatPanels.get(chatFocusHistory[0] || 'main') || activePanel;
-      const input = document.getElementById('chat-input');
-      if (input) { input.value = `Tell me about \`${path}\``; input.focus(); }
+      createFloatingPanel({ prefill: `Tell me about \`${path}\`` });
     }},
     { sep: true },
     { label: 'Rename...', action: () => {
