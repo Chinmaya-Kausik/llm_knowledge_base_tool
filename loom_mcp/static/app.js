@@ -1891,11 +1891,11 @@ function computeLayoutForce(nodes, saved) {
   // Collision radius — must cover the full card rectangle diagonal to prevent overlap
   const collideRadius = Math.sqrt(cardW * cardW + cardH * cardH) / 2 + pad / 3;
 
-  // Run simulation — moderate repulsion, strong collision, tight linking
+  // Run simulation — gentle repulsion, strong collision, tight linking
   const simulation = d3.forceSimulation(simNodes)
     .force('collide', d3.forceCollide(collideRadius).strength(1).iterations(5))
-    .force('charge', d3.forceManyBody().strength(-150))
-    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW + pad).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-50))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.9).strength(0.5))
     .force('center', d3.forceCenter(
       (cols * (cardW + pad)) / 2,
       (Math.ceil(nodes.length / cols) * (cardH + pad)) / 2
@@ -1998,14 +1998,23 @@ function autoLayout() {
     }
   }
 
+  // Animate cards to new positions
   for (const [path, card] of cardElements) {
     if (positions[path]) {
+      card.style.transition = 'left 0.4s ease, top 0.4s ease';
       card.style.left = positions[path].x + 'px';
       card.style.top = positions[path].y + 'px';
       layoutData[path] = positions[path];
     }
   }
-  scheduleEdgeUpdate(); debounceSaveLayout(); setTimeout(fitView, 100);
+  // Remove transition after animation completes, update edges
+  setTimeout(() => {
+    for (const [, card] of cardElements) card.style.transition = '';
+    scheduleEdgeUpdate();
+    debounceSaveLayout();
+  }, 450);
+  // Fit view after animation
+  setTimeout(fitView, 500);
 }
 
 // ========================================
