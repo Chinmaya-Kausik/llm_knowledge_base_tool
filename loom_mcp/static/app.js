@@ -1766,11 +1766,14 @@ function renderCurrentLevel() {
 
 function renderRootCanvas(world) {
   const topNodes = graphData.top_nodes || [];
-  const positions = computeLayout(topNodes, layoutData);
+  const hasSavedPositions = topNodes.some(n => layoutData[n.data.id]);
+
+  // Initial positions: use saved or simple grid for first render
+  const gridPositions = computeLayoutGrid(topNodes, layoutData);
 
   for (const node of topNodes) {
     const nd = node.data;
-    const pos = positions[nd.id] || { x: 0, y: 0 };
+    const pos = gridPositions[nd.id] || { x: 0, y: 0 };
     const meta = cardMeta.get(nd.id);
     const content = meta?.content || '';
     const card = createDocCard(nd, content, pos);
@@ -1778,6 +1781,95 @@ function renderRootCanvas(world) {
     cardElements.set(nd.id, card);
     layoutData[nd.id] = pos;
   }
+
+  // If all cards had saved positions, keep them — don't re-layout
+  if (hasSavedPositions) return;
+
+  // After render, measure actual heights and run force layout with real sizes
+  requestAnimationFrame(() => {
+    const cardW = 400, pad = 40;
+    const heights = {};
+    for (const [id, el] of cardElements) {
+      heights[id] = el.offsetHeight || 280;
+    }
+
+    // Run d3-force with actual heights
+    if (typeof d3.forceSimulation !== 'function') return;
+
+    const cols = Math.max(2, Math.ceil(Math.sqrt(topNodes.length * 1.8)));
+    const simNodes = topNodes.map((node, i) => ({
+      id: node.data.id,
+      x: (i % cols) * (cardW + pad) + cardW / 2,
+      y: Math.floor(i / cols) * 400 + 200,
+    }));
+
+    const idSet = new Set(topNodes.map(n => n.data.id));
+    const edges = (graphData?.top_edges || graphData?.edges || []);
+    const links = [];
+    for (const e of edges) {
+      if (idSet.has(e.data.source) && idSet.has(e.data.target))
+        links.push({ source: e.data.source, target: e.data.target });
+    }
+
+    // Rectangular collision using actual card heights
+    function forceRectCollide() {
+      let nodes;
+      function force(alpha) {
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i], b = nodes[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const overlapX = (cardW + pad) / 2 - Math.abs(dx);
+            const hA = heights[a.id] || 280, hB = heights[b.id] || 280;
+            const overlapY = ((hA + hB) / 2 + pad) / 2 - Math.abs(dy);
+            if (overlapX > 0 && overlapY > 0) {
+              const str = alpha * 0.8;
+              if (overlapX < overlapY) {
+                a.x -= Math.sign(dx) * overlapX * str / 2;
+                b.x += Math.sign(dx) * overlapX * str / 2;
+              } else {
+                a.y -= Math.sign(dy) * overlapY * str / 2;
+                b.y += Math.sign(dy) * overlapY * str / 2;
+              }
+            }
+          }
+        }
+      }
+      force.initialize = function(n) { nodes = n; };
+      return force;
+    }
+
+    const simulation = d3.forceSimulation(simNodes)
+      .force('rectCollide', forceRectCollide())
+      .force('charge', d3.forceManyBody().strength(-30))
+      .force('link', d3.forceLink(links).id(d => d.id).distance(cardW * 0.8).strength(0.5))
+      .force('center', d3.forceCenter(
+        (cols * (cardW + pad)) / 2,
+        (Math.ceil(topNodes.length / cols) * 400) / 2
+      ))
+      .stop();
+
+    for (let i = 0; i < 150; i++) simulation.tick();
+
+    // Animate cards to final positions
+    for (const sn of simNodes) {
+      const card = cardElements.get(sn.id);
+      if (card) {
+        const finalPos = { x: Math.round(sn.x - cardW / 2), y: Math.round(sn.y - (heights[sn.id] || 280) / 2) };
+        card.style.transition = 'left 0.5s ease, top 0.5s ease';
+        card.style.left = finalPos.x + 'px';
+        card.style.top = finalPos.y + 'px';
+        layoutData[sn.id] = finalPos;
+      }
+    }
+
+    setTimeout(() => {
+      for (const [, card] of cardElements) card.style.transition = '';
+      scheduleEdgeUpdate();
+      debounceSaveLayout();
+      fitView();
+    }, 550);
+  });
 }
 
 function renderSubCanvas(world, parentPath) {
