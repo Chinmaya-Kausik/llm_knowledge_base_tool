@@ -4927,7 +4927,8 @@ function initChat() {
       // Load context breakdown from backend
       function loadContextBreakdown(level) {
         const sessionId = activePanel.sessionId || chatSessionId || '';
-        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}`)
+        const ctxPath = activePanel?.contextPath || currentLevel()?.parentPath || '';
+        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}`)
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data) { document.getElementById('ctx-breakdown').innerHTML = '<span style="color:var(--text-dim)">Unavailable</span>'; return; }

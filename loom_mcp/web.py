@@ -942,11 +942,11 @@ async def api_claude_logout():
 
 
 @app.get("/api/context-info")
-def api_context_info(session_id: str = "", level: str = "page"):
+def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
     """Return context assembly breakdown with token estimates."""
     from loom_mcp.chat import sessions, _permissions_block, _memory_block, _load_context_config
     session = sessions.get(session_id, {})
-    page_path = session.get("page_path", "")
+    page_path = path or session.get("page_path", "")
     config = _load_context_config(LOOM_ROOT)
 
     perm = _permissions_block(LOOM_ROOT)
@@ -958,9 +958,9 @@ def api_context_info(session_id: str = "", level: str = "page"):
 
     # Build file list based on context level
     files = []
-    if page_path and not page_path.startswith("vm:"):
-        target = LOOM_ROOT / page_path
-        if level == "page":
+    target = LOOM_ROOT / page_path if page_path else LOOM_ROOT
+    if not page_path.startswith("vm:"):
+        if level == "page" and page_path:
             # Current file or folder's ABOUT.md
             if target.is_file():
                 try:
