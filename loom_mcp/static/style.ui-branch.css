@@ -1379,6 +1379,7 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   flex-shrink: 0;
 }
 .sidebar-resize:hover { background: var(--accent-soft); }
+#sidebar.collapsed + .sidebar-resize { display: none; }
 
 /* Chat search bar */
 .chat-search-bar {
