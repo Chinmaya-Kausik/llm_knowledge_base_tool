@@ -2931,6 +2931,47 @@ async function initSidebar() {
       }
     }
   });
+
+  // Drag tree items to canvas
+  container.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.tree-item');
+    if (!item || !item.dataset.id) return;
+    e.dataTransfer.setData('text/plain', item.dataset.id);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+  // Make tree items draggable
+  container.querySelectorAll('.tree-item').forEach(item => { item.draggable = true; });
+  // Re-apply draggable after lazy-load
+  new MutationObserver(() => {
+    container.querySelectorAll('.tree-item:not([draggable])').forEach(item => { item.draggable = true; });
+  }).observe(container, { childList: true, subtree: true });
+
+  // Canvas drop handler
+  const canvas = document.getElementById('infinite-canvas');
+  canvas.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+    // If card already exists, focus it
+    const existing = cardElements.get(id);
+    if (existing) {
+      setFocusedItem(id, existing);
+      return;
+    }
+    // Create card at drop position (accounting for canvas transform)
+    const nd = nodeById(id);
+    if (!nd) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left - (currentTransform.x || 0)) / (currentTransform.k || 1);
+    const y = (e.clientY - rect.top - (currentTransform.y || 0)) / (currentTransform.k || 1);
+    const meta = cardMeta.get(id);
+    const card = createDocCard(nd, meta?.content || '', { x, y });
+    document.getElementById('world').appendChild(card);
+    cardElements.set(id, card);
+    setFocusedItem(id, card);
+    trackRecentFile(id, nd.label || id.split('/').pop());
+  });
 }
 
 function countChildren(item) {
