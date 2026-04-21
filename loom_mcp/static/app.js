@@ -3979,6 +3979,11 @@ function dockPanel(panelId, action) {
   else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
   else {
     chatPanelEl.classList.add('chat-float');
+    // If fullpage is open, ensure we're above it (z-index 300)
+    const _fpCheck = document.getElementById('fullpage-overlay');
+    if (_fpCheck && _fpCheck.style.display !== 'none') {
+      topZIndex = Math.max(topZIndex, 400);
+    }
     bringToFront(chatPanelEl);
   }
 
