@@ -16,7 +16,21 @@ fi
 export LOOM_PORT="${LOOM_PORT:-8421}"
 export LOOM_ROOT="${LOOM_ROOT:-$(pwd)/demo}"
 
-echo "Starting Loom UI dev server on port $LOOM_PORT..."
+# Check if port is already in use
+if lsof -i ":$LOOM_PORT" -P -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "ERROR: Port $LOOM_PORT is already in use!"
+  echo "Kill the existing process or set a different port: LOOM_PORT=8422 $0"
+  lsof -i ":$LOOM_PORT" -P -sTCP:LISTEN
+  read -p "Kill it and continue? [y/N] " yn
+  if [ "$yn" = "y" ] || [ "$yn" = "Y" ]; then
+    lsof -ti ":$LOOM_PORT" | xargs kill 2>/dev/null
+    sleep 1
+  else
+    exit 1
+  fi
+fi
+
+echo "Starting Loom UI dev server on port $LOOM_PORT (branch: $current)..."
 
 # Wait for server to be ready, then open browser
 (
