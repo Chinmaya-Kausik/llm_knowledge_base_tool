@@ -799,7 +799,26 @@ def api_get_settings():
     authenticated = auth_check.returncode == 0
     # Check Codex availability
     codex_available = shutil.which("codex") is not None
-    return {"loom_root": str(LOOM_ROOT), "claude_authenticated": authenticated, "codex_available": codex_available}
+    # Get local IP for remote access URL
+    local_ip = ""
+    if REMOTE_ENABLED:
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            pass
+    return {
+        "loom_root": str(LOOM_ROOT),
+        "claude_authenticated": authenticated,
+        "codex_available": codex_available,
+        "remote_enabled": REMOTE_ENABLED,
+        "auth_token": AUTH_TOKEN if REMOTE_ENABLED else "",
+        "local_ip": local_ip,
+        "port": int(os.environ.get("LOOM_PORT", 8420)),
+    }
 
 
 @app.post("/api/codex-auth")
@@ -831,6 +850,60 @@ async def api_set_api_key(request: Request):
         del os.environ[key_name]
         return {"ok": True, "message": f"{key_name} removed."}
     return {"ok": True, "message": "No change."}
+
+
+@app.get("/api/qr-code")
+def api_qr_code():
+    """Generate a QR code for mobile access as a PNG data URL."""
+    if not REMOTE_ENABLED:
+        return {"error": "Remote access not enabled"}
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        return {"error": "Could not determine local IP"}
+    port = int(os.environ.get("LOOM_PORT", 8420))
+    url = f"http://{local_ip}:{port}?token={AUTH_TOKEN}"
+    try:
+        import qrcode
+        import qrcode.image.svg
+        import io
+        import base64
+        qr = qrcode.QRCode(version=None, box_size=8, border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        data_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        return {"url": url, "qr_data_url": data_url, "local_ip": local_ip, "port": port}
+    except ImportError:
+        return {"url": url, "qr_data_url": None, "local_ip": local_ip, "port": port, "error": "qrcode not installed (pip install qrcode[pil])"}
+
+
+@app.post("/api/remote-access")
+async def api_toggle_remote(request: Request):
+    """Enable or disable remote access. Requires server restart to take effect."""
+    body = await request.json()
+    enable = body.get("enable", False)
+    config_path = Path.home() / ".loom-app-config.json"
+    try:
+        data = {}
+        if config_path.exists():
+            data = json.loads(config_path.read_text())
+        if enable:
+            os.environ["LOOM_REMOTE"] = "1"
+            if not data.get("auth_token"):
+                data["auth_token"] = "loom_" + secrets.token_hex(32)
+        else:
+            os.environ.pop("LOOM_REMOTE", None)
+        config_path.write_text(json.dumps(data, indent=2))
+        return {"ok": True, "message": "Restart server to apply.", "token": data.get("auth_token", "")}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/api/claude-auth")

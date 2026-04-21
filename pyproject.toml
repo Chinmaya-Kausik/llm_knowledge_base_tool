@@ -30,6 +30,7 @@ web = [
     "pexpect>=4.9.0",
     "claude-agent-sdk>=0.1.50",
     "asyncssh>=2.14.0",
+    "qrcode[pil]>=8.0",
 ]
 
 [project.scripts]

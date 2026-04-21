@@ -7758,12 +7758,84 @@ function openFullSettings(initialTab) {
       }
 
     } else if (tabId === 'storage') {
+      // Remote access + QR code section
+      body.innerHTML = `
+        <div class="fs-row">
+          <div class="fs-row-text"><div class="fs-row-label">Remote access</div><div class="fs-row-desc">Allow connections from other devices on the network. Requires restart.</div></div>
+          <div class="fs-row-ctrl"><button class="fs-btn" id="fs-remote-toggle">Checking...</button></div>
+        </div>
+        <div id="fs-remote-info" style="display:none">
+          <div class="fs-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div class="fs-row-text"><div class="fs-row-label">Connect from phone</div><div class="fs-row-desc">Scan this QR code to open Loom on your phone. Same WiFi required.</div></div>
+            <div style="display:flex;gap:16px;align-items:center;width:100%">
+              <canvas id="fs-qr-canvas" width="160" height="160" style="border-radius:var(--r-sm);background:#fff;padding:8px;flex-shrink:0"></canvas>
+              <div style="flex:1">
+                <div id="fs-remote-url" style="font-family:var(--font-mono);font-size:11px;color:var(--text);word-break:break-all;margin-bottom:8px"></div>
+                <button class="fs-btn" id="fs-copy-url" style="font-size:10px">Copy URL</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Check remote status
+      authFetch(`${getBaseUrl()}/api/settings`).then(r => r.json()).then(resp => {
+        const toggleBtn = document.getElementById('fs-remote-toggle');
+        const info = document.getElementById('fs-remote-info');
+        if (resp.remote_enabled) {
+          toggleBtn.textContent = 'Disable';
+          toggleBtn.onclick = () => toggleRemote(false);
+          info.style.display = '';
+          // Fetch QR code from backend
+          authFetch(`${getBaseUrl()}/api/qr-code`).then(r => r.ok ? r.json() : null).then(qr => {
+            if (!qr) return;
+            const url = qr.url;
+            document.getElementById('fs-remote-url').textContent = url;
+            document.getElementById('fs-copy-url').onclick = () => {
+              navigator.clipboard.writeText(url);
+              document.getElementById('fs-copy-url').textContent = 'Copied!';
+              setTimeout(() => { document.getElementById('fs-copy-url').textContent = 'Copy URL'; }, 1500);
+            };
+            if (qr.qr_data_url) {
+              const canvas = document.getElementById('fs-qr-canvas');
+              const img = new Image();
+              img.onload = () => {
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+              };
+              img.src = qr.qr_data_url;
+            }
+          }).catch(() => {});
+        } else {
+          toggleBtn.textContent = 'Enable';
+          toggleBtn.onclick = () => toggleRemote(true);
+        }
+      }).catch(() => {});
+
+      async function toggleRemote(enable) {
+        const btn = document.getElementById('fs-remote-toggle');
+        btn.textContent = enable ? 'Enabling...' : 'Disabling...';
+        try {
+          await fetch('/api/remote-access', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enable }),
+          });
+          btn.textContent = 'Restarting...';
+          await restartServer();
+        } catch { btn.textContent = 'Failed'; }
+      }
+
+      // Remaining storage settings below
+      const storageBody = document.createElement('div');
+      body.appendChild(storageBody);
       const storageSettings = [
         { key: 'vm-sync', label: 'VM sync', desc: 'Automatically rsync wiki, memory, and transcripts to a remote VM.', opts: ['off', 'on'] },
         { key: 'sync-interval', label: 'Sync interval', desc: 'Seconds between automatic syncs.', type: 'slider', min: 30, max: 300, suffix: 's' },
         { key: 'transcript-autosave', label: 'Auto-save transcripts', desc: 'Save chat transcripts to raw/ when a session ends.', opts: ['on', 'off'] },
       ];
-      renderSettingsRows(body, storageSettings);
+      renderSettingsRows(storageBody, storageSettings);
 
     } else if (tabId === 'memory') {
       const memSettings = [
