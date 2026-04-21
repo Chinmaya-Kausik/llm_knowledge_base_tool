@@ -3770,6 +3770,23 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 let chatFocusHistory = ['main']; // Ordered by recency of focus
 let chatCycleIndex = -1;
+
+function getAlivePanels() {
+  // Returns IDs of panels that are actually open/visible (not collapsed/minimized)
+  const result = [];
+  for (const [id, p] of chatPanels) {
+    if (id === 'main') {
+      const cp = document.getElementById('chat-panel');
+      const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
+      if (isOpen) result.push(id);
+    } else if (p.container && !p.container.classList.contains('minimized')) {
+      result.push(id);
+    }
+  }
+  // Order by focus history
+  const ordered = [...new Set([...chatFocusHistory.filter(id => result.includes(id)), ...result])];
+  return ordered;
+}
 let chatSoloCycleIndex = -1;
 
 // ========================================
@@ -8583,10 +8600,10 @@ async function init() {
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
     if (matchesBinding(e, 'restart-server')) { e.preventDefault(); restartServer(); return; }
     if (matchesBinding(e, 'delete-file') && !inInput) { e.preventDefault(); deleteCurrentFile(); return; }
-    // Cmd+J: cycle focus between chats (no minimizing, no creating)
+    // Cmd+J: cycle focus between open chats (no minimizing)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
-      const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
+      const alive = getAlivePanels();
       console.log('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
 
       if (alive.length === 0) { createFloatingPanel(); return; }
@@ -8594,6 +8611,36 @@ async function init() {
 
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
       focusChatPanel(alive[chatCycleIndex]);
+      return;
+    }
+    // Cmd+/: solo cycle — focus one, minimize/close others
+    if (matchesBinding(e, 'cycle-chat-solo')) {
+      e.preventDefault();
+      const alive = getAlivePanels();
+      console.log('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
+
+      if (alive.length === 0) { createFloatingPanel(); return; }
+
+      chatSoloCycleIndex = ((chatSoloCycleIndex < 0 ? 0 : chatSoloCycleIndex) + 1) % alive.length;
+      const targetId = alive[chatSoloCycleIndex];
+
+      // Minimize all others
+      for (const id of alive) {
+        if (id === targetId) continue;
+        if (id === 'main') {
+          const cp = document.getElementById('chat-panel');
+          const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
+          if (isOpen) {
+            const ph = document.querySelector('#chat-header .panel-header');
+            if (ph) ph.click();
+          }
+        } else {
+          const p = chatPanels.get(id);
+          if (p?.container) p.container.classList.add('minimized');
+        }
+      }
+
+      focusChatPanel(targetId);
       return;
     }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
