@@ -1,6 +1,6 @@
 // Loom Service Worker — cache static assets, network-only for API/WS
 
-const CACHE_NAME = 'loom-cache-v2';
+const CACHE_NAME = 'loom-cache-v3';
 
 const PRECACHE_URLS = [
   '/',
@@ -61,19 +61,20 @@ self.addEventListener('fetch', (event) => {
     return;  // Let browser handle normally (network only)
   }
 
-  // Cache-first for static assets
+  // Network-first for static assets — always get fresh, cache as fallback for offline
   if (url.pathname.startsWith('/static/') || url.pathname === '/') {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          // Cache successful responses
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
+      fetch(event.request).then((response) => {
+        // Cache successful responses for offline use
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => {
+        // Network failed — try cache (offline mode)
+        return caches.match(event.request);
+      });
       }).catch(() => {
         // Offline fallback
         if (url.pathname === '/') {
