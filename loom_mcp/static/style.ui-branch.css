@@ -1612,7 +1612,7 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 400px;
+  max-height: 280px;
 }
 .ctx-popover-section {
   padding: 10px 12px;

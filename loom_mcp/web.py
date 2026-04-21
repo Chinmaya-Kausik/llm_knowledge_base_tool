@@ -980,18 +980,18 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
                         except Exception:
                             pass
         elif level == "folder":
-            # All files in the folder (or parent folder if page_path is a file)
+            # Folder level injects the folder's ABOUT.md (which lists children with summaries)
             folder = target if target.is_dir() else target.parent
-            try:
-                for f in sorted(folder.rglob("*.md"))[:20]:
-                    rel = str(f.relative_to(LOOM_ROOT))
-                    try:
-                        tokens = len(f.read_text(encoding="utf-8", errors="replace")) // 4
-                        files.append({"path": rel, "type": "folder", "tokens": tokens})
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            about = folder / "ABOUT.md"
+            if about.exists():
+                try:
+                    content = about.read_text(encoding="utf-8", errors="replace")
+                    rel = str(about.relative_to(LOOM_ROOT))
+                    child_count = content.count("\n## ") + content.count("\n- [")
+                    files.append({"path": rel, "type": "folder", "tokens": len(content) // 4,
+                                  "note": f"Folder overview ({child_count} children summarized)"})
+                except Exception:
+                    pass
         elif level == "global":
             # Global injects the master index (titles + summaries for all pages)
             index = LOOM_ROOT / "wiki" / "meta" / "index.md"

@@ -4895,7 +4895,7 @@ function initChat() {
 
       popover.innerHTML = `
         <div class="ctx-popover-section">
-          <div class="ctx-popover-label">Scope</div>
+          <div class="ctx-popover-label">Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(applies to next new chat)</span></div>
           <div class="seg ctx-scope-seg">
             ${levels.map(l => `<button data-val="${l.val}"${l.val === current ? ' class="on"' : ''}>${l.label}</button>`).join('')}
           </div>
