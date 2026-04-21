@@ -990,10 +990,10 @@ def api_context_info(session_id: str = "", level: str = "page"):
             except Exception:
                 pass
         elif level == "global":
-            # Wiki index + key files
+            # Wiki pages (flat .md or folders with ABOUT.md) + index
             wiki_pages = LOOM_ROOT / "wiki" / "pages"
             if wiki_pages.exists():
-                for f in sorted(wiki_pages.rglob("ABOUT.md"))[:20]:
+                for f in sorted(wiki_pages.rglob("*.md"))[:30]:
                     rel = str(f.relative_to(LOOM_ROOT))
                     try:
                         tokens = len(f.read_text(encoding="utf-8", errors="replace")) // 4
