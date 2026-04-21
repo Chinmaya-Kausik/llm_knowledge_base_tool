@@ -5424,8 +5424,7 @@ function sendChatMessage() {
   syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  console.log('[chat-send] text:', JSON.stringify(text), 'ws:', mainP.ws?.readyState, 'generating:', chatGenerating, 'checkpoint:', checkpointMode);
-  if (!text && !checkpointMode) { console.log('[chat-send] empty text, returning'); return; }
+  if (!text && !checkpointMode) return;
   if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) {
     // Queue the message and connect — send after WS opens
     connectChat();
@@ -5480,7 +5479,6 @@ function sendChatMessage() {
 
   chatMessages.push({ role: 'user', content: fullText });
   currentResponseText = '';
-  updatePanelSubtitle('main');
   const userMsgEl = appendChatMessage('user', text || '', isRedirect ? 'redirect' : null);
   // Show sent images inline in the message
   if (sentImages.length > 0) {
