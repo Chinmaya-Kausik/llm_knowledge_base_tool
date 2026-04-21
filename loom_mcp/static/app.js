@@ -5424,7 +5424,8 @@ function sendChatMessage() {
   syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text && !checkpointMode) return;
+  console.log('[chat-send] text:', JSON.stringify(text), 'ws:', mainP.ws?.readyState, 'generating:', chatGenerating, 'checkpoint:', checkpointMode);
+  if (!text && !checkpointMode) { console.log('[chat-send] empty text, returning'); return; }
   if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) {
     // Queue the message and connect — send after WS opens
     connectChat();
