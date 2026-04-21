@@ -1132,6 +1132,76 @@ async def api_append_chat(request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/chat/list")
+def api_list_chats():
+    """List saved chat transcripts from raw/chats/."""
+    chats_dir = LOOM_ROOT / "raw" / "chats"
+    if not chats_dir.exists():
+        return {"chats": []}
+    chats = []
+    for f in sorted(chats_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if "_precompact_" in f.name:
+            continue
+        # Read frontmatter for title/date
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+            title = f.stem.replace("_", " ").replace("-", " ")
+            date = ""
+            context = ""
+            for line in text.split("\n")[:20]:
+                if line.startswith("title:"):
+                    title = line[6:].strip().strip('"').strip("'")
+                elif line.startswith("date:"):
+                    date = line[5:].strip().strip('"')
+                elif line.startswith("context_path:"):
+                    context = line[13:].strip().strip('"')
+            msg_count = text.count("\n## User") + text.count("\n## Assistant")
+            chats.append({
+                "filename": f.name,
+                "title": title,
+                "date": date,
+                "context": context,
+                "messages": msg_count,
+            })
+        except Exception:
+            continue
+    return {"chats": chats[:50]}
+
+
+@app.get("/api/chat/load")
+def api_load_chat(filename: str):
+    """Load a saved chat transcript and parse it into messages."""
+    chat_file = LOOM_ROOT / "raw" / "chats" / filename
+    if not chat_file.exists():
+        return {"error": "Chat not found"}
+    try:
+        text = chat_file.read_text(encoding="utf-8", errors="replace")
+        # Parse markdown transcript into messages
+        messages = []
+        current_role = None
+        current_content = []
+        for line in text.split("\n"):
+            if line.startswith("## User"):
+                if current_role and current_content:
+                    messages.append({"role": current_role, "content": "\n".join(current_content).strip()})
+                current_role = "user"
+                current_content = []
+            elif line.startswith("## Assistant"):
+                if current_role and current_content:
+                    messages.append({"role": current_role, "content": "\n".join(current_content).strip()})
+                current_role = "assistant"
+                current_content = []
+            elif line.startswith("---") and not current_role:
+                continue  # Skip frontmatter delimiter
+            elif current_role:
+                current_content.append(line)
+        if current_role and current_content:
+            messages.append({"role": current_role, "content": "\n".join(current_content).strip()})
+        return {"filename": filename, "messages": messages}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/api/chat/save")
 async def api_save_chat(request: Request):
     """Save a chat transcript to raw/chats/."""
