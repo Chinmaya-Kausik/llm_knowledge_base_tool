@@ -3514,7 +3514,7 @@ class ChatPanel {
     this.assistantEl = null;
     this.thinkingEl = null;
     this.thinkingWrapper = null;
-    this.contextLevel = options.contextLevel || 'page';
+    this.contextLevel = options.contextLevel || getSmartContextDefault();
     this.contextPath = options.contextPath || null; // Custom context path
     this.messages = options.messages ? [...options.messages] : [];
     this.isTemporary = false;
@@ -3858,18 +3858,26 @@ function openNewChat() {
 }
 
 function focusChatPanel(panelId) {
+  // If fullpage overlay is open, ensure chat appears above it
+  const fullpage = document.getElementById('fullpage-overlay');
+  const fullpageOpen = fullpage && fullpage.style.display !== 'none';
+
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
-    if (!cp.classList.contains('chat-bottom') && !cp.classList.contains('chat-right') && !cp.classList.contains('chat-float')) {
+    // Uncollapse if collapsed
+    if (cp.classList.contains('chat-collapsed') || cp.classList.contains('chat-collapsed-right') || cp.classList.contains('chat-collapsed-float')) {
       const ph = document.querySelector('#chat-header .panel-header');
       if (ph) ph.click();
     }
+    // Bring above fullpage overlay if needed
+    if (fullpageOpen) cp.style.zIndex = '350';
     if (cp.classList.contains('chat-float')) bringToFront(cp);
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
+      if (fullpageOpen) p.container.style.zIndex = '350';
       bringToFront(p.container);
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
     }
@@ -5573,6 +5581,16 @@ function sendChatMessage() {
     if (tokEl) tokEl.textContent = chatTokenCount + ' tokens';
   }, 100);
   syncToPanel(chatPanels.get('main'));
+}
+
+function getSmartContextDefault() {
+  // Root canvas → global, inside a folder → folder, viewing a file → page
+  const level = typeof currentLevel === 'function' ? currentLevel() : null;
+  if (!level || !level.parentPath) return 'global';
+  // Check if we're inside a subfolder
+  const depth = (level.parentPath || '').split('/').filter(Boolean).length;
+  if (depth === 0) return 'global';
+  return 'folder';
 }
 
 function updateContextChip() {
@@ -8485,6 +8503,10 @@ async function init() {
         return;
       }
       if (checkpointMode) { exitCheckpointMode(); return; }
+      // If the focused chat panel is above fullpage, send it back behind
+      const focusedChatId = chatFocusHistory[0] || 'main';
+      const focusedEl = focusedChatId === 'main' ? document.getElementById('chat-panel') : chatPanels.get(focusedChatId)?.container;
+      if (focusedEl && focusedEl.style.zIndex === '350') { focusedEl.style.zIndex = ''; return; }
       if (expandedCard) { collapseFullPage(); return; }
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }

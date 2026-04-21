@@ -513,13 +513,25 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                 _track(str(about_path.relative_to(loom_root)) if about_path.exists() else folder_rel + "/ABOUT.md", len(content), "Folder overview")
 
     elif context_level == "global":
+        # Root ABOUT.md — describes the loom
+        root_about = loom_root / "ABOUT.md"
+        if root_about.exists():
+            try:
+                root_content = root_about.read_text(encoding="utf-8").strip()
+                if root_content:
+                    parts.append(f"--- Loom Overview ---\n{root_content}")
+                    _track("ABOUT.md", len(root_content), "Loom overview")
+            except Exception:
+                pass
+        # Master index
         index_path = loom_root / "wiki" / "meta" / "index.md"
         if index_path.exists():
             try:
                 from loom_mcp.lib.frontmatter import read_frontmatter
                 _, index_content = read_frontmatter(index_path)
-                if len(index_content) > budget:
-                    index_content = index_content[:budget - 50] + "\n\n[... truncated ...]"
+                remaining = budget - sum(len(p) for p in parts)
+                if len(index_content) > remaining:
+                    index_content = index_content[:remaining - 50] + "\n\n[... truncated ...]"
                 parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
                 _track("wiki/meta/index.md", len(index_content), "Master index")
             except Exception:
