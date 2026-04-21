@@ -3858,9 +3858,9 @@ function openNewChat() {
 }
 
 function focusChatPanel(panelId) {
-  // If fullpage overlay is open, ensure chat appears above it
   const fullpage = document.getElementById('fullpage-overlay');
   const fullpageOpen = fullpage && fullpage.style.display !== 'none';
+  console.log('[focusChat]', panelId, 'fullpageOpen:', fullpageOpen, 'topZIndex:', topZIndex);
 
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
@@ -3869,23 +3869,28 @@ function focusChatPanel(panelId) {
       const ph = document.querySelector('#chat-header .panel-header');
       if (ph) ph.click();
     }
-    // Bring above fullpage overlay if needed
-    if (fullpageOpen) {
-      topZIndex = Math.max(topZIndex, 350);
-      cp.style.setProperty('z-index', '350', 'important');
-    }
     if (cp.classList.contains('chat-float')) bringToFront(cp);
+    // Bring above fullpage AFTER bringToFront (so we override it)
+    if (fullpageOpen) {
+      topZIndex = Math.max(topZIndex, 400);
+      cp.style.setProperty('z-index', String(topZIndex), 'important');
+      console.log('[focusChat] main elevated to', topZIndex);
+    }
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
-      if (fullpageOpen) {
-        topZIndex = Math.max(topZIndex, 350);
-        p.container.style.setProperty('z-index', '350', 'important');
-      }
       bringToFront(p.container);
+      // Bring above fullpage AFTER bringToFront
+      if (fullpageOpen) {
+        topZIndex = Math.max(topZIndex, 400);
+        p.container.style.setProperty('z-index', String(topZIndex), 'important');
+        console.log('[focusChat] floating elevated to', topZIndex);
+      }
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
+    } else {
+      console.log('[focusChat] panel not found:', panelId);
     }
   }
 }
@@ -8512,7 +8517,11 @@ async function init() {
       // If the focused chat panel is above fullpage, send it back behind
       const focusedChatId = chatFocusHistory[0] || 'main';
       const focusedEl = focusedChatId === 'main' ? document.getElementById('chat-panel') : chatPanels.get(focusedChatId)?.container;
-      if (focusedEl && parseInt(focusedEl.style.zIndex) >= 350) { focusedEl.style.setProperty('z-index', '100', 'important'); return; }
+      if (focusedEl && parseInt(focusedEl.style.zIndex) >= 350) {
+        console.log('[Escape] sending chat behind fullpage, was z-index:', focusedEl.style.zIndex);
+        focusedEl.style.setProperty('z-index', '100', 'important');
+        return;
+      }
       if (expandedCard) { collapseFullPage(); return; }
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }
@@ -8552,9 +8561,10 @@ async function init() {
     // Cmd+J: cycle focus between chat inputs (in visit order)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
-      // Build list: all panels, ordered by focus history, then any not yet in history
       const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
-      if (alive.length <= 1) { focusChatPanel(alive[0] || 'main'); return; }
+      console.log('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
+      if (alive.length === 0) { createFloatingPanel(); return; }
+      if (alive.length === 1) { focusChatPanel(alive[0]); return; }
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
       focusChatPanel(alive[chatCycleIndex]);
       return;
@@ -8563,7 +8573,7 @@ async function init() {
     if (matchesBinding(e, 'cycle-chat-solo')) {
       e.preventDefault();
       const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
-      if (!alive.length) return;
+      if (alive.length === 0) { createFloatingPanel(); return; }
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
       const targetId = alive[chatCycleIndex];
       for (const [id, p] of chatPanels) {
