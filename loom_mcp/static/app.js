@@ -1295,6 +1295,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
       ${typeBadgeHtml}
       <div class="doc-controls">
         ${childBadge}
+        <button class="btn-history" title="Git history"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5V6L7.5 7.5"/></svg></button>
         <button class="btn-collapse" title="Collapse">-</button>
       </div>
     </div>
@@ -1443,6 +1444,88 @@ function wireCardButtons(card, hasChildren) {
       drillInto(path);
     });
   }
+
+  // History button — show git log for this file
+  const histBtn = card.querySelector('.btn-history');
+  if (histBtn) {
+    histBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showCardHistory(card, path);
+    });
+  }
+}
+
+async function showCardHistory(card, path) {
+  // Toggle: if history pane already exists, remove it
+  const existing = card.querySelector('.card-history');
+  if (existing) { existing.remove(); return; }
+
+  const histPane = document.createElement('div');
+  histPane.className = 'card-history';
+  histPane.innerHTML = '<div style="padding:8px;color:var(--text-dim);font-size:var(--fs-xs)">Loading history...</div>';
+  card.querySelector('.doc-body').after(histPane);
+
+  try {
+    const resp = await authFetch(`${getBaseUrl()}/api/git-history?path=${encodeURIComponent(path)}&limit=10`);
+    if (!resp.ok) throw new Error('Failed');
+    const data = await resp.json();
+    if (!data.commits?.length) {
+      histPane.innerHTML = '<div style="padding:8px;color:var(--text-dim);font-size:var(--fs-xs)">No git history</div>';
+      return;
+    }
+    histPane.innerHTML = data.commits.map(c => `
+      <div class="card-history-item" data-hash="${c.hash}">
+        <span class="card-history-msg">${c.message}</span>
+        <span class="card-history-date">${c.date.split(' ')[0]}</span>
+      </div>
+    `).join('');
+
+    // Click a commit to show diff
+    histPane.querySelectorAll('.card-history-item').forEach(item => {
+      item.onclick = async () => {
+        const hash = item.dataset.hash;
+        // Toggle active
+        histPane.querySelectorAll('.card-history-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        // Show diff
+        let diffEl = histPane.querySelector('.card-history-diff');
+        if (!diffEl) {
+          diffEl = document.createElement('div');
+          diffEl.className = 'card-history-diff';
+          histPane.appendChild(diffEl);
+        }
+        diffEl.innerHTML = '<span style="color:var(--text-dim)">Loading diff...</span>';
+        try {
+          const dr = await authFetch(`${getBaseUrl()}/api/git-diff?path=${encodeURIComponent(path)}&hash=${hash}`);
+          const dd = await dr.json();
+          if (dd.diff) {
+            diffEl.innerHTML = renderDiff(dd.diff);
+          } else {
+            diffEl.innerHTML = '<span style="color:var(--text-dim)">No diff (initial commit)</span>';
+          }
+        } catch { diffEl.innerHTML = '<span style="color:var(--red)">Failed to load diff</span>'; }
+      };
+    });
+  } catch {
+    histPane.innerHTML = '<div style="padding:8px;color:var(--red);font-size:var(--fs-xs)">Could not load history</div>';
+  }
+}
+
+function renderDiff(diffText) {
+  const lines = diffText.split('\n');
+  let html = '';
+  for (const line of lines) {
+    if (line.startsWith('@@')) {
+      html += `<div class="diff-hunk">${line.replace(/</g, '&lt;')}</div>`;
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      html += `<div class="diff-add">${line.replace(/</g, '&lt;')}</div>`;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      html += `<div class="diff-del">${line.replace(/</g, '&lt;')}</div>`;
+    } else if (!line.startsWith('diff ') && !line.startsWith('index ') && !line.startsWith('---') && !line.startsWith('+++')) {
+      html += `<div class="diff-ctx">${line.replace(/</g, '&lt;') || '&nbsp;'}</div>`;
+    }
+  }
+  return html;
 }
 
 async function expandCardContent(card, path) {

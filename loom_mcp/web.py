@@ -917,6 +917,45 @@ def api_context_info(session_id: str = "", level: str = "page"):
     }
 
 
+@app.get("/api/git-history")
+def api_git_history(path: str, limit: int = 10):
+    """Return git log for a file in the loom."""
+    import subprocess
+    target = LOOM_ROOT / path
+    if not target.exists():
+        return {"error": "File not found", "commits": []}
+    try:
+        result = subprocess.run(
+            ["git", "log", f"--max-count={limit}", "--format=%H|%ai|%s", "--", str(target)],
+            capture_output=True, text=True, cwd=str(LOOM_ROOT), timeout=5
+        )
+        commits = []
+        for line in result.stdout.strip().split('\n'):
+            if '|' in line:
+                parts = line.split('|', 2)
+                commits.append({"hash": parts[0], "date": parts[1].strip(), "message": parts[2].strip()})
+        return {"path": path, "commits": commits}
+    except Exception as e:
+        return {"error": str(e), "commits": []}
+
+
+@app.get("/api/git-diff")
+def api_git_diff(path: str, hash: str):
+    """Return git diff for a specific commit on a file."""
+    import subprocess
+    target = LOOM_ROOT / path
+    if not target.exists():
+        return {"error": "File not found"}
+    try:
+        result = subprocess.run(
+            ["git", "diff", f"{hash}~1", hash, "--", str(target)],
+            capture_output=True, text=True, cwd=str(LOOM_ROOT), timeout=5
+        )
+        return {"path": path, "hash": hash, "diff": result.stdout}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/api/browse")
 def api_browse(path: str = "~"):
     """List directories at a given path for the workspace picker."""

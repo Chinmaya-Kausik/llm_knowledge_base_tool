@@ -1380,6 +1380,48 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 .sidebar-resize:hover { background: var(--accent-soft); }
 
+/* Card history (time machine) */
+.card-history {
+  border-top: 1px solid var(--border-soft);
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: var(--fs-xs);
+}
+.card-history-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 10px;
+  cursor: pointer;
+  gap: 8px;
+}
+.card-history-item:hover { background: var(--bg-hover); }
+.card-history-item.active { background: var(--accent-soft); }
+.card-history-msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.card-history-date {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.card-history-diff {
+  border-top: 1px solid var(--border-soft);
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.diff-add { background: var(--diff-add-bg); color: var(--diff-add-fg); padding: 0 10px; }
+.diff-del { background: var(--diff-del-bg); color: var(--diff-del-fg); padding: 0 10px; }
+.diff-ctx { color: var(--text-muted); padding: 0 10px; }
+.diff-hunk { color: var(--cyan); padding: 0 10px; font-weight: 500; }
+
 /* Sidebar counts */
 .sb-count {
   margin-left: auto;
