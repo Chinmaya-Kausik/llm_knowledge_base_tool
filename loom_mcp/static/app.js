@@ -6457,7 +6457,22 @@ function handleChatEvent(msg) {
 
     case 'result':
       // Store usage info for status bar
-      if (msg.usage) lastResultUsage = msg.usage;
+      if (msg.usage) {
+        lastResultUsage = msg.usage;
+        // Update context chip with real input token count (= context window size)
+        const inputTokens = msg.usage.input_tokens || msg.usage.inputTokens || 0;
+        if (inputTokens > 0) {
+          const chip = document.getElementById('chat-context-chip');
+          if (chip) {
+            const label = inputTokens >= 1000 ? `~${(inputTokens / 1000).toFixed(1)}K` : `~${inputTokens}`;
+            chip.querySelector('.ctx-tokens').textContent = label;
+            const pct = Math.min(100, (inputTokens / 200000) * 100);
+            const fill = chip.querySelector('.ctx-bar-fill');
+            if (fill) fill.style.width = pct + '%';
+            chip.dataset.usage = pct > 60 ? 'high' : pct > 30 ? 'mid' : '';
+          }
+        }
+      }
       if (msg.cost_usd) lastResultCost = msg.cost_usd;
       // Use result as authoritative text if we missed streaming
       if (msg.content && !currentResponseText) {
