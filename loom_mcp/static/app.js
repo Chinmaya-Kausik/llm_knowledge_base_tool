@@ -3534,6 +3534,7 @@ class ChatPanel {
     this.activePlanPath = null;
     this.activePlanContent = '';
     this.editedFiles = new Set();
+    this.readFiles = new Set();
     this.model = null;
     this.messagesContainer = null; // DOM element for this panel's messages
   }
@@ -3720,7 +3721,7 @@ let currentThinkingEl, currentThinkingWrapper, chatContextLevel, chatMessages;
 let chatIsTemporary, chatStartTime, chatTokenCount, chatTimerInterval;
 let currentActivityGroup, activeSubagents, currentResponseText, pendingAgentPrompt;
 let checkpointMode, redirectSnapshot, redirectCheckpoints, wasUserInterrupt;
-let lastResultUsage, lastResultCost, activePlanPath, activePlanContent, sessionEditedFiles;
+let lastResultUsage, lastResultCost, activePlanPath, activePlanContent, sessionEditedFiles, sessionReadFiles;
 let chatMessagesContainer = null; // Current panel's messages DOM element
 let selectedCards = new Set();
 
@@ -3739,6 +3740,7 @@ function syncFromPanel(panel) {
   wasUserInterrupt = panel.wasUserInterrupt; lastResultUsage = panel.lastResultUsage;
   lastResultCost = panel.lastResultCost; activePlanPath = panel.activePlanPath;
   activePlanContent = panel.activePlanContent; sessionEditedFiles = panel.editedFiles;
+  sessionReadFiles = panel.readFiles;
   chatMessagesContainer = panel.messagesContainer;
 }
 
@@ -3757,6 +3759,7 @@ function syncToPanel(panel) {
   panel.wasUserInterrupt = wasUserInterrupt; panel.lastResultUsage = lastResultUsage;
   panel.lastResultCost = lastResultCost; panel.activePlanPath = activePlanPath;
   panel.activePlanContent = activePlanContent; panel.editedFiles = sessionEditedFiles;
+  panel.readFiles = sessionReadFiles;
   panel.messagesContainer = chatMessagesContainer;
 }
 
@@ -4911,18 +4914,28 @@ function initChat() {
       `;
       ctxChip.parentElement.appendChild(popover);
 
-      // Wire scope buttons
+      // Wire scope buttons — locked after first message
+      const hasMessages = (activePanel.messages?.length || chatMessages?.length || 0) > 0;
       popover.querySelectorAll('.ctx-scope-seg button').forEach(btn => {
-        btn.onclick = (ev) => {
-          ev.stopPropagation();
-          popover.querySelectorAll('.ctx-scope-seg button').forEach(b => b.classList.remove('on'));
-          btn.classList.add('on');
-          activePanel.contextLevel = btn.dataset.val;
-          syncFromPanel(activePanel);
-          updateContextChip();
-          loadContextBreakdown(btn.dataset.val);
-        };
+        if (hasMessages) {
+          btn.disabled = true;
+          btn.style.opacity = '0.4';
+          btn.style.cursor = 'not-allowed';
+        } else {
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            popover.querySelectorAll('.ctx-scope-seg button').forEach(b => b.classList.remove('on'));
+            btn.classList.add('on');
+            activePanel.contextLevel = btn.dataset.val;
+            syncFromPanel(activePanel);
+            updateContextChip();
+            loadContextBreakdown(btn.dataset.val);
+          };
+        }
       });
+      if (hasMessages) {
+        popover.querySelector('.ctx-popover-label').innerHTML = 'Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(locked for this session)</span>';
+      }
 
       // Load context breakdown from backend
       function loadContextBreakdown(level) {
@@ -4939,11 +4952,20 @@ function initChat() {
               html += `<div class="ctx-block-row"><span>${block.name}</span><span class="ctx-block-tokens">~${block.tokens.toLocaleString()} tokens${est}</span></div>`;
             }
             if (data.files?.length > 0) {
-              html += '<div class="ctx-popover-label" style="margin-top:6px">Files injected into prompt</div>';
+              html += '<div class="ctx-popover-label" style="margin-top:6px">Injected at start</div>';
               for (const f of data.files) {
                 const note = f.note ? `<div style="font-size:9px;color:var(--text-dim);padding-left:8px">${f.note}</div>` : '';
                 html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>${note}`;
               }
+            }
+            // Show files read during this session
+            const readFiles = [...(sessionReadFiles || [])];
+            if (readFiles.length > 0) {
+              html += '<div class="ctx-popover-label" style="margin-top:6px">Read during chat</div>';
+              for (const path of readFiles.slice(0, 30)) {
+                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${path}</span></div>`;
+              }
+              if (readFiles.length > 30) html += `<div style="font-size:9px;color:var(--text-dim);padding:2px 8px">+${readFiles.length - 30} more</div>`;
             }
             bd.innerHTML = html;
             // Update footer
@@ -6012,6 +6034,12 @@ function handleChatEvent(msg) {
       const toolName = msg.tool || 'tool';
       if (!toolName || toolName === 'unknown') break;
       const toolDesc = formatToolDesc(toolName, msg.input || {});
+
+      // Track files accessed during this session
+      const toolInput = msg.input || {};
+      if (toolInput.file_path) sessionReadFiles.add(toolInput.file_path);
+      if (toolInput.path) sessionReadFiles.add(toolInput.path);
+      if (toolName === 'Glob' && toolInput.pattern) sessionReadFiles.add(toolInput.pattern);
 
       // Finalize thinking (for the right context)
       const tw2 = sub ? sub.thinkingWrapper : currentThinkingWrapper;
