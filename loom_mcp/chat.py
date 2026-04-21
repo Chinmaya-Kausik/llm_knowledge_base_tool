@@ -362,9 +362,7 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
     # 1. Permissions — always included, highest priority
     perm = _permissions_block(loom_root)
     used = len(perm)
-    # Permissions checks CLAUDE.md existence
-    if (loom_root / "CLAUDE.md").exists():
-        files_included.append({"path": "CLAUDE.md", "block": "permissions", "chars": 0, "note": "Checked for existence"})
+    # Permissions is a hardcoded string — CLAUDE.md is only checked for existence, not injected
 
     # 2. Memory — second priority
     mem = _memory_block(loom_root, page_path, config)
@@ -393,27 +391,11 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
 
     # 3. Location — lowest priority, adaptive
     remaining_budget = max(0, budget - used - 50)
-    loc = _location_block_adaptive(loom_root, page_path, context_level, config, remaining_budget)
+    loc_files = []  # Track files read by location block
+    loc = _location_block_adaptive(loom_root, page_path, context_level, config, remaining_budget, loc_files)
     if loc:
         used += len(loc)
-        # Track location files based on what the function actually reads
-        if context_level == "page" and page_path:
-            full_path = loom_root / page_path
-            if full_path.exists():
-                files_included.append({"path": page_path, "block": "location", "chars": len(loc)})
-            parent_about = full_path.parent / "ABOUT.md"
-            if parent_about.exists() and full_path.parent != loom_root:
-                files_included.append({"path": str(parent_about.relative_to(loom_root)), "block": "location", "chars": 0, "note": "Parent folder"})
-        elif context_level == "folder" and page_path:
-            full_path = loom_root / page_path
-            folder = full_path if full_path.is_dir() else full_path.parent
-            about = folder / "ABOUT.md"
-            if about.exists():
-                files_included.append({"path": str(about.relative_to(loom_root)), "block": "location", "chars": len(loc)})
-        elif context_level == "global":
-            index = loom_root / "wiki" / "meta" / "index.md"
-            if index.exists():
-                files_included.append({"path": "wiki/meta/index.md", "block": "location", "chars": len(loc)})
+    files_included.extend(loc_files)
 
     # Assemble
     parts = [perm]
@@ -443,8 +425,11 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
     return total
 
 
-def _location_block_adaptive(loom_root: Path, page_path: str | None, context_level: str, config: dict, budget: int) -> str | None:
-    """Location block with adaptive content injection based on remaining budget."""
+def _location_block_adaptive(loom_root: Path, page_path: str | None, context_level: str, config: dict, budget: int, files_out: list | None = None) -> str | None:
+    """Location block with adaptive content injection based on remaining budget.
+
+    If files_out is provided, appends dicts describing each file actually read.
+    """
     if not page_path:
         return None
 
@@ -472,21 +457,29 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
 
     parts = []
 
+    def _track(path_rel, chars, note=None):
+        if files_out is not None:
+            files_out.append({"path": path_rel, "block": "location", "chars": chars, "note": note})
+
     if context_level == "page":
         full_path = loom_root / page_path
         if full_path.exists() and config.get("page_content", {}).get("enabled", True):
             content = get_page_content(full_path)
             if content:
+                actual_path = page_path
+                # get_page_content on a dir reads ABOUT.md
+                if full_path.is_dir():
+                    actual_path = page_path.rstrip("/") + "/ABOUT.md"
                 if len(content) <= 2000:
-                    # Small file: inject full content
                     parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
+                    _track(actual_path, len(content), "Full content")
                 elif len(content) <= budget - 200:
-                    # Medium file: inject truncated to budget
                     max_chars = min(len(content), budget - 200)
                     parts.append(f"The user is currently viewing: `{page_path}`\n\n{content[:max_chars]}\n\n[... truncated ...]")
+                    _track(actual_path, max_chars, "Truncated")
                 else:
-                    # Large file: just the path, Claude reads on demand
                     parts.append(f"The user is currently viewing: `{page_path}` (large file — read on demand)")
+                    _track(actual_path, 0, "Path only (too large)")
             else:
                 parts.append(f"The user is currently viewing: `{page_path}`")
 
@@ -503,7 +496,7 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                                 remaining = budget - current_size - 50
                                 if len(parent_content) <= remaining:
                                     parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
-                                # else: skip parent, not enough budget
+                                    _track(str(parent_about.relative_to(loom_root)), len(parent_content), "Parent folder")
 
     elif context_level == "folder":
         full_path = loom_root / page_path
@@ -515,6 +508,8 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                     content = content[:budget - 50] + "\n\n[... truncated ...]"
                 folder_rel = str(folder.relative_to(loom_root))
                 parts.append(f"The user is browsing folder: `{folder_rel}`\n\n{content}")
+                about_path = folder / "ABOUT.md"
+                _track(str(about_path.relative_to(loom_root)) if about_path.exists() else folder_rel + "/ABOUT.md", len(content), "Folder overview")
 
     elif context_level == "global":
         index_path = loom_root / "wiki" / "meta" / "index.md"
@@ -525,6 +520,7 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                 if len(index_content) > budget:
                     index_content = index_content[:budget - 50] + "\n\n[... truncated ...]"
                 parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
+                _track("wiki/meta/index.md", len(index_content), "Master index")
             except Exception:
                 pass
 
