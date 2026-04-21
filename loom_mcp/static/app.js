@@ -4900,8 +4900,8 @@ function initChat() {
             ${levels.map(l => `<button data-val="${l.val}"${l.val === current ? ' class="on"' : ''}>${l.label}</button>`).join('')}
           </div>
         </div>
-        <div class="ctx-popover-section">
-          <div class="ctx-popover-label">Context breakdown</div>
+        <div class="ctx-popover-section ctx-popover-scroll">
+          <div class="ctx-popover-label">Context sent to agent</div>
           <div id="ctx-breakdown" class="ctx-breakdown"><span style="color:var(--text-dim)">Loading...</span></div>
         </div>
         <div class="ctx-popover-footer">
@@ -4939,9 +4939,10 @@ function initChat() {
               html += `<div class="ctx-block-row"><span>${block.name}</span><span class="ctx-block-tokens">~${block.tokens.toLocaleString()} tokens${est}</span></div>`;
             }
             if (data.files?.length > 0) {
-              html += '<div class="ctx-popover-label" style="margin-top:6px">Files in context</div>';
+              html += '<div class="ctx-popover-label" style="margin-top:6px">Files injected into prompt</div>';
               for (const f of data.files) {
-                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>`;
+                const note = f.note ? `<div style="font-size:9px;color:var(--text-dim);padding-left:8px">${f.note}</div>` : '';
+                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>${note}`;
               }
             }
             bd.innerHTML = html;

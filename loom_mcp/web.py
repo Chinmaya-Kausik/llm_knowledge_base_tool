@@ -993,23 +993,27 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
             except Exception:
                 pass
         elif level == "global":
-            # Wiki pages (flat .md or folders with ABOUT.md) + index
-            wiki_pages = LOOM_ROOT / "wiki" / "pages"
-            if wiki_pages.exists():
-                for f in sorted(wiki_pages.rglob("*.md"))[:30]:
-                    rel = str(f.relative_to(LOOM_ROOT))
-                    try:
-                        tokens = len(f.read_text(encoding="utf-8", errors="replace")) // 4
-                        files.append({"path": rel, "type": "global", "tokens": tokens})
-                    except Exception:
-                        pass
+            # Global injects the master index (titles + summaries for all pages)
             index = LOOM_ROOT / "wiki" / "meta" / "index.md"
             if index.exists():
                 try:
-                    tokens = len(index.read_text(encoding="utf-8", errors="replace")) // 4
-                    files.insert(0, {"path": "wiki/meta/index.md", "type": "index", "tokens": tokens})
+                    content = index.read_text(encoding="utf-8", errors="replace")
+                    tokens = len(content) // 4
+                    # Count how many pages are referenced in the index
+                    page_count = content.count("\n## ") + content.count("\n- ")
+                    files.append({"path": "wiki/meta/index.md", "type": "index", "tokens": tokens,
+                                  "note": f"Master index ({page_count} pages summarized)"})
                 except Exception:
                     pass
+            # Also check conventions and memory index
+            for extra in ("wiki/meta/conventions.md", "MEMORY.md"):
+                ef = LOOM_ROOT / extra
+                if ef.exists():
+                    try:
+                        tokens = len(ef.read_text(encoding="utf-8", errors="replace")) // 4
+                        files.append({"path": extra, "type": "global", "tokens": tokens})
+                    except Exception:
+                        pass
 
     total_chars = len(perm) + len(mem) + loc_chars
     return {

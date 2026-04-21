@@ -1608,9 +1608,11 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   box-shadow: var(--shadow-lg);
   z-index: 200;
   width: 300px;
-  max-height: 360px;
   padding: 0;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 400px;
 }
 .ctx-popover-section {
   padding: 10px 12px;
@@ -1626,6 +1628,11 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   font-family: var(--font-mono);
 }
 .ctx-scope-seg { margin-bottom: 0; }
+.ctx-popover-section.ctx-popover-scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
 .ctx-breakdown { font-size: var(--fs-xs); }
 .ctx-block-row {
   display: flex;
