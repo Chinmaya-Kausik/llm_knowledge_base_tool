@@ -4179,10 +4179,13 @@ function createPanelHeader(panelId, label = 'Chat') {
       else if (cp.classList.contains('chat-float') || cp.classList.contains('chat-collapsed-float')) mode = 'float';
 
       if (isOpen) {
-        // Collapsing — save position for float, clear size styles
+        // Collapsing — save position and z-index for float, clear size styles
         const pos = mode === 'float' ? { left: cp.style.left, top: cp.style.top } : null;
+        const savedZ = cp.style.getPropertyValue('z-index');
+        const savedZPriority = cp.style.getPropertyPriority('z-index');
         cp.removeAttribute('style');
         if (pos) { cp.style.left = pos.left; cp.style.top = pos.top; }
+        if (savedZ) cp.style.setProperty('z-index', savedZ, savedZPriority);
 
         ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
         const collapsed = mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed';
