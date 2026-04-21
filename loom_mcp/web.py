@@ -956,22 +956,55 @@ def api_context_info(session_id: str = "", level: str = "page"):
     loc_estimates = {"page": 1000, "folder": 4000, "global": 12000}
     loc_chars = loc_estimates.get(level, 1000)
 
-    # Build file list from page_path
+    # Build file list based on context level
     files = []
     if page_path and not page_path.startswith("vm:"):
         target = LOOM_ROOT / page_path
-        if target.is_file():
+        if level == "page":
+            # Current file or folder's ABOUT.md
+            if target.is_file():
+                try:
+                    content = target.read_text(encoding="utf-8", errors="replace")
+                    files.append({"path": page_path, "type": "page", "tokens": len(content) // 4})
+                except Exception:
+                    pass
+            elif target.is_dir():
+                about = target / "ABOUT.md"
+                if about.exists():
+                    try:
+                        content = about.read_text(encoding="utf-8", errors="replace")
+                        files.append({"path": page_path + "/ABOUT.md", "type": "page", "tokens": len(content) // 4})
+                    except Exception:
+                        pass
+        elif level == "folder":
+            # All files in the folder (or parent folder if page_path is a file)
+            folder = target if target.is_dir() else target.parent
             try:
-                content = target.read_text(encoding="utf-8", errors="replace")
-                files.append({"path": page_path, "type": "page", "tokens": len(content) // 4})
+                for f in sorted(folder.rglob("*.md"))[:20]:
+                    rel = str(f.relative_to(LOOM_ROOT))
+                    try:
+                        tokens = len(f.read_text(encoding="utf-8", errors="replace")) // 4
+                        files.append({"path": rel, "type": "folder", "tokens": tokens})
+                    except Exception:
+                        pass
             except Exception:
                 pass
-        elif target.is_dir():
-            about = target / "ABOUT.md"
-            if about.exists():
+        elif level == "global":
+            # Wiki index + key files
+            wiki_pages = LOOM_ROOT / "wiki" / "pages"
+            if wiki_pages.exists():
+                for f in sorted(wiki_pages.rglob("ABOUT.md"))[:20]:
+                    rel = str(f.relative_to(LOOM_ROOT))
+                    try:
+                        tokens = len(f.read_text(encoding="utf-8", errors="replace")) // 4
+                        files.append({"path": rel, "type": "global", "tokens": tokens})
+                    except Exception:
+                        pass
+            index = LOOM_ROOT / "wiki" / "meta" / "index.md"
+            if index.exists():
                 try:
-                    content = about.read_text(encoding="utf-8", errors="replace")
-                    files.append({"path": page_path + "/ABOUT.md", "type": "page", "tokens": len(content) // 4})
+                    tokens = len(index.read_text(encoding="utf-8", errors="replace")) // 4
+                    files.insert(0, {"path": "wiki/meta/index.md", "type": "index", "tokens": tokens})
                 except Exception:
                     pass
 

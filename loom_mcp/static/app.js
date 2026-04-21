@@ -5424,8 +5424,18 @@ function sendChatMessage() {
   syncFromPanel(mainP);
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
+  if (!text && !checkpointMode) return;
   if (!mainP.ws || mainP.ws.readyState !== WebSocket.OPEN) {
+    // Queue the message and connect — send after WS opens
     connectChat();
+    const waitForOpen = () => {
+      if (mainP.ws && mainP.ws.readyState === WebSocket.OPEN) {
+        sendChatMessage();
+      } else if (mainP.ws && mainP.ws.readyState === WebSocket.CONNECTING) {
+        setTimeout(waitForOpen, 100);
+      }
+    };
+    setTimeout(waitForOpen, 200);
     syncToPanel(mainP);
     return;
   }
