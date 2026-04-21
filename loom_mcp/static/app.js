@@ -8620,13 +8620,6 @@ async function init() {
       focusChatPanel(targetId);
       return;
     }
-    if (matchesBinding(e, 'toggle-chat')) {
-      e.preventDefault();
-      console.log('[Cmd+\\] toggle chat');
-      const ph = document.querySelector('#chat-header .panel-header');
-      if (ph) ph.click();
-      return;
-    }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
     if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
     if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
