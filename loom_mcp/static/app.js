@@ -3787,8 +3787,9 @@ function getAlivePanels() {
   return ordered;
 }
 
-function reopenClosedPanel() {
-  // Try to reopen the most recently focused closed/minimized panel
+function reopenAnyPanel() {
+  // Try to reopen any closed/minimized panel, preferring focus history order
+  // First check focus history
   for (const id of chatFocusHistory) {
     if (!chatPanels.has(id)) continue;
     if (id === 'main') {
@@ -3800,6 +3801,9 @@ function reopenClosedPanel() {
       if (p?.container?.classList.contains('minimized')) { focusChatPanel(id); return true; }
     }
   }
+  // Fallback: main is always there, just uncollapse it
+  const cp = document.getElementById('chat-panel');
+  if (cp) { focusChatPanel('main'); return true; }
   return false;
 }
 let chatSoloCycleIndex = -1;
@@ -3891,8 +3895,7 @@ function openNewChat() {
 }
 
 function focusChatPanel(panelId) {
-  const fullpage = document.getElementById('fullpage-overlay');
-  const fullpageOpen = fullpage && fullpage.style.display !== 'none';
+  const fullpageOpen = !!expandedCard;
   console.log('[focusChat]', panelId, 'fullpageOpen:', fullpageOpen, 'topZIndex:', topZIndex);
 
   if (panelId === 'main') {
@@ -4012,8 +4015,7 @@ function dockPanel(panelId, action) {
   else {
     chatPanelEl.classList.add('chat-float');
     // If fullpage is open, ensure we're above it (z-index 300)
-    const _fpCheck = document.getElementById('fullpage-overlay');
-    if (_fpCheck && _fpCheck.style.display !== 'none') {
+    if (expandedCard) {
       topZIndex = Math.max(topZIndex, 400);
     }
     bringToFront(chatPanelEl);
@@ -4463,8 +4465,7 @@ function createFloatingPanel(options = {}) {
   document.getElementById('canvas-container').appendChild(card);
   bringToFront(card);
   // If fullpage is open, elevate above it
-  const _fp = document.getElementById('fullpage-overlay');
-  if (_fp && _fp.style.display !== 'none') {
+  if (expandedCard) {
     topZIndex = Math.max(topZIndex, 400);
     card.style.setProperty('z-index', String(topZIndex), 'important');
   }
@@ -8626,7 +8627,7 @@ async function init() {
 
       if (alive.length === 0) {
         // Try reopening a closed panel first, else create new
-        if (!reopenClosedPanel()) createFloatingPanel();
+        reopenAnyPanel();
         return;
       }
       if (alive.length === 1) { focusChatPanel(alive[0]); return; }
@@ -8642,7 +8643,7 @@ async function init() {
       console.log('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
 
       if (alive.length === 0) {
-        if (!reopenClosedPanel()) createFloatingPanel();
+        reopenAnyPanel();
         return;
       }
 
