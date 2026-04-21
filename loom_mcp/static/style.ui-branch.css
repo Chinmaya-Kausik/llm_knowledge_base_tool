@@ -1897,3 +1897,49 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   opacity: 0.4;
 }
 .fs-content-body .keybind-reset:hover { opacity: 1; }
+
+/* =============================================================
+   RESPONSIVE — mobile + tablet
+   ============================================================= */
+
+/* Tablet (< 768px): sidebar collapses, chat full-width */
+@media (max-width: 768px) {
+  #sidebar { width: 0; min-width: 0; padding: 0; overflow: hidden; border-right: none; }
+  .sidebar-resize { display: none; }
+  #chat-panel.chat-bottom { height: 50vh; }
+  #chat-panel.chat-right { width: 100%; right: 0; }
+  .floating-chat-panel { width: calc(100vw - 20px) !important; left: 10px !important; }
+  .palette { width: calc(100vw - 32px); right: 16px; }
+  .sm-dropdown { width: calc(100vw - 32px); right: 16px; }
+  .fs-card { grid-template-columns: 1fr; width: 100vw; height: 100vh; }
+  .fs-nav { display: flex; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border-soft); padding: 0; }
+  .fs-nav-title { display: none; }
+  .fs-nav-item { white-space: nowrap; padding: 8px 12px; border-left: none; border-bottom: 2px solid transparent; }
+  .fs-nav-item.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .fs-content-header { padding: 16px 16px 12px; }
+  .fs-row { padding: 10px 16px; flex-wrap: wrap; }
+  .tb-search-wrap { max-width: 140px; }
+  .doc-card { max-width: calc(100vw - 40px); }
+}
+
+/* Phone (< 480px): single-column, touch-friendly */
+@media (max-width: 480px) {
+  #toolbar { padding: 0 8px; gap: 4px; }
+  .tb-brand-btn .tb-brand-text { display: none; }
+  .tb-tab-group .view-tab span { display: none; }
+  .tb-search-wrap { max-width: 100px; }
+  .tb-divider { display: none; }
+  #breadcrumb-bar { font-size: 10px; padding: 2px 8px; }
+  .palette { right: 8px; width: calc(100vw - 16px); }
+  .sm-dropdown { right: 8px; width: calc(100vw - 16px); }
+  #chat-panel.chat-bottom { height: 60vh; }
+  .keybinding-panel { width: calc(100vw - 16px); }
+  .fs-row { gap: 8px; }
+  .fs-row-ctrl { width: 100%; }
+  .seg button { font-size: 10px; padding: 3px 4px; }
+  /* Touch targets: minimum 44px */
+  .tree-item { min-height: 36px; }
+  .sm-item { min-height: 40px; }
+  .panel-header button { min-width: 36px; min-height: 36px; }
+  #chat-send { width: 44px; height: 44px; }
+}
