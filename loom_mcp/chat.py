@@ -484,8 +484,8 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
             else:
                 parts.append(f"The user is currently viewing: `{page_path}`")
 
-            # Parent folder ABOUT.md — only if budget allows
-            if config.get("folder_readme", {}).get("enabled", True):
+            # Parent folder ABOUT.md — only for files (not when page_path is already a folder)
+            if not full_path.is_dir() and config.get("folder_readme", {}).get("enabled", True):
                 current_size = sum(len(p) for p in parts)
                 if current_size < budget - 500:
                     parent = full_path.parent
