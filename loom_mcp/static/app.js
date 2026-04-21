@@ -3770,6 +3770,7 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 let chatFocusHistory = ['main']; // Ordered by recency of focus
 let chatCycleIndex = -1;
+let chatSoloCycleIndex = -1;
 
 // ========================================
 // Action Menu
@@ -3976,7 +3977,10 @@ function dockPanel(panelId, action) {
   chatPanelEl.removeAttribute('style');
   if (action === 'dock-right') chatPanelEl.classList.add('chat-right');
   else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
-  else chatPanelEl.classList.add('chat-float');
+  else {
+    chatPanelEl.classList.add('chat-float');
+    bringToFront(chatPanelEl);
+  }
 
   if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
 }
@@ -8584,20 +8588,17 @@ async function init() {
       e.preventDefault();
       const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
       if (alive.length === 0) { createFloatingPanel(); return; }
-      chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
-      const targetId = alive[chatCycleIndex];
+      chatSoloCycleIndex = ((chatSoloCycleIndex < 0 ? 0 : chatSoloCycleIndex) + 1) % alive.length;
+      const targetId = alive[chatSoloCycleIndex];
       for (const [id, p] of chatPanels) {
         if (id === targetId) continue;
         if (id === 'main') {
           const cp = document.getElementById('chat-panel');
-          const mode = cp.classList.contains('chat-right') ? 'right' : cp.classList.contains('chat-float') ? 'float' : 'bottom';
           const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
           if (isOpen) {
-            const pos = mode === 'float' ? { left: cp.style.left, top: cp.style.top } : null;
-            cp.removeAttribute('style');
-            if (pos) { cp.style.left = pos.left; cp.style.top = pos.top; }
-            ['chat-bottom','chat-right','chat-float'].forEach(c => cp.classList.remove(c));
-            cp.classList.add(mode === 'right' ? 'chat-collapsed-right' : mode === 'float' ? 'chat-collapsed-float' : 'chat-collapsed');
+            // Use toggleMinimize behavior instead of raw style manipulation
+            const ph = document.querySelector('#chat-header .panel-header');
+            if (ph) ph.click();
           }
         } else if (p.container) {
           p.container.classList.add('minimized');
