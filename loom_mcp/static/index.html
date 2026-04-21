@@ -445,6 +445,13 @@
       </div>
       <div id="plan-divider" style="display:none"></div>
       <div id="chat-main">
+        <div id="chat-search-bar" class="chat-search-bar" style="display:none">
+          <input type="text" id="chat-search-input" placeholder="Search in chat..." class="fs-input" style="flex:1;font-size:var(--fs-xs)">
+          <span id="chat-search-count" style="font-size:10px;color:var(--text-dim);white-space:nowrap"></span>
+          <button id="chat-search-prev" class="fs-btn" style="padding:2px 6px;font-size:10px" title="Previous">&#x25B2;</button>
+          <button id="chat-search-next" class="fs-btn" style="padding:2px 6px;font-size:10px" title="Next">&#x25BC;</button>
+          <button id="chat-search-close" class="fs-btn" style="padding:2px 6px;font-size:10px" title="Close">&#x2715;</button>
+        </div>
         <div id="chat-messages"></div>
       </div>
     </div>

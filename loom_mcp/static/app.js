@@ -4928,6 +4928,92 @@ function initChat() {
     updateContextChip();
   }
 
+  // Chat search — Cmd+F within chat
+  const chatSearchBar = document.getElementById('chat-search-bar');
+  const chatSearchInput = document.getElementById('chat-search-input');
+  const chatSearchCount = document.getElementById('chat-search-count');
+  let chatSearchMatches = [];
+  let chatSearchIdx = -1;
+
+  function openChatSearch() {
+    chatSearchBar.style.display = 'flex';
+    chatSearchInput.focus();
+    chatSearchInput.select();
+  }
+  function closeChatSearch() {
+    chatSearchBar.style.display = 'none';
+    chatSearchInput.value = '';
+    clearChatHighlights();
+    chatSearchMatches = [];
+    chatSearchIdx = -1;
+    chatSearchCount.textContent = '';
+  }
+  function clearChatHighlights() {
+    document.querySelectorAll('#chat-messages .chat-search-hl').forEach(el => {
+      el.replaceWith(document.createTextNode(el.textContent));
+    });
+    // Normalize text nodes
+    document.getElementById('chat-messages').normalize();
+  }
+  function doChatSearch(query) {
+    clearChatHighlights();
+    chatSearchMatches = [];
+    chatSearchIdx = -1;
+    if (!query) { chatSearchCount.textContent = ''; return; }
+    const msgs = document.getElementById('chat-messages');
+    const walker = document.createTreeWalker(msgs, NodeFilter.SHOW_TEXT);
+    const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    for (const node of textNodes) {
+      const text = node.textContent;
+      const matches = [...text.matchAll(regex)];
+      if (matches.length === 0) continue;
+      const frag = document.createDocumentFragment();
+      let lastIdx = 0;
+      for (const m of matches) {
+        if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+        const hl = document.createElement('mark');
+        hl.className = 'chat-search-hl';
+        hl.textContent = m[0];
+        frag.appendChild(hl);
+        chatSearchMatches.push(hl);
+        lastIdx = m.index + m[0].length;
+      }
+      if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+      node.parentNode.replaceChild(frag, node);
+    }
+    chatSearchCount.textContent = chatSearchMatches.length > 0 ? `${chatSearchMatches.length} found` : 'No matches';
+    if (chatSearchMatches.length > 0) navigateChatMatch(0);
+  }
+  function navigateChatMatch(idx) {
+    if (chatSearchMatches.length === 0) return;
+    chatSearchMatches.forEach(m => m.classList.remove('current'));
+    chatSearchIdx = ((idx % chatSearchMatches.length) + chatSearchMatches.length) % chatSearchMatches.length;
+    const current = chatSearchMatches[chatSearchIdx];
+    current.classList.add('current');
+    current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    chatSearchCount.textContent = `${chatSearchIdx + 1} / ${chatSearchMatches.length}`;
+  }
+
+  chatSearchInput.addEventListener('input', () => doChatSearch(chatSearchInput.value));
+  chatSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); navigateChatMatch(chatSearchIdx + (e.shiftKey ? -1 : 1)); }
+    if (e.key === 'Escape') { e.preventDefault(); closeChatSearch(); }
+  });
+  document.getElementById('chat-search-next').onclick = () => navigateChatMatch(chatSearchIdx + 1);
+  document.getElementById('chat-search-prev').onclick = () => navigateChatMatch(chatSearchIdx - 1);
+  document.getElementById('chat-search-close').onclick = closeChatSearch;
+
+  // Cmd+F in chat panel opens chat search instead of toolbar search
+  document.getElementById('chat-panel').addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      e.preventDefault();
+      e.stopPropagation();
+      openChatSearch();
+    }
+  });
+
   const allChatClasses = ['chat-collapsed', 'chat-collapsed-right', 'chat-collapsed-float',
     'chat-bottom', 'chat-right', 'chat-float'];
   let chatDockMode = 'bottom'; // 'bottom', 'right', 'float'

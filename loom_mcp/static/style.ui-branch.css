@@ -1380,6 +1380,27 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 .sidebar-resize:hover { background: var(--accent-soft); }
 
+/* Chat search bar */
+.chat-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-surface2);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.chat-search-hl {
+  background: oklch(0.75 0.15 85 / 0.3);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.chat-search-hl.current {
+  background: oklch(0.75 0.15 85 / 0.6);
+  outline: 1px solid oklch(0.75 0.15 85);
+}
+
 /* Card history (time machine) */
 .card-history {
   border-top: 1px solid var(--border-soft);
