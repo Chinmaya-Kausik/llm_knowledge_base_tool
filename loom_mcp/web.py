@@ -943,89 +943,43 @@ async def api_claude_logout():
 
 @app.get("/api/context-info")
 def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
-    """Return context assembly breakdown with token estimates."""
-    from loom_mcp.chat import sessions, _permissions_block, _memory_block, _load_context_config
-    session = sessions.get(session_id, {})
-    page_path = path or session.get("page_path", "")
-    config = _load_context_config(LOOM_ROOT)
+    """Return real context assembly breakdown by running build_system_prompt."""
+    from loom_mcp.chat import sessions, build_system_prompt
 
-    perm = _permissions_block(LOOM_ROOT)
-    mem = _memory_block(LOOM_ROOT, page_path, config) or ""
+    # Create a temporary session with the given path so build_system_prompt works
+    temp_id = session_id or "__context_preview__"
+    page_path = path or (sessions.get(session_id, {}).get("page_path", ""))
+    if temp_id not in sessions:
+        sessions[temp_id] = {"page_path": page_path}
+    else:
+        sessions[temp_id]["page_path"] = page_path
 
-    # Estimate location block size by level
-    loc_estimates = {"page": 1000, "folder": 4000, "global": 12000}
-    loc_chars = loc_estimates.get(level, 1000)
+    # Actually run build_system_prompt — this traces what files are read
+    build_system_prompt(temp_id, LOOM_ROOT, level)
 
-    # Build file list based on context level
-    files = []
-    target = LOOM_ROOT / page_path if page_path else LOOM_ROOT
-    if not page_path.startswith("vm:"):
-        if level == "page":
-            # Current file or folder's ABOUT.md
-            if target.is_file():
-                try:
-                    content = target.read_text(encoding="utf-8", errors="replace")
-                    files.append({"path": page_path, "type": "page", "tokens": len(content) // 4})
-                except Exception:
-                    pass
-            elif target.is_dir():
-                # Check common page files
-                for name in ("ABOUT.md", "CLAUDE.md", "README.md"):
-                    candidate = target / name
-                    if candidate.exists():
-                        try:
-                            content = candidate.read_text(encoding="utf-8", errors="replace")
-                            rel = (page_path + "/" + name).lstrip("/")
-                            files.append({"path": rel, "type": "page", "tokens": len(content) // 4})
-                        except Exception:
-                            pass
-        elif level == "folder":
-            # Folder level injects the folder's ABOUT.md (which lists children with summaries)
-            folder = target if target.is_dir() else target.parent
-            about = folder / "ABOUT.md"
-            if about.exists():
-                try:
-                    content = about.read_text(encoding="utf-8", errors="replace")
-                    rel = str(about.relative_to(LOOM_ROOT))
-                    child_count = content.count("\n## ") + content.count("\n- [")
-                    files.append({"path": rel, "type": "folder", "tokens": len(content) // 4,
-                                  "note": f"Folder overview ({child_count} children summarized)"})
-                except Exception:
-                    pass
-        elif level == "global":
-            # Global injects the master index (titles + summaries for all pages)
-            index = LOOM_ROOT / "wiki" / "meta" / "index.md"
-            if index.exists():
-                try:
-                    content = index.read_text(encoding="utf-8", errors="replace")
-                    tokens = len(content) // 4
-                    # Count how many pages are referenced in the index
-                    page_count = content.count("\n## ") + content.count("\n- ")
-                    files.append({"path": "wiki/meta/index.md", "type": "index", "tokens": tokens,
-                                  "note": f"Master index ({page_count} pages summarized)"})
-                except Exception:
-                    pass
-            # Also check conventions and memory index
-            for extra in ("wiki/meta/conventions.md", "MEMORY.md"):
-                ef = LOOM_ROOT / extra
-                if ef.exists():
-                    try:
-                        tokens = len(ef.read_text(encoding="utf-8", errors="replace")) // 4
-                        files.append({"path": extra, "type": "global", "tokens": tokens})
-                    except Exception:
-                        pass
+    # Read the metadata it stored
+    meta = sessions[temp_id].get("_prompt_metadata", {})
 
-    total_chars = len(perm) + len(mem) + loc_chars
+    # Clean up temp session
+    if temp_id == "__context_preview__":
+        sessions.pop(temp_id, None)
+
+    blocks = meta.get("blocks", [])
+    files = meta.get("files", [])
+
     return {
         "level": level,
         "page_path": page_path,
         "blocks": [
-            {"name": "Permissions", "chars": len(perm), "tokens": len(perm) // 4},
-            {"name": "Memory", "chars": len(mem), "tokens": len(mem) // 4},
-            {"name": "Location", "chars": loc_chars, "tokens": loc_chars // 4, "estimated": True},
+            {"name": b["name"], "chars": b["chars"], "tokens": b["chars"] // 4}
+            for b in blocks
         ],
-        "files": files,
-        "total_tokens": total_chars // 4,
+        "files": [
+            {"path": f["path"], "type": f.get("block", ""), "tokens": f["chars"] // 4,
+             "note": f.get("note")}
+            for f in files
+        ],
+        "total_tokens": meta.get("total_tokens", 0),
         "max_tokens": 200000,
     }
 

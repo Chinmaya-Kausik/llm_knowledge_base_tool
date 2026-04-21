@@ -336,7 +336,7 @@ def _location_block(loom_root: Path, page_path: str | None, context_level: str, 
     return "\n\n".join(parts) if parts else None
 
 
-def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str:
+def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str | dict:
     """Build system prompt from modular context blocks with adaptive budget.
 
     Assembles blocks in priority order. If total exceeds budget, trims
@@ -347,6 +347,8 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
     - page: current file content + parent folder ABOUT.md
     - folder: current folder ABOUT.md (lists children with summaries)
     - global: full master index (titles + summaries for all pages)
+
+    If return_metadata=True is in the session, returns a dict with prompt + metadata.
     """
     import logging
     log = logging.getLogger("loom.chat")
@@ -355,17 +357,20 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
     session = sessions.get(session_id, {})
     page_path = session.get("page_path")
     budget = config.get("total_budget_chars", 12000)
+    files_included = []  # Track what files are actually read
 
     # 1. Permissions — always included, highest priority
     perm = _permissions_block(loom_root)
     used = len(perm)
+    # Permissions checks CLAUDE.md existence
+    if (loom_root / "CLAUDE.md").exists():
+        files_included.append({"path": "CLAUDE.md", "block": "permissions", "chars": 0, "note": "Checked for existence"})
 
     # 2. Memory — second priority
     mem = _memory_block(loom_root, page_path, config)
     if mem and used + len(mem) <= budget:
         pass  # fits
     elif mem:
-        # Truncate memory to fit
         remaining = max(0, budget - used - 100)
         if remaining > 0:
             mem = mem[:remaining] + "\n[... truncated ...]"
@@ -374,12 +379,41 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
 
     if mem:
         used += len(mem)
+        # Track which memory file was read
+        if page_path:
+            parts_list = page_path.split("/")
+            if len(parts_list) >= 2 and parts_list[0] == "projects":
+                pm = loom_root / "projects" / parts_list[1] / "MEMORY.md"
+                if pm.exists():
+                    files_included.append({"path": f"projects/{parts_list[1]}/MEMORY.md", "block": "memory", "chars": len(mem)})
+        if not any(f["block"] == "memory" for f in files_included):
+            rm = loom_root / "MEMORY.md"
+            if rm.exists():
+                files_included.append({"path": "MEMORY.md", "block": "memory", "chars": len(mem)})
 
     # 3. Location — lowest priority, adaptive
-    remaining_budget = max(0, budget - used - 50)  # 50 chars for boundary marker
+    remaining_budget = max(0, budget - used - 50)
     loc = _location_block_adaptive(loom_root, page_path, context_level, config, remaining_budget)
     if loc:
         used += len(loc)
+        # Track location files based on what the function actually reads
+        if context_level == "page" and page_path:
+            full_path = loom_root / page_path
+            if full_path.exists():
+                files_included.append({"path": page_path, "block": "location", "chars": len(loc)})
+            parent_about = full_path.parent / "ABOUT.md"
+            if parent_about.exists() and full_path.parent != loom_root:
+                files_included.append({"path": str(parent_about.relative_to(loom_root)), "block": "location", "chars": 0, "note": "Parent folder"})
+        elif context_level == "folder" and page_path:
+            full_path = loom_root / page_path
+            folder = full_path if full_path.is_dir() else full_path.parent
+            about = folder / "ABOUT.md"
+            if about.exists():
+                files_included.append({"path": str(about.relative_to(loom_root)), "block": "location", "chars": len(loc)})
+        elif context_level == "global":
+            index = loom_root / "wiki" / "meta" / "index.md"
+            if index.exists():
+                files_included.append({"path": "wiki/meta/index.md", "block": "location", "chars": len(loc)})
 
     # Assemble
     parts = [perm]
@@ -392,6 +426,20 @@ def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "
     total = "\n\n".join(parts)
     log.info("[prompt] total=%d chars (~%d tokens), budget=%d, page_path=%s",
              len(total), len(total) // 4, budget, page_path)
+
+    # Store metadata on session for the context-info endpoint
+    session["_prompt_metadata"] = {
+        "total_chars": len(total),
+        "total_tokens": len(total) // 4,
+        "blocks": [
+            {"name": "Permissions", "chars": len(perm)},
+            {"name": "Memory", "chars": len(mem) if mem else 0},
+            {"name": "Location", "chars": len(loc) if loc else 0},
+        ],
+        "files": files_included,
+        "level": context_level,
+    }
+
     return total
 
 
