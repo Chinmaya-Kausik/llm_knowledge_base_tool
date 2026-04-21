@@ -1,10 +1,12 @@
 // Loom Service Worker — cache static assets, network-only for API/WS
 
-const CACHE_NAME = 'loom-cache-v1';
+const CACHE_NAME = 'loom-cache-v2';
 
 const PRECACHE_URLS = [
   '/',
+  '/static/fonts/fonts.css',
   '/static/style.css',
+  '/static/style.ui-branch.css',
   '/static/app.js',
   '/static/vendor/marked.min.js',
   '/static/vendor/xterm.min.js',
@@ -22,6 +24,8 @@ const PRECACHE_URLS = [
   '/static/vendor/d3-transition.min.js',
   '/static/vendor/d3-drag.min.js',
   '/static/vendor/d3-zoom.min.js',
+  '/static/vendor/d3-quadtree.min.js',
+  '/static/vendor/d3-force.min.js',
   '/static/vendor/cola.min.js',
 ];
 
