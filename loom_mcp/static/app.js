@@ -3783,9 +3783,24 @@ function getAlivePanels() {
       result.push(id);
     }
   }
-  // Order by focus history
   const ordered = [...new Set([...chatFocusHistory.filter(id => result.includes(id)), ...result])];
   return ordered;
+}
+
+function reopenClosedPanel() {
+  // Try to reopen the most recently focused closed/minimized panel
+  for (const id of chatFocusHistory) {
+    if (!chatPanels.has(id)) continue;
+    if (id === 'main') {
+      const cp = document.getElementById('chat-panel');
+      const isClosed = cp.classList.contains('chat-collapsed') || cp.classList.contains('chat-collapsed-right') || cp.classList.contains('chat-collapsed-float');
+      if (isClosed) { focusChatPanel('main'); return true; }
+    } else {
+      const p = chatPanels.get(id);
+      if (p?.container?.classList.contains('minimized')) { focusChatPanel(id); return true; }
+    }
+  }
+  return false;
 }
 let chatSoloCycleIndex = -1;
 
@@ -4435,8 +4450,11 @@ function createFloatingPanel(options = {}) {
 
   inputArea.appendChild(attachBar);
   inputArea.appendChild(pillsRow);
-  inputArea.appendChild(input);
-  inputArea.appendChild(sendBtn);
+  const inputRow = document.createElement('div');
+  inputRow.className = 'chat-input-row';
+  inputRow.appendChild(input);
+  inputRow.appendChild(sendBtn);
+  inputArea.appendChild(inputRow);
   card.appendChild(inputArea);
 
   card.style.left = (150 + panelCounter * 30) + 'px';
@@ -8606,7 +8624,11 @@ async function init() {
       const alive = getAlivePanels();
       console.log('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
 
-      if (alive.length === 0) { createFloatingPanel(); return; }
+      if (alive.length === 0) {
+        // Try reopening a closed panel first, else create new
+        if (!reopenClosedPanel()) createFloatingPanel();
+        return;
+      }
       if (alive.length === 1) { focusChatPanel(alive[0]); return; }
 
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
@@ -8619,7 +8641,10 @@ async function init() {
       const alive = getAlivePanels();
       console.log('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
 
-      if (alive.length === 0) { createFloatingPanel(); return; }
+      if (alive.length === 0) {
+        if (!reopenClosedPanel()) createFloatingPanel();
+        return;
+      }
 
       chatSoloCycleIndex = ((chatSoloCycleIndex < 0 ? 0 : chatSoloCycleIndex) + 1) % alive.length;
       const targetId = alive[chatSoloCycleIndex];

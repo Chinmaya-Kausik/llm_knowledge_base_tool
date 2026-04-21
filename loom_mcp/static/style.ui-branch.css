@@ -1545,7 +1545,13 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 
 /* Floating panel input + send — match main panel */
-.fcp-input-area { border-top: 1px solid var(--border-soft); }
+.fcp-input-area {
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 8px;
+}
 .fcp-input {
   background: var(--bg-sunken);
   border: 1px solid transparent;
