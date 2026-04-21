@@ -30,6 +30,9 @@ if lsof -i ":$LOOM_PORT" -P -sTCP:LISTEN >/dev/null 2>&1; then
   fi
 fi
 
+# Clear Python bytecache to ensure fresh code
+find loom_mcp -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+
 echo "Starting Loom UI dev server on port $LOOM_PORT (branch: $current)..."
 
 # Wait for server to be ready, then open browser
