@@ -2193,22 +2193,25 @@ async def auth_and_cache(request: Request, call_next):
     """Auth check for remote access + no-cache for static files."""
     path = request.url.path
 
-    # Skip auth for ping endpoint (used by endpoint switcher)
-    if path == "/api/ping":
+    # Skip auth for static files and ping (no sensitive data)
+    if path.startswith("/static") or path == "/api/ping" or path == "/sw.js" or path == "/favicon.ico":
         return await call_next(request)
 
     # Auth check when remote access is enabled
     if REMOTE_ENABLED:
         client_host = request.client.host if request.client else None
         if not _is_localhost(client_host):
-            # Check bearer token or query param
+            # Check bearer token, query param, or session cookie
             auth_header = request.headers.get("authorization", "")
             query_token = request.query_params.get("token", "")
+            cookie_token = request.cookies.get("loom_token", "")
             token = ""
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
             elif query_token:
                 token = query_token
+            elif cookie_token:
+                token = cookie_token
 
             if token != AUTH_TOKEN:
                 return JSONResponse(
@@ -2219,6 +2222,11 @@ async def auth_and_cache(request: Request, call_next):
     response = await call_next(request)
     if path.startswith("/static") or path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+
+    # Set session cookie on successful auth via query param (so subsequent requests work)
+    if REMOTE_ENABLED and request.query_params.get("token") == AUTH_TOKEN:
+        response.set_cookie("loom_token", AUTH_TOKEN, httponly=True, samesite="lax", max_age=86400 * 30)
+
     return response
 
 
