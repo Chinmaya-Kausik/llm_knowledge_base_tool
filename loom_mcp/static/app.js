@@ -8583,41 +8583,17 @@ async function init() {
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
     if (matchesBinding(e, 'restart-server')) { e.preventDefault(); restartServer(); return; }
     if (matchesBinding(e, 'delete-file') && !inInput) { e.preventDefault(); deleteCurrentFile(); return; }
-    // Cmd+J: smart cycle — create if needed, solo focus (show one, minimize others)
+    // Cmd+J: cycle focus between chats (no minimizing, no creating)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
       const alive = [...new Set([...chatFocusHistory, ...chatPanels.keys()])].filter(id => chatPanels.has(id));
       console.log('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
 
-      // No panels at all → create one
       if (alive.length === 0) { createFloatingPanel(); return; }
+      if (alive.length === 1) { focusChatPanel(alive[0]); return; }
 
-      // Only main → create a floating panel and focus it
-      if (alive.length === 1 && alive[0] === 'main') {
-        createFloatingPanel();
-        return;
-      }
-
-      // Multiple panels → cycle with solo behavior
       chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
-      const targetId = alive[chatCycleIndex];
-
-      // Minimize all others
-      for (const [id, p] of chatPanels) {
-        if (id === targetId) continue;
-        if (id === 'main') {
-          const cp = document.getElementById('chat-panel');
-          const isOpen = cp.classList.contains('chat-bottom') || cp.classList.contains('chat-right') || cp.classList.contains('chat-float');
-          if (isOpen) {
-            const ph = document.querySelector('#chat-header .panel-header');
-            if (ph) ph.click();
-          }
-        } else if (p.container) {
-          p.container.classList.add('minimized');
-        }
-      }
-
-      focusChatPanel(targetId);
+      focusChatPanel(alive[chatCycleIndex]);
       return;
     }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
