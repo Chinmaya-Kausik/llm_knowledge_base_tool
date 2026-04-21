@@ -4416,6 +4416,12 @@ function createFloatingPanel(options = {}) {
 
   document.getElementById('canvas-container').appendChild(card);
   bringToFront(card);
+  // If fullpage is open, elevate above it
+  const _fp = document.getElementById('fullpage-overlay');
+  if (_fp && _fp.style.display !== 'none') {
+    topZIndex = Math.max(topZIndex, 400);
+    card.style.setProperty('z-index', String(topZIndex), 'important');
+  }
   panel.container = card;
   panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
