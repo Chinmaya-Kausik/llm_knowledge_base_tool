@@ -4574,7 +4574,7 @@ function createFloatingPanel(options = {}) {
   input.addEventListener('focus', () => {
     chatFocusHistory = chatFocusHistory.filter(id => id !== panelId);
     chatFocusHistory.unshift(panelId);
-    chatCycleIndex = -1;
+    // Don't reset chatCycleIndex here — it breaks Cmd+J cycling
   });
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
@@ -5255,7 +5255,7 @@ function initChat() {
   input.addEventListener('focus', () => {
     chatFocusHistory = chatFocusHistory.filter(id => id !== 'main');
     chatFocusHistory.unshift('main');
-    chatCycleIndex = -1;
+    // Don't reset chatCycleIndex here — it breaks Cmd+J cycling
   });
 
   // Send message
