@@ -3982,6 +3982,8 @@ function dockPanel(panelId, action) {
     bringToFront(chatPanelEl);
   }
 
+  console.log('[dockPanel] action:', action, 'classes:', [...chatPanelEl.classList], 'style:', chatPanelEl.style.cssText, 'offsetW:', chatPanelEl.offsetWidth, 'offsetH:', chatPanelEl.offsetHeight, 'display:', getComputedStyle(chatPanelEl).display, 'position:', getComputedStyle(chatPanelEl).position, 'zIndex:', getComputedStyle(chatPanelEl).zIndex);
+
   if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
 }
 
@@ -8607,7 +8609,13 @@ async function init() {
       focusChatPanel(targetId);
       return;
     }
-    if (matchesBinding(e, 'toggle-chat')) { e.preventDefault(); const ph = document.querySelector('#chat-header .panel-header'); if (ph) ph.click(); return; }
+    if (matchesBinding(e, 'toggle-chat')) {
+      e.preventDefault();
+      console.log('[Cmd+\\] toggle chat');
+      const ph = document.querySelector('#chat-header .panel-header');
+      if (ph) ph.click();
+      return;
+    }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
     if (matchesBinding(e, 'auto-layout') && !inInput) { e.preventDefault(); autoLayout(); return; }
     if (matchesBinding(e, 'toggle-edit') && expandedCard) { e.preventDefault(); toggleFullPageEdit(expandedCard, expandedCard.dataset.path); return; }
