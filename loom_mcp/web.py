@@ -2249,7 +2249,17 @@ def serve_media(filepath: str):
 
 # --- Static file serving ---
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+# Static files with no-cache headers (StaticFiles bypasses middleware)
+from starlette.responses import FileResponse as _FR
+from starlette.staticfiles import StaticFiles as _SF
+
+class NoCacheStaticFiles(_SF):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.middleware("http")

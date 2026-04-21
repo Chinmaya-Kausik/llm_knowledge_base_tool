@@ -26,7 +26,7 @@ const DEFAULT_KEYBINDINGS = {
   'cycle-chat-focus': { key: 'j', mod: true, label: 'Cycle chat focus' },
   'cycle-chat-solo':  { key: '/', mod: true, label: 'Solo cycle chats' },
   'new-terminal':   { key: '`', mod: true, label: 'New terminal' },
-  'restart-server': { key: 'R', mod: true, shift: true, label: 'Restart server' },
+  'restart-server': { key: 'H', mod: true, shift: true, label: 'Restart server' },
   'delete-file':    { key: 'Backspace', mod: true, label: 'Delete file' },
   'background-agent': { key: 'B', mod: true, shift: true, label: 'Background agent' },
 };
