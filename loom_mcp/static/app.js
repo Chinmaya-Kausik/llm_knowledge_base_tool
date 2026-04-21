@@ -7358,12 +7358,16 @@ async function restartServer() {
   try {
     await fetch('/api/restart', { method: 'POST' });
   } catch {}
-  // Poll until server is back up
+  // Poll until server is fully ready
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
-      const resp = await fetch('/api/tree', { signal: AbortSignal.timeout(2000) });
-      if (resp.ok) break;
+      const resp = await fetch('/api/ping', { signal: AbortSignal.timeout(2000) });
+      if (resp.ok) {
+        // Wait a bit more for static files to be ready
+        await new Promise(r => setTimeout(r, 500));
+        break;
+      }
     } catch {}
   }
   window.location.href = window.location.pathname + '?_=' + Date.now();
