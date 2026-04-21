@@ -5580,14 +5580,27 @@ function updateContextChip() {
   if (!chip) return;
   const level = activePanel.contextLevel || 'page';
   chip.querySelector('.ctx-scope').textContent = level;
-  // Token estimate based on context level (rough)
-  const estimates = { page: '~1K', folder: '~4K', global: '~12K' };
-  const tokenK = { page: 1, folder: 4, global: 12 };
-  const pct = Math.min(100, (tokenK[level] / 200) * 100);
-  chip.querySelector('.ctx-tokens').textContent = estimates[level] || '--';
-  const fill = chip.querySelector('.ctx-bar-fill');
-  if (fill) fill.style.width = pct + '%';
-  chip.dataset.usage = pct > 60 ? 'high' : pct > 30 ? 'mid' : '';
+
+  // Fetch real token count from backend
+  const ctxPath = activePanel?.contextPath || currentLevel()?.parentPath || '';
+  const sessionId = activePanel?.sessionId || chatSessionId || '';
+  authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      const tokens = data.total_tokens || 0;
+      const maxTokens = data.max_tokens || 200000;
+      const label = tokens >= 1000 ? `~${(tokens / 1000).toFixed(1)}K` : `~${tokens}`;
+      chip.querySelector('.ctx-tokens').textContent = label;
+      chip.querySelector('.ctx-max').textContent = `${Math.round(maxTokens / 1000)}K`;
+      const pct = Math.min(100, (tokens / maxTokens) * 100);
+      const fill = chip.querySelector('.ctx-bar-fill');
+      if (fill) fill.style.width = pct + '%';
+      chip.dataset.usage = pct > 60 ? 'high' : pct > 30 ? 'mid' : '';
+    })
+    .catch(() => {
+      chip.querySelector('.ctx-tokens').textContent = '--';
+    });
 }
 
 function sendQueuedMessage(text) {

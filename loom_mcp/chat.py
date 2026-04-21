@@ -430,7 +430,8 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
 
     If files_out is provided, appends dicts describing each file actually read.
     """
-    if not page_path:
+    # Global level works even without a page_path
+    if not page_path and context_level != "global":
         return None
 
     # VM context — page_path starts with "vm:"
