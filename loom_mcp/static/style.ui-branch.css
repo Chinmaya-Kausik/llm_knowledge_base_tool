@@ -1607,9 +1607,10 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
   border-radius: var(--r-md, 6px);
   box-shadow: var(--shadow-lg);
   z-index: 200;
-  width: 280px;
+  width: 300px;
+  max-height: 360px;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 .ctx-popover-section {
   padding: 10px 12px;

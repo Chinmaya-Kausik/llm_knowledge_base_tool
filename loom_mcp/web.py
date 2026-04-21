@@ -960,7 +960,7 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
     files = []
     target = LOOM_ROOT / page_path if page_path else LOOM_ROOT
     if not page_path.startswith("vm:"):
-        if level == "page" and page_path:
+        if level == "page":
             # Current file or folder's ABOUT.md
             if target.is_file():
                 try:
@@ -969,13 +969,16 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
                 except Exception:
                     pass
             elif target.is_dir():
-                about = target / "ABOUT.md"
-                if about.exists():
-                    try:
-                        content = about.read_text(encoding="utf-8", errors="replace")
-                        files.append({"path": page_path + "/ABOUT.md", "type": "page", "tokens": len(content) // 4})
-                    except Exception:
-                        pass
+                # Check common page files
+                for name in ("ABOUT.md", "CLAUDE.md", "README.md"):
+                    candidate = target / name
+                    if candidate.exists():
+                        try:
+                            content = candidate.read_text(encoding="utf-8", errors="replace")
+                            rel = (page_path + "/" + name).lstrip("/")
+                            files.append({"path": rel, "type": "page", "tokens": len(content) // 4})
+                        except Exception:
+                            pass
         elif level == "folder":
             # All files in the folder (or parent folder if page_path is a file)
             folder = target if target.is_dir() else target.parent
