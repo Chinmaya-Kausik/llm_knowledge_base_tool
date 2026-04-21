@@ -30,8 +30,16 @@ if lsof -i ":$LOOM_PORT" -P -sTCP:LISTEN >/dev/null 2>&1; then
   fi
 fi
 
-# Clear Python bytecache to ensure fresh code
+# Clear ALL caches to ensure fresh code
+echo "[debug] Clearing caches..."
 find loom_mcp -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+# Also clear uv's cached editable install
+find .venv -name 'loom_mcp' -path '*/site-packages/*' -type d -exec rm -rf {} + 2>/dev/null || true
+find .venv -name 'loom*.dist-info' -path '*/site-packages/*' -type d -exec rm -rf {} + 2>/dev/null || true
+echo "[debug] Branch: $current"
+echo "[debug] web.py mtime: $(stat -f '%Sm' loom_mcp/web.py 2>/dev/null || echo 'unknown')"
+echo "[debug] app.js mtime: $(stat -f '%Sm' loom_mcp/static/app.js 2>/dev/null || echo 'unknown')"
+echo "[debug] style.ui-branch.css mtime: $(stat -f '%Sm' loom_mcp/static/style.ui-branch.css 2>/dev/null || echo 'unknown')"
 
 echo "Starting Loom UI dev server on port $LOOM_PORT (branch: $current)..."
 
@@ -39,6 +47,10 @@ echo "Starting Loom UI dev server on port $LOOM_PORT (branch: $current)..."
 (
   for i in $(seq 1 30); do
     if curl -s -o /dev/null "http://localhost:$LOOM_PORT/api/ping" 2>/dev/null; then
+      # Verify the server is serving fresh files
+      echo "[debug] Server ready. Checking app.js version..."
+      served_mtime=$(curl -sI "http://localhost:$LOOM_PORT/static/app.js" 2>/dev/null | grep -i last-modified | head -1)
+      echo "[debug] Served app.js: $served_mtime"
       open "http://localhost:$LOOM_PORT"
       exit 0
     fi
