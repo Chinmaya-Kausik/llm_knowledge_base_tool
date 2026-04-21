@@ -3870,14 +3870,20 @@ function focusChatPanel(panelId) {
       if (ph) ph.click();
     }
     // Bring above fullpage overlay if needed
-    if (fullpageOpen) cp.style.zIndex = '350';
+    if (fullpageOpen) {
+      topZIndex = Math.max(topZIndex, 350);
+      cp.style.setProperty('z-index', '350', 'important');
+    }
     if (cp.classList.contains('chat-float')) bringToFront(cp);
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
-      if (fullpageOpen) p.container.style.zIndex = '350';
+      if (fullpageOpen) {
+        topZIndex = Math.max(topZIndex, 350);
+        p.container.style.setProperty('z-index', '350', 'important');
+      }
       bringToFront(p.container);
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
     }
@@ -8506,7 +8512,7 @@ async function init() {
       // If the focused chat panel is above fullpage, send it back behind
       const focusedChatId = chatFocusHistory[0] || 'main';
       const focusedEl = focusedChatId === 'main' ? document.getElementById('chat-panel') : chatPanels.get(focusedChatId)?.container;
-      if (focusedEl && focusedEl.style.zIndex === '350') { focusedEl.style.zIndex = ''; return; }
+      if (focusedEl && parseInt(focusedEl.style.zIndex) >= 350) { focusedEl.style.setProperty('z-index', '100', 'important'); return; }
       if (expandedCard) { collapseFullPage(); return; }
       if (canvasStack.length > 1) { navigateToLevel(canvasStack.length - 2); return; }
     }
