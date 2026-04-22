@@ -1,6 +1,14 @@
 // === Loom Knowledge Base UI v3 ===
 // Canvas stack with drill-in sub-canvases, edge aggregation, border resizing
 
+// Polyfill: crypto.randomUUID not available in non-secure contexts (HTTP on iOS Safari)
+if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+  crypto.randomUUID = function() {
+    return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+      (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16));
+  };
+}
+
 // Debug mode — enable with localStorage.setItem('loom-debug', '1')
 const LOOM_DEBUG = localStorage.getItem('loom-debug') === '1';
 function debugLog(...args) { if (LOOM_DEBUG) debugLog(...args); }
