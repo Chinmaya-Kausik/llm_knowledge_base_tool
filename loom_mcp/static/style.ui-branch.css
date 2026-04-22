@@ -1337,13 +1337,14 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 /* Theme dropdown removed — use Settings > Appearance */
 
 /* Menus moved to body to escape toolbar stacking context */
-#action-menu, #toolbar-menu {
+#action-menu, #toolbar-menu, #target-dropdown {
   position: fixed;
   top: calc(var(--toolbar-height) + 4px);
   z-index: 310;
 }
 #action-menu { right: 80px; }
 #toolbar-menu { right: 50px; }
+#target-dropdown { left: 120px; }
 
 /* Sleeker checkboxes in filter menus */
 .toolbar-menu label {

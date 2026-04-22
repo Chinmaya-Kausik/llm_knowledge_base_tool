@@ -215,6 +215,8 @@ async function initTargetSelector() {
   const btn = document.getElementById('target-btn');
   const dropdown = document.getElementById('target-dropdown');
   if (!btn || !dropdown) return;
+  // Move to body to escape toolbar stacking context
+  document.body.appendChild(dropdown);
 
   btn.onclick = async () => {
     dropdown.classList.toggle('hidden');
@@ -422,10 +424,7 @@ function createVMTerminalPanel(vmId, vmLabel) {
   const term = new XTerm({
     cursorBlink: true, fontSize: 13,
     fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
-    theme: { background: '#1a1b26', foreground: '#c0caf5', cursor: '#c0caf5',
-             selectionBackground: '#33467c', black: '#15161e', red: '#f7768e',
-             green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7',
-             magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6' },
+    theme: getTerminalTheme(),
   });
   const fitAddon = new XFitAddon();
   term.loadAddon(fitAddon);
@@ -4769,6 +4768,25 @@ function connectPanelChat(panel, messagesEl) {
 // ========================================
 let terminalCounter = 0;
 
+function getTerminalTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const get = (prop, fallback) => cs.getPropertyValue(prop).trim() || fallback;
+  return {
+    background: get('--bg', '#1a1b26'),
+    foreground: get('--text', '#c0caf5'),
+    cursor: get('--text-bright', '#c0caf5'),
+    selectionBackground: get('--accent-soft', '#33467c'),
+    black: get('--bg-sunken', '#15161e'),
+    red: get('--red', '#f7768e'),
+    green: get('--green', '#9ece6a'),
+    yellow: get('--yellow', '#e0af68'),
+    blue: get('--accent', '#7aa2f7'),
+    magenta: get('--accent2', '#bb9af7'),
+    cyan: get('--cyan', '#7dcfff'),
+    white: get('--text', '#a9b1d6'),
+  };
+}
+
 function createTerminalPanel() {
   const id = ++terminalCounter;
   const card = document.createElement('div');
@@ -4854,12 +4872,7 @@ function createTerminalPanel() {
     cursorBlink: true,
     fontSize: 13,
     fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
-    theme: {
-      background: '#1a1b26',
-      foreground: '#c0caf5',
-      cursor: '#c0caf5',
-      selectionBackground: '#33467c',
-    },
+    theme: getTerminalTheme(),
   });
   const fitAddon = XFitAddon ? new XFitAddon() : null;
   if (fitAddon) term.loadAddon(fitAddon);
