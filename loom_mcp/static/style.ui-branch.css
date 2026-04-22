@@ -2238,6 +2238,8 @@ html[data-mobile] .fs-panel { padding: 0; }
 html[data-mobile] .fs-card {
   width: 100vw; height: 100dvh; height: 100vh;
   border-radius: 0; grid-template-columns: 1fr;
+  padding-top: 44px;
+  padding-top: env(safe-area-inset-top, 44px);
 }
 html[data-mobile] .fs-nav {
   display: flex; flex-direction: row; overflow-x: auto;
