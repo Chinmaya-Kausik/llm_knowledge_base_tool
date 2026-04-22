@@ -1865,10 +1865,11 @@ function navigateToLevel(index) {
 }
 
 function syncEmptyChatScopes() {
-  // Update all chat panels with no messages to match the current canvas location
+  // Update all chat panels with no messages to match current location
   const level = currentLevel();
-  const path = level.parentPath || '';
   const smartLevel = getSmartContextDefault();
+  // Use fullscreen file path if in page mode, otherwise canvas path
+  const path = (expandedCard && expandedCard.dataset?.path) || level.parentPath || '';
 
   for (const [id, panel] of chatPanels) {
     const msgs = panel.messages || [];
@@ -2307,6 +2308,7 @@ function expandCardFullPage(card, highlightQuery) {
   // Append to canvas-container — fills content area, respects sidebar + toolbar
   document.getElementById('canvas-container').appendChild(overlay);
   expandedCard = overlay;
+  syncEmptyChatScopes();
   // Auto-hide sidebar on fullscreen enter
   const sidebar = document.getElementById('sidebar');
   expandedCard._sidebarWasOpen = sidebar && !sidebar.classList.contains('collapsed');
@@ -2561,6 +2563,7 @@ function collapseFullPage() {
     }
     expandedCard.remove();
     expandedCard = null;
+    syncEmptyChatScopes();
     if (fullpageReturnView) {
       switchView(fullpageReturnView);
       fullpageReturnView = null;
@@ -5694,10 +5697,10 @@ function sendChatMessage() {
 }
 
 function getSmartContextDefault() {
-  // Root canvas → global, inside a folder → folder, viewing a file → page
+  // Fullscreen file → page, root canvas → global, subfolder → folder
+  if (expandedCard) return 'page';
   const level = typeof currentLevel === 'function' ? currentLevel() : null;
   if (!level || !level.parentPath) return 'global';
-  // Check if we're inside a subfolder
   const depth = (level.parentPath || '').split('/').filter(Boolean).length;
   if (depth === 0) return 'global';
   return 'folder';
