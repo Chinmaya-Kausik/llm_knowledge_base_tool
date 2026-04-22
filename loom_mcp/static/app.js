@@ -2502,25 +2502,17 @@ function renderChatTranscript(container, rawContent) {
     if (!text) continue;
     try {
 
-    // Clean raw Python dicts everywhere
-    function cleanDicts(s) {
-      return s.split('\n').map(line => {
-        const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
-        if (dm) {
-          let t = dm[1].replace(/['"]\s*\}\s*$/, '');
-          return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-        }
-        return line;
-      }).join('\n');
+    // Strip raw Python dict lines (subagent results that leaked outside <details>)
+    function stripDicts(s) {
+      return s.split('\n').filter(line =>
+        !line.match(/^\s*[-*]?\s*\{'type':\s*'text'/)
+      ).join('\n');
     }
 
     if (section.role === 'user') {
       // Extract user text: remove <details> blocks AND raw dict lines
       let userText = text.replace(/<details>[\s\S]*?<\/details>/g, '');
-      // Remove lines starting with raw dicts
-      userText = userText.split('\n').filter(line =>
-        !line.match(/^\s*[-*]?\s*\{'type':\s*'text'/)
-      ).join('\n').trim();
+      userText = stripDicts(userText).trim();
       if (userText) {
         const msgEl = document.createElement('div');
         msgEl.className = 'chat-msg chat-msg-user';
@@ -2532,25 +2524,14 @@ function renderChatTranscript(container, rawContent) {
       for (const block of detailsBlocks) {
         container.appendChild(buildDetailsElement(block));
       }
-      // Render any raw dicts outside <details> as assistant content
-      const afterDetails = text.replace(/<details>[\s\S]*?<\/details>/g, '').replace(/^[^{]*$/m, '');
-      const dictContent = cleanDicts(afterDetails).trim();
-      if (dictContent && dictContent !== userText) {
-        const dictEl = document.createElement('div');
-        dictEl.className = 'chat-msg chat-msg-assistant';
-        const inner = document.createElement('div');
-        inner.className = 'chat-msg-content chat-text';
-        inner.innerHTML = marked.parse(dictContent);
-        dictEl.appendChild(inner);
-        container.appendChild(dictEl);
-      }
     } else {
       // Assistant: render as HTML with native <details>
       const msgEl = document.createElement('div');
       msgEl.className = 'chat-msg chat-msg-assistant';
       const contentEl = document.createElement('div');
       contentEl.className = 'chat-msg-content chat-text';
-      let cleaned = cleanDicts(text);
+      // Strip raw dict lines and line number prefixes
+      let cleaned = stripDicts(text);
       cleaned = cleaned.replace(/^\d+\t/gm, '');
       contentEl.innerHTML = marked.parse(cleaned);
       msgEl.appendChild(contentEl);
@@ -6319,6 +6300,10 @@ function handleChatEvent(msg) {
 
         chatTokenCount += Math.ceil(msg.content.length / 4);
         currentResponseText += msg.content;
+        // Track subagent text for saving (parent text captured at 'done')
+        if (msg.subagent_id) {
+          chatMessages.push({ role: 'text', content: msg.content, subagent_id: msg.subagent_id });
+        }
         // Get or create .chat-text in the right container
         let textEl = container._currentTextEl;
         if (!textEl || !container.contains(textEl)) {
@@ -6919,29 +6904,39 @@ function buildDetailsElement(html) {
     const body = document.createElement('div');
     body.className = 'chat-activity-body';
 
-    // Parse tool entries from saved markdown format:
-    // - **ToolName** — description
-    //   - result text
+    // Parse saved markdown: tool entries, blockquotes (thinking), plain text, dicts
     const lines = content.split('\n');
     let i = 0;
     while (i < lines.length) {
       const line = lines[i].trim();
       if (!line) { i++; continue; }
 
-      // Match "- **ToolName** — description" or "- **ToolName** — description"
-      // Handle raw Python dict lines from subagent results
-      const dictMatch = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
-      if (dictMatch) {
-        let text = dictMatch[1].replace(/['"]\s*\}\s*$/, '');
-        text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-        const resultEl = document.createElement('div');
-        resultEl.className = 'chat-msg-content chat-text';
-        resultEl.innerHTML = marked.parse(text);
-        body.appendChild(resultEl);
-        i++;
-        continue;
+      // Skip raw Python dict lines (subagent results already handled by tool_result)
+      if (line.match(/^[-*]?\s*\{'type':\s*'text'/)) { i++; continue; }
+
+      // Blockquote = subagent thinking (old format: > text)
+      if (line.startsWith('>')) {
+        const thinkText = line.replace(/^>\s*/, '');
+        const thinkEl = document.createElement('div');
+        thinkEl.className = 'chat-thinking-content';
+        thinkEl.style.cssText = 'font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 8px;border-left:2px solid var(--border);margin:4px 0';
+        thinkEl.textContent = thinkText;
+        body.appendChild(thinkEl);
+        i++; continue;
       }
 
+      // HTML blockquote = subagent thinking (new format: <blockquote>text</blockquote>)
+      if (line.startsWith('<blockquote>')) {
+        const thinkText = line.replace(/<\/?blockquote>/g, '');
+        const thinkEl = document.createElement('div');
+        thinkEl.className = 'chat-thinking-content';
+        thinkEl.style.cssText = 'font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 8px;border-left:2px solid var(--border);margin:4px 0';
+        thinkEl.textContent = thinkText;
+        body.appendChild(thinkEl);
+        i++; continue;
+      }
+
+      // Tool entry: - **ToolName** — description
       const toolMatch = line.match(/^[-*]\s*\*\*(\w+)\*\*\s*[—–-]\s*(.*)/);
       if (toolMatch) {
         const tName = toolMatch[1];
@@ -6952,16 +6947,14 @@ function buildDetailsElement(html) {
         const toolResult = document.createElement('div');
         toolResult.className = 'chat-tool-result';
 
-        // Collect ALL result lines until next tool entry, dict, or blank gap before tool
+        // Collect result lines until next tool entry, blockquote, or blank gap before tool
         let resultLines = [];
         while (i + 1 < lines.length) {
           const next = lines[i + 1];
           const nextTrimmed = next.trim();
-          // Stop at next tool entry
           if (nextTrimmed.match(/^[-*]\s*\*\*\w+\*\*\s*[—–-]/)) break;
-          // Stop at subagent dict
           if (nextTrimmed.match(/^[-*]?\s*\{'type'/)) break;
-          // Stop at blank followed by tool entry
+          if (nextTrimmed.startsWith('>') || nextTrimmed.startsWith('<blockquote>')) break;
           if (nextTrimmed === '' && i + 2 < lines.length && lines[i + 2].trim().match(/^[-*]\s*\*\*\w+\*\*/)) break;
           i++;
           resultLines.push(next.replace(/^\s{0,4}[-*]?\s*/, ''));
@@ -6980,6 +6973,15 @@ function buildDetailsElement(html) {
         });
         body.appendChild(toolEntry);
         body.appendChild(toolResult);
+        i++; continue;
+      }
+
+      // Plain text (subagent text output) — render as markdown
+      if (!line.startsWith('-') && !line.startsWith('*') && !line.startsWith('<')) {
+        const textEl = document.createElement('div');
+        textEl.className = 'chat-text';
+        textEl.innerHTML = marked.parse(line);
+        body.appendChild(textEl);
       }
       i++;
     }
@@ -7034,8 +7036,8 @@ async function continueSavedChat(path, content) {
 
   const messagesEl = panel.messagesContainer;
 
-  // Split on ## You/Claude/User/Assistant headers and render each as a chat bubble
-  let pendingActivity = '';
+  // Split on ## You/Claude/User/Assistant headers and render each as a live-chat-style bubble.
+  // Show full details (thinking, tools, subagents) visually, but _forkedHistory only has user+assistant text.
   const sections = content.split(/^(?=## (?:You|Claude|User|Assistant)\b)/m);
   for (const section of sections) {
     const trimmed = section.trim();
@@ -7047,44 +7049,44 @@ async function continueSavedChat(path, content) {
     if (userMatch) {
       const body = trimmed.replace(/^## (?:You|User)\s*/, '').trim();
       if (!body) continue;
-      // Split user text from activity blocks (<details> tags come after user text)
-      const detailsIdx = body.indexOf('<details>');
-      const userText = detailsIdx >= 0 ? body.slice(0, detailsIdx).trim() : body;
-      // Stash activity HTML to prepend to the next Claude section
-      pendingActivity = detailsIdx >= 0 ? body.slice(detailsIdx) : '';
+      // Extract user text (strip <details> and raw dicts)
+      let userText = body.replace(/<details>[\s\S]*?<\/details>/g, '');
+      userText = userText.split('\n').filter(line =>
+        !line.match(/^\s*[-*]?\s*\{'type':\s*'text'/)
+      ).join('\n').trim();
       if (userText) {
         const el = document.createElement('div');
         el.className = 'chat-msg chat-msg-user';
         el.textContent = userText;
         messagesEl.appendChild(el);
       }
+      // Render <details> blocks as live-chat-style activity
+      const detailsBlocks = body.match(/<details>[\s\S]*?<\/details>/g) || [];
+      for (const block of detailsBlocks) {
+        messagesEl.appendChild(buildDetailsElement(block));
+      }
     } else if (assistantMatch) {
       const body = trimmed.replace(/^## (?:Claude|Assistant)\s*/, '').trim();
-      if (!body && !pendingActivity) continue;
+      if (!body) continue;
       const el = document.createElement('div');
       el.className = 'chat-msg chat-msg-assistant';
 
-      // Render pending activity (thinking/tools) as live-chat-style DOM
-      const allActivity = (pendingActivity || '') + '\n' + (body || '');
-      pendingActivity = '';
-      const parts = allActivity.split(/(<details>[\s\S]*?<\/details>)/g);
+      // Split on <details> blocks to render activity inline
+      const parts = body.split(/(<details>[\s\S]*?<\/details>)/g);
       for (const part of parts) {
         if (part.startsWith('<details>')) {
           el.appendChild(buildDetailsElement(part));
         } else if (part.trim()) {
-          // Clean raw Python dicts from subagent results
-          let cleanedPart = part.split('\n').map(line => {
-            const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
-            if (dm) {
-              let t = dm[1].replace(/['"]\s*\}\s*$/, '');
-              return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-            }
-            return line;
-          }).join('\n');
-          const textEl = document.createElement('div');
-          textEl.innerHTML = marked.parse(cleanedPart);
-          renderLatex(textEl);
-          while (textEl.firstChild) el.appendChild(textEl.firstChild);
+          // Strip raw Python dict lines
+          const cleaned = part.split('\n').filter(line =>
+            !line.match(/^\s*[-*]?\s*\{'type':\s*'text'/)
+          ).join('\n').trim();
+          if (cleaned) {
+            const textEl = document.createElement('div');
+            textEl.innerHTML = marked.parse(cleaned);
+            renderLatex(textEl);
+            while (textEl.firstChild) el.appendChild(textEl.firstChild);
+          }
         }
       }
       messagesEl.appendChild(el);
@@ -7476,7 +7478,14 @@ function getLanguageExt(filename) {
 async function createCodeEditor(container, content, filename, options = {}) {
   const cm = await loadCodeMirror();
   const langName = getLanguageExt(filename);
-  const extensions = [cm.basicSetup, cm.oneDark, cm.EditorView.theme({ '&': { backgroundColor: 'transparent' }, '.cm-gutters': { backgroundColor: 'transparent' } })];
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const extensions = [cm.basicSetup];
+  if (isDark) {
+    extensions.push(cm.oneDark);
+  } else {
+    extensions.push(cm.syntaxHighlighting(cm.classHighlighter));
+  }
+  extensions.push(cm.EditorView.theme({ '&': { backgroundColor: 'transparent' }, '.cm-gutters': { backgroundColor: 'transparent' } }));
 
   if (langName === 'python') extensions.push(cm.python());
   else if (langName === 'javascript') extensions.push(cm.javascript());

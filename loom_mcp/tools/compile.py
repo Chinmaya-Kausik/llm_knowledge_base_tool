@@ -577,9 +577,9 @@ def _render_messages(messages: list[dict]) -> list[str]:
                     # Stop at boundaries: new subagent, user, assistant
                     if mr in ("user", "assistant") or (mr == "subagent" and mc.startswith("Started:")):
                         break
-                    # Render inner messages (thinking/tool/tool_result)
+                    # Render inner messages (thinking/tool/tool_result/text)
                     if mr == "thinking":
-                        subagent_lines.append(f"> {mc[:500]}{'...' if len(mc) > 500 else ''}")
+                        subagent_lines.append(f"<blockquote>{mc[:500]}{'...' if len(mc) > 500 else ''}</blockquote>")
                     elif mr == "tool":
                         if ": " in mc:
                             tname, tdesc = mc.split(": ", 1)
@@ -589,6 +589,9 @@ def _render_messages(messages: list[dict]) -> list[str]:
                     elif mr == "tool_result":
                         if mc:
                             subagent_lines.append(f"  - {mc}")
+                    elif mr == "text":
+                        if mc:
+                            subagent_lines.append(mc)
                     i += 1
 
                 status = ""

@@ -124,8 +124,15 @@ class ClaudeCodeAdapter(AgentAdapter):
                         if block_cls == 'ToolResultBlock':
                             content = getattr(block, 'content', '')
                             if isinstance(content, list):
+                                def _extract_text(item):
+                                    """Extract text from SDK content blocks or plain dicts."""
+                                    if hasattr(item, 'text'):
+                                        return item.text
+                                    if isinstance(item, dict) and 'text' in item:
+                                        return item['text']
+                                    return str(item)
                                 content = '\n'.join(
-                                    getattr(item, 'text', str(item))
+                                    _extract_text(item)
                                     for item in content
                                 )
                             yield AgentEvent(

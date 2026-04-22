@@ -610,6 +610,63 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb { background: oklch(0.84 0.00
 html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.76 0.010 80); }
 
 /* =============================================================
+   LIGHT / PAPER scoped contrast fixes
+   ============================================================= */
+
+/* Tool entries: opacity 0.75 is too faded on light backgrounds */
+html[data-theme="light"] .chat-tool-entry,
+html[data-theme="paper"] .chat-tool-entry { opacity: 0.9; }
+
+/* Light-mode CodeMirror: One Light palette, slightly darkened, medium-weight keywords */
+html[data-theme="light"] .cm-editor .cm-content,
+html[data-theme="paper"] .cm-editor .cm-content { color: #383a42; }
+
+html[data-theme="light"] .cm-editor .cm-gutters,
+html[data-theme="paper"] .cm-editor .cm-gutters { color: oklch(0.55 0.01 265); }
+
+html[data-theme="light"] .cm-editor .cm-activeLine,
+html[data-theme="light"] .cm-editor .cm-activeLineGutter,
+html[data-theme="paper"] .cm-editor .cm-activeLine,
+html[data-theme="paper"] .cm-editor .cm-activeLineGutter { background: rgba(0,0,0,0.04) !important; }
+
+html[data-theme="light"] .cm-editor .cm-line,
+html[data-theme="paper"] .cm-editor .cm-line { -webkit-text-stroke: 0.2px; }
+
+html[data-theme="light"] .cm-editor .tok-keyword,     html[data-theme="paper"] .cm-editor .tok-keyword     { color: #a626a4; }
+html[data-theme="light"] .cm-editor .tok-definition,  html[data-theme="paper"] .cm-editor .tok-definition  { color: #4078f2; }
+html[data-theme="light"] .cm-editor .tok-string,
+html[data-theme="light"] .cm-editor .tok-string2,
+html[data-theme="paper"] .cm-editor .tok-string,
+html[data-theme="paper"] .cm-editor .tok-string2      { color: #50a14f; }
+html[data-theme="light"] .cm-editor .tok-number,      html[data-theme="paper"] .cm-editor .tok-number      { color: #986801; }
+html[data-theme="light"] .cm-editor .tok-comment,     html[data-theme="paper"] .cm-editor .tok-comment     { color: #a0a1a7; font-style: italic; }
+html[data-theme="light"] .cm-editor .tok-typeName,    html[data-theme="paper"] .cm-editor .tok-typeName    { color: #c18401; }
+html[data-theme="light"] .cm-editor .tok-variableName,
+html[data-theme="light"] .cm-editor .tok-variableName2,
+html[data-theme="paper"] .cm-editor .tok-variableName,
+html[data-theme="paper"] .cm-editor .tok-variableName2{ color: #e45649; }
+html[data-theme="light"] .cm-editor .tok-propertyName,html[data-theme="paper"] .cm-editor .tok-propertyName{ color: #e45649; }
+html[data-theme="light"] .cm-editor .tok-operator,    html[data-theme="paper"] .cm-editor .tok-operator    { color: #383a42; }
+html[data-theme="light"] .cm-editor .tok-punctuation, html[data-theme="paper"] .cm-editor .tok-punctuation { color: #383a42; }
+html[data-theme="light"] .cm-editor .tok-bool,        html[data-theme="paper"] .cm-editor .tok-bool        { color: #986801; }
+html[data-theme="light"] .cm-editor .tok-literal,     html[data-theme="paper"] .cm-editor .tok-literal     { color: #986801; }
+html[data-theme="light"] .cm-editor .tok-className,   html[data-theme="paper"] .cm-editor .tok-className   { color: #c18401; }
+html[data-theme="light"] .cm-editor .tok-atom,        html[data-theme="paper"] .cm-editor .tok-atom        { color: #a626a4; }
+html[data-theme="light"] .cm-editor .tok-meta,        html[data-theme="paper"] .cm-editor .tok-meta        { color: #4078f2; }
+html[data-theme="light"] .cm-editor .tok-namespace,   html[data-theme="paper"] .cm-editor .tok-namespace   { color: #e45649; }
+html[data-theme="light"] .cm-editor .tok-local,       html[data-theme="paper"] .cm-editor .tok-local       { color: #e45649; }
+
+/* Selection highlight */
+html[data-theme="light"] .cm-editor .cm-selectionBackground,
+html[data-theme="paper"] .cm-editor .cm-selectionBackground { background: rgba(0, 100, 200, 0.15) !important; }
+html[data-theme="light"] .cm-editor.cm-focused .cm-selectionBackground,
+html[data-theme="paper"] .cm-editor.cm-focused .cm-selectionBackground { background: rgba(0, 100, 200, 0.20) !important; }
+
+/* Cursor */
+html[data-theme="light"] .cm-editor .cm-cursor,
+html[data-theme="paper"] .cm-editor .cm-cursor { border-left-color: #383a42 !important; }
+
+/* =============================================================
    TOOLBAR — Phase 2 three-cluster layout
    ============================================================= */
 :root { --toolbar-height: calc(44px * var(--density, 1)); }
