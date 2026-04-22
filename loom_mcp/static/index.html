@@ -466,60 +466,7 @@
     <button id="selection-ask-btn">Chat with Claude</button>
   </div>
 
-  <!-- Set mobile mode immediately before JS loads -->
-  <script>
-  if(window.innerWidth<=768){
-    document.documentElement.setAttribute('data-mobile','');
-    // Wire mobile tabs inline — no dependency on app.js loading
-    document.addEventListener('DOMContentLoaded', function(){
-      document.querySelectorAll('.mtab').forEach(function(tab){
-        tab.addEventListener('click', function(){
-          var t = tab.dataset.tab;
-          document.querySelectorAll('.mtab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===t);});
-          document.querySelectorAll('.mobile-view').forEach(function(v){v.style.display='none';});
-          var canvas = document.getElementById('canvas-container');
-          if(canvas) canvas.style.display = t==='canvas' ? '' : 'none';
-          if(t!=='canvas'){
-            var view = document.getElementById('mobile-'+t+'-view');
-            if(view) view.style.display = t==='chat' ? 'flex' : '';
-          }
-          // Delegate to app.js handler if loaded
-          try {
-            if(typeof switchMobileTab==='function') switchMobileTab(t);
-          } catch(e) {
-            var target = t==='canvas' ? null : document.getElementById('mobile-'+t+'-view');
-            if(target) target.innerHTML='<div style="padding:20px;color:red;font-size:12px">'+e.message+'</div>';
-          }
-        });
-      });
-    });
-  }
-  </script>
-
-  <!-- Mobile bottom tab bar (hidden on desktop via CSS) -->
-  <nav class="mobile-tab-bar" id="mobile-tab-bar">
-    <button class="mtab active" data-tab="canvas">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span>Canvas</span>
-    </button>
-    <button class="mtab" data-tab="files">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-      <span>Files</span>
-    </button>
-    <button class="mtab" data-tab="chat">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <span>Chat</span>
-    </button>
-    <button class="mtab" data-tab="more">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-      <span>More</span>
-    </button>
-  </nav>
-
-  <!-- Mobile full-screen views (hidden on desktop) -->
-  <div id="mobile-files-view" class="mobile-view" style="display:none"></div>
-  <div id="mobile-chat-view" class="mobile-view" style="display:none"></div>
-  <div id="mobile-more-view" class="mobile-view" style="display:none"></div>
+  <!-- Mobile tab bar — created by initMobile() in app.js -->
 
   <script>
   // Theme switcher — dropdown with preview swatches
@@ -689,15 +636,6 @@
         reg.update();
       });
     }
-  </script>
-  <script>
-  // Mobile JS error overlay — shows errors visually since there's no dev console
-  if(document.documentElement.hasAttribute('data-mobile')){
-    window.onerror=function(msg,src,line){
-      var d=document.getElementById('mobile-more-view');
-      if(d) d.innerHTML='<div style="padding:16px;color:red;font-size:12px;word-break:break-all">JS Error: '+msg+'<br>at '+src+':'+line+'</div>';
-    };
-  }
   </script>
   <script src="/static/app.js"></script>
 </body>

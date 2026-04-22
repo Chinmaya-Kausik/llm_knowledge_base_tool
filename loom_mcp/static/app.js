@@ -8786,87 +8786,122 @@ function renderKeybindingEditor(container) {
 
 // --- Main init ---
 // ========================================
-// Mobile UI
+// Mobile UI (v2)
 // ========================================
-function isMobile() { return window.innerWidth <= 768; }
+function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
 var _mobileActive = false;
 var _mobileTab = 'canvas';
 
 function initMobile() {
-  function updateMobileMode() {
-    const mobile = isMobile();
-    if (mobile === _mobileActive) return;
-    _mobileActive = mobile;
-    if (mobile) {
-      document.documentElement.setAttribute('data-mobile', '');
-      // Don't call switchMobileTab here on first init — canvas hasn't loaded yet.
-      // CSS handles visibility via [data-mobile]. Tab switching works after graph loads.
-    } else {
-      document.documentElement.removeAttribute('data-mobile');
-      document.querySelectorAll('.mobile-view').forEach(v => v.style.display = 'none');
-      const canvasEl = document.getElementById('canvas-container');
-      if (canvasEl) canvasEl.style.display = '';
-    }
-  }
-  updateMobileMode();
-  window.addEventListener('resize', updateMobileMode);
+  if (!isMobile()) return;
+  _mobileActive = true;
+  document.documentElement.setAttribute('data-mobile', '');
 
-  // Tab bar click handlers
-  document.querySelectorAll('.mtab').forEach(tab => {
-    tab.onclick = () => switchMobileTab(tab.dataset.tab);
-  });
+  // Build mobile shell: [content area] + [tab bar]
+  const shell = document.createElement('div');
+  shell.className = 'mobile-shell';
+  shell.id = 'mobile-shell';
+
+  const content = document.createElement('div');
+  content.className = 'mobile-content';
+  content.id = 'mobile-content';
+
+  // Move canvas-container into the shell
+  const canvas = document.getElementById('canvas-container');
+  if (canvas) content.appendChild(canvas);
 
   // Canvas floating controls
   const floatControls = document.createElement('div');
-  floatControls.className = 'canvas-float-controls';
+  floatControls.className = 'mobile-float-controls';
   floatControls.innerHTML = `
-    <button class="canvas-float-btn" title="Fit to view" onclick="fitView()">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-    </button>
-    <button class="canvas-float-btn" title="Auto layout" onclick="autoLayout()">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-    </button>`;
-  document.getElementById('canvas-container').appendChild(floatControls);
+    <button class="mobile-float-btn" onclick="fitView()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+    <button class="mobile-float-btn" onclick="autoLayout()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>`;
+  content.appendChild(floatControls);
 
   // Mobile breadcrumb
-  const mBreadcrumb = document.createElement('div');
-  mBreadcrumb.className = 'mobile-breadcrumb';
-  mBreadcrumb.id = 'mobile-breadcrumb';
-  document.getElementById('canvas-container').appendChild(mBreadcrumb);
+  const bc = document.createElement('div');
+  bc.className = 'mobile-breadcrumb';
+  bc.id = 'mobile-breadcrumb';
+  content.appendChild(bc);
+
+  // Tab bar
+  const tabBar = document.createElement('nav');
+  tabBar.className = 'mobile-tab-bar';
+  const tabs = [
+    { id: 'canvas', icon: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>', label: 'Canvas' },
+    { id: 'files', icon: '<path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>', label: 'Files' },
+    { id: 'chat', icon: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>', label: 'Chat' },
+    { id: 'more', icon: '<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>', label: 'More' },
+  ];
+  for (const t of tabs) {
+    const btn = document.createElement('button');
+    btn.className = 'mobile-tab' + (t.id === 'canvas' ? ' active' : '');
+    btn.dataset.tab = t.id;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5">${t.icon}</svg><span>${t.label}</span>`;
+    btn.addEventListener('click', () => switchMobileTab(t.id));
+    tabBar.appendChild(btn);
+  }
+
+  shell.appendChild(content);
+  shell.appendChild(tabBar);
+  document.body.appendChild(shell);
+
+  // VisualViewport handler for iOS keyboard
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      document.documentElement.style.setProperty('--vvh', `${window.visualViewport.height}px`);
+    });
+  }
+
+  // matchMedia listener for orientation/resize changes
+  window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
+    if (!e.matches && _mobileActive) {
+      _mobileActive = false;
+      document.documentElement.removeAttribute('data-mobile');
+      // Restore desktop layout — move canvas back
+      const c = document.getElementById('canvas-container');
+      if (c) document.body.insertBefore(c, document.getElementById('mobile-shell'));
+      document.getElementById('mobile-shell')?.remove();
+    }
+  });
 }
+
+// --- Mobile view switching ---
+var _mobileFilePath = [];
+var _mobileChatPanel = null;
 
 function switchMobileTab(tab) {
   _mobileTab = tab;
-  document.querySelectorAll('.mtab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.mobile-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
 
-  // Hide all mobile views
-  document.querySelectorAll('.mobile-view').forEach(v => v.style.display = 'none');
+  const content = document.getElementById('mobile-content');
+  if (!content) return;
 
-  // Show canvas container only on canvas tab
-  const canvasEl = document.getElementById('canvas-container');
-  if (canvasEl) canvasEl.style.display = tab === 'canvas' ? '' : 'none';
+  // Remove any existing mobile view (except canvas-container which stays)
+  content.querySelectorAll('.mobile-view').forEach(v => v.remove());
 
-  try {
-    if (tab === 'canvas') {
-      updateMobileBreadcrumb();
-      fitView();
-    } else if (tab === 'files') {
-      const view = document.getElementById('mobile-files-view');
-      view.style.display = '';
-      renderMobileFiles();
-    } else if (tab === 'chat') {
-      const view = document.getElementById('mobile-chat-view');
-      view.style.display = 'flex';
-      initMobileChat();
-    } else if (tab === 'more') {
-      const view = document.getElementById('mobile-more-view');
-      view.style.display = '';
-      renderMobileMore();
-    }
-  } catch (e) {
-    console.error('[Mobile] switchTab error:', e);
-    const errView = document.getElementById('mobile-' + tab + '-view');
-    if (errView) errView.innerHTML = `<div style="padding:20px;color:red;font-size:12px">${e.message}</div>`;
+  // Show/hide canvas
+  const canvas = document.getElementById('canvas-container');
+  if (canvas) canvas.style.display = tab === 'canvas' ? '' : 'none';
+
+  if (tab === 'canvas') {
+    updateMobileBreadcrumb();
+    try { fitView(); } catch {}
+  } else if (tab === 'files') {
+    const view = document.createElement('div');
+    view.className = 'mobile-view mobile-files';
+    content.appendChild(view);
+    renderMobileFiles(view);
+  } else if (tab === 'chat') {
+    const view = document.createElement('div');
+    view.className = 'mobile-view mobile-chat';
+    content.appendChild(view);
+    renderMobileChat(view);
+  } else if (tab === 'more') {
+    const view = document.createElement('div');
+    view.className = 'mobile-view mobile-more';
+    content.appendChild(view);
+    renderMobileMore(view);
   }
 }
 
@@ -8874,244 +8909,183 @@ function updateMobileBreadcrumb() {
   const bc = document.getElementById('mobile-breadcrumb');
   if (!bc) return;
   const level = currentLevel();
-  if (!level.parentPath) {
-    bc.style.display = 'none';
-    return;
-  }
+  if (!level.parentPath) { bc.style.display = 'none'; return; }
   bc.style.display = 'flex';
-  const label = level.label || level.parentPath.split('/').pop();
-  bc.innerHTML = `<button class="mobile-back-btn" onclick="navigateToLevel(canvasStack.length - 2)">&#8592;</button>
-    <span class="mobile-crumb-label">${label}</span>`;
+  bc.innerHTML = `<button class="mobile-back-btn" onclick="navigateToLevel(canvasStack.length-2)">\u2190</button>
+    <span class="mobile-crumb-label">${level.label || level.parentPath.split('/').pop()}</span>`;
 }
 
-// Mobile Files — push navigation
-var _mobileFilePath = [];
-function renderMobileFiles() {
-  const view = document.getElementById('mobile-files-view');
+// --- Mobile Files ---
+function renderMobileFiles(container) {
   if (!filesTreeData) {
-    view.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Loading...</div>';
-    api.fetchTree().then(data => { filesTreeData = data; renderMobileFiles(); });
+    container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Loading...</div>';
+    api.fetchTree().then(data => { filesTreeData = data; renderMobileFiles(container); }).catch(e => {
+      container.innerHTML = `<div style="padding:20px;color:var(--red)">${e.message}</div>`;
+    });
     return;
   }
-
-  // Navigate to current path in tree
   let node = filesTreeData;
   for (const seg of _mobileFilePath) {
     const child = (node.children || []).find(c => c.name === seg);
-    if (child) node = child;
-    else break;
+    if (child) node = child; else break;
   }
-
   const folderName = _mobileFilePath.length > 0 ? _mobileFilePath[_mobileFilePath.length - 1] : 'Files';
-  let html = `<div class="mobile-files-header">`;
-  if (_mobileFilePath.length > 0) {
-    html += `<button class="mobile-back-btn" onclick="_mobileFilePath.pop(); renderMobileFiles();">&#8592;</button>`;
-  }
-  html += `<span class="mobile-folder-name">${folderName}</span></div>`;
-  html += `<ul class="mobile-files-list">`;
+  const folderIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>';
+  const fileIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
-  const children = node.children || [];
-  for (const child of children) {
-    const isFolder = child.type === 'folder';
-    const icon = isFolder
-      ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>'
-      : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
-    const chevron = isFolder ? '<span class="file-chevron">&#8250;</span>' : '';
-    const path = [..._mobileFilePath, child.name].join('/');
-    if (isFolder) {
-      html += `<li class="mobile-files-item" onclick="_mobileFilePath.push('${child.name}'); renderMobileFiles();">
-        <span class="file-icon">${icon}</span><span class="file-name">${child.name}</span>${chevron}</li>`;
+  let html = '<div class="mf-header">';
+  if (_mobileFilePath.length > 0) html += `<button class="mf-back" onclick="_mobileFilePath.pop();switchMobileTab('files')">\u2190</button>`;
+  html += `<span class="mf-title">${folderName}</span></div><div class="mf-list">`;
+  for (const child of (node.children || [])) {
+    const isDir = child.type === 'folder';
+    const esc = child.name.replace(/'/g, "\\'");
+    if (isDir) {
+      html += `<div class="mf-item" onclick="_mobileFilePath.push('${esc}');switchMobileTab('files')">
+        <span class="mf-icon">${folderIcon}</span><span class="mf-name">${child.name}</span><span class="mf-chevron">\u203A</span></div>`;
     } else {
-      html += `<li class="mobile-files-item" onclick="expandCard(null, '${path}');">
-        <span class="file-icon">${icon}</span><span class="file-name">${child.name}</span></li>`;
+      const path = [..._mobileFilePath, child.name].join('/');
+      html += `<div class="mf-item" onclick="expandCard(null,'${path.replace(/'/g, "\\'")}')">
+        <span class="mf-icon">${fileIcon}</span><span class="mf-name">${child.name}</span></div>`;
     }
   }
-  html += '</ul>';
-  view.innerHTML = html;
+  if (!(node.children || []).length) html += '<div class="mf-empty">Empty folder</div>';
+  html += '</div>';
+  container.innerHTML = html;
 }
 
-// Mobile Chat
-var _mobileChatInit = false;
-function initMobileChat() {
-  const view = document.getElementById('mobile-chat-view');
-  if (_mobileChatInit) return;
-  _mobileChatInit = true;
+// --- Mobile Chat ---
+function renderMobileChat(container) {
+  // Create a dedicated chat panel for mobile (own WebSocket, not mirroring main)
+  container.innerHTML = `
+    <div class="mc-messages" id="mc-messages"></div>
+    <div class="mc-input-bar">
+      <textarea class="mc-input" id="mc-input" placeholder="Message..." rows="1"></textarea>
+      <button class="mc-send" id="mc-send">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>`;
 
-  // Use the main panel's messages container — mirror it into mobile view
-  const mainPanel = chatPanels.get('main');
+  const input = container.querySelector('#mc-input');
+  const sendBtn = container.querySelector('#mc-send');
+  const msgsEl = container.querySelector('#mc-messages');
 
-  // Scope chip
-  const scopeChip = document.createElement('div');
-  scopeChip.className = 'chat-context-chip';
-  scopeChip.style.cssText = 'margin: 8px 12px; font-size: 12px; cursor: pointer;';
-  const level = mainPanel?.contextLevel || getSmartContextDefault();
-  scopeChip.innerHTML = `<svg class="ctx-icon" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
-    <span class="ctx-label">ctx:</span> <span class="ctx-scope">${level}</span>`;
-
-  // Move main panel's messages container into mobile view
-  const msgs = document.createElement('div');
-  msgs.className = 'mobile-chat-messages';
-  // Clone existing messages from main panel
-  const mainMsgs = document.getElementById('chat-messages');
-  if (mainMsgs) {
-    for (const child of [...mainMsgs.children]) {
-      msgs.appendChild(child.cloneNode(true));
-    }
-  }
-
-  // Input bar
-  const inputBar = document.createElement('div');
-  inputBar.className = 'mobile-chat-input-bar';
-  const textarea = document.createElement('textarea');
-  textarea.placeholder = 'Message...';
-  textarea.rows = 1;
-  textarea.addEventListener('input', () => {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   });
-  const sendBtn = document.createElement('button');
-  sendBtn.className = 'mobile-chat-send';
-  sendBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+
   sendBtn.onclick = () => {
-    const text = textarea.value.trim();
+    const text = input.value.trim();
     if (!text) return;
-    textarea.value = '';
-    textarea.style.height = 'auto';
-    // Use the main panel's WebSocket to send
-    const mp = chatPanels.get('main');
-    if (mp?.ws && mp.ws.readyState === WebSocket.OPEN) {
-      // Add user message to mobile view
-      const userEl = document.createElement('div');
-      userEl.className = 'chat-msg chat-msg-user';
-      userEl.textContent = text;
-      msgs.appendChild(userEl);
-      msgs.scrollTop = msgs.scrollHeight;
-      // Send via main panel
-      const mainInput = document.getElementById('chat-input');
-      if (mainInput) {
-        mainInput.value = text;
-        document.getElementById('chat-send')?.click();
-      }
-    } else {
-      // No WebSocket — show error
-      const errEl = document.createElement('div');
-      errEl.style.cssText = 'padding:8px 12px;color:var(--text-muted);font-size:13px';
-      errEl.textContent = 'Connecting to chat...';
-      msgs.appendChild(errEl);
-      // Try to init chat
-      const mainInput = document.getElementById('chat-input');
-      if (mainInput) {
-        mainInput.value = text;
-        document.getElementById('chat-send')?.click();
-      }
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Show user message
+    const userEl = document.createElement('div');
+    userEl.className = 'chat-msg chat-msg-user';
+    userEl.textContent = text;
+    msgsEl.appendChild(userEl);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    // Send via main panel's WebSocket (the session is shared)
+    const mainInput = document.getElementById('chat-input');
+    if (mainInput) {
+      mainInput.value = text;
+      document.getElementById('chat-send')?.click();
     }
   };
-  inputBar.appendChild(textarea);
-  inputBar.appendChild(sendBtn);
 
-  view.appendChild(scopeChip);
-  view.appendChild(msgs);
-  view.appendChild(inputBar);
-
-  // Observe main panel messages and mirror to mobile
-  if (mainMsgs) {
-    const observer = new MutationObserver(() => {
-      // Sync new messages
-      while (msgs.children.length > mainMsgs.children.length + 1) {
-        // +1 for scope chip — don't remove that
-      }
-      // Simple approach: copy last message if different
-      const lastMain = mainMsgs.lastElementChild;
-      if (lastMain) {
-        const lastMobile = msgs.lastElementChild;
-        if (!lastMobile || lastMobile.className !== lastMain.className || lastMobile.innerHTML !== lastMain.innerHTML) {
-          msgs.appendChild(lastMain.cloneNode(true));
-          msgs.scrollTop = msgs.scrollHeight;
-        }
-      }
-    });
-    observer.observe(mainMsgs, { childList: true, subtree: true });
-  }
-
-  // iOS keyboard handling
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      const offset = window.innerHeight - window.visualViewport.height;
-      inputBar.style.paddingBottom = `calc(8px + ${offset}px)`;
-    });
-  }
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+  };
 }
 
-// Mobile More menu
-function renderMobileMore() {
-  const view = document.getElementById('mobile-more-view');
+// --- Mobile More ---
+function renderMobileMore(container) {
   const isVM = isVMTarget();
   const items = [
-    { label: 'Search', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', action: 'openMobileSearch()' },
-    ...(!isVM ? [{ label: 'Tags', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>', action: 'switchView("tags")' }] : []),
-    ...(!isVM ? [{ label: 'Health', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>', action: 'switchView("health")' }] : []),
-    { label: 'Settings', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>', action: 'openFullSettings()' },
-    { label: 'Theme', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', action: 'openFullSettings("appearance")' },
+    { label: 'Search', icon: 'search', action: () => openMobileSearch() },
+    ...(!isVM ? [{ label: 'Tags', icon: 'tag', action: () => switchView('tags') }] : []),
+    ...(!isVM ? [{ label: 'Health', icon: 'activity', action: () => switchView('health') }] : []),
+    { label: 'Settings', icon: 'settings', action: () => openFullSettings() },
+    { label: 'Appearance', icon: 'palette', action: () => openFullSettings('appearance') },
   ];
-
-  view.innerHTML = `<ul class="mobile-more-list">${items.map(i =>
-    `<li class="mobile-more-item" onclick="${i.action}">${i.icon}<span>${i.label}</span></li>`
-  ).join('')}</ul>`;
+  const iconSvg = {
+    search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
+    palette: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>',
+  };
+  container.innerHTML = '<div class="mm-list">' + items.map((item, i) =>
+    `<div class="mm-item" data-idx="${i}">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">${iconSvg[item.icon] || ''}</svg>
+      <span>${item.label}</span>
+      <span class="mm-chevron">\u203A</span>
+    </div>`
+  ).join('') + '</div>';
+  container.querySelectorAll('.mm-item').forEach((el, i) => {
+    el.onclick = () => items[i].action();
+  });
 }
 
+// --- Mobile Search (bottom sheet) ---
 function openMobileSearch() {
-  // Open search as a bottom sheet with input + results
   const content = document.createElement('div');
   content.style.padding = '16px';
-  content.innerHTML = `<input type="text" placeholder="Search..." style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;" id="mobile-search-input">
-    <div id="mobile-search-results" style="margin-top:12px;max-height:50vh;overflow-y:auto"></div>`;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Search...';
+  input.className = 'mc-input';
+  input.style.cssText = 'width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:16px;box-sizing:border-box;';
+  const results = document.createElement('div');
+  results.style.cssText = 'margin-top:12px;max-height:50vh;overflow-y:auto;overscroll-behavior:contain';
+  content.appendChild(input);
+  content.appendChild(results);
   openBottomSheet(content);
-  setTimeout(() => {
-    const input = document.getElementById('mobile-search-input');
-    input?.focus();
-    let t;
-    input.oninput = () => {
-      clearTimeout(t);
-      t = setTimeout(async () => {
-        const q = input.value.trim();
-        if (!q) { document.getElementById('mobile-search-results').innerHTML = ''; return; }
-        const results = await api.fetchSearch(q, 'all', 'both');
-        const el = document.getElementById('mobile-search-results');
-        if (!results.length) { el.innerHTML = '<div style="color:var(--text-muted);padding:8px">No results</div>'; return; }
-        el.innerHTML = results.slice(0, 30).map(r =>
-          `<div class="mobile-files-item" onclick="closeBottomSheet();expandCard(null,'${r.path}');" style="border-bottom:1px solid var(--border-soft);padding:10px 0">
+  setTimeout(() => input.focus(), 100);
+  let t;
+  input.oninput = () => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const q = input.value.trim();
+      if (!q) { results.innerHTML = ''; return; }
+      try {
+        const data = await api.fetchSearch(q, 'all', 'both');
+        if (!data.length) { results.innerHTML = '<div style="color:var(--text-muted);padding:8px">No results</div>'; return; }
+        results.innerHTML = data.slice(0, 30).map(r =>
+          `<div class="mf-item" style="padding:10px 0" data-path="${r.path}">
             <span style="font-size:13px;color:var(--text)">${r.path}</span>
-            ${r.context ? `<span style="font-size:11px;color:var(--text-muted);display:block;margin-top:2px">${r.context.slice(0, 80)}</span>` : ''}
+            ${r.context ? `<span style="font-size:11px;color:var(--text-muted);display:block;margin-top:2px">${escapeHtml(r.context).slice(0, 80)}</span>` : ''}
           </div>`
         ).join('');
-      }, 300);
-    };
-  }, 100);
+        results.querySelectorAll('.mf-item').forEach(el => {
+          el.onclick = () => { closeBottomSheet(); expandCard(null, el.dataset.path); };
+        });
+      } catch (e) {
+        results.innerHTML = `<div style="color:var(--red);padding:8px">${e.message}</div>`;
+      }
+    }, 300);
+  };
 }
 
-// Bottom sheet
-let _bottomSheetEl = null;
-let _bottomSheetScrim = null;
-function openBottomSheet(content, options = {}) {
+// --- Bottom sheet ---
+var _bottomSheetEl = null;
+var _bottomSheetScrim = null;
+
+function openBottomSheet(content) {
   closeBottomSheet();
   _bottomSheetScrim = document.createElement('div');
-  _bottomSheetScrim.className = 'bottom-sheet-scrim';
+  _bottomSheetScrim.className = 'bs-scrim';
   _bottomSheetScrim.onclick = closeBottomSheet;
-  document.body.appendChild(_bottomSheetScrim);
 
   _bottomSheetEl = document.createElement('div');
-  _bottomSheetEl.className = 'bottom-sheet';
-  _bottomSheetEl.innerHTML = '<div class="bottom-sheet-handle"></div>';
-  if (typeof content === 'string') {
-    const div = document.createElement('div');
-    div.innerHTML = content;
-    _bottomSheetEl.appendChild(div);
-  } else {
-    _bottomSheetEl.appendChild(content);
-  }
-  document.body.appendChild(_bottomSheetEl);
+  _bottomSheetEl.className = 'bs-sheet';
+  _bottomSheetEl.innerHTML = '<div class="bs-handle"></div>';
+  _bottomSheetEl.appendChild(typeof content === 'string' ? Object.assign(document.createElement('div'), { innerHTML: content }) : content);
 
-  // Animate in
+  document.body.appendChild(_bottomSheetScrim);
+  document.body.appendChild(_bottomSheetEl);
   requestAnimationFrame(() => {
     _bottomSheetScrim.classList.add('visible');
     _bottomSheetEl.classList.add('open');
@@ -9119,22 +9093,16 @@ function openBottomSheet(content, options = {}) {
 }
 
 function closeBottomSheet() {
-  if (_bottomSheetEl) {
-    _bottomSheetEl.classList.remove('open');
-    _bottomSheetScrim?.classList.remove('visible');
-    setTimeout(() => {
-      _bottomSheetEl?.remove();
-      _bottomSheetScrim?.remove();
-      _bottomSheetEl = null;
-      _bottomSheetScrim = null;
-    }, 300);
-  }
+  if (!_bottomSheetEl) return;
+  _bottomSheetEl.classList.remove('open');
+  _bottomSheetScrim?.classList.remove('visible');
+  setTimeout(() => {
+    _bottomSheetEl?.remove(); _bottomSheetScrim?.remove();
+    _bottomSheetEl = null; _bottomSheetScrim = null;
+  }, 300);
 }
 
 async function init() {
-  // Mobile setup first — wire tab handlers before anything else
-  initMobile();
-
   // Try to select backend if multiple are configured
   const backends = getBackends();
   if (backends.length > 0) {
@@ -9142,9 +9110,10 @@ async function init() {
     if (!ok) { showOfflineOverlay(); return; }
   }
 
+  initMobile(); // Must run before initCanvas so shell wraps canvas-container
   initCanvas();
   initFilterDropdowns();
-  initChat();
+  if (!_mobileActive) initChat(); // Desktop chat panel — mobile has its own
   initSelectionTooltip();
 
   document.querySelectorAll('.view-tab').forEach(tab => tab.onclick = () => switchView(tab.dataset.view));
@@ -9387,14 +9356,5 @@ async function init() {
 }
 
 window.navigateToLevel = navigateToLevel;
-
-// Wire mobile tab handlers immediately — don't depend on init() succeeding
-(function() {
-  document.querySelectorAll('.mtab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      if (typeof switchMobileTab === 'function') switchMobileTab(tab.dataset.tab);
-    });
-  });
-})();
 
 init().catch(e => console.error('[init] FATAL:', e));
