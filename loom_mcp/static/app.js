@@ -8856,10 +8856,15 @@ function initMobile() {
   document.body.appendChild(shell);
   if (typeof _mdbg !== 'undefined') _mdbg.push('shell created, tabs=' + tabBar.children.length);
 
-  // VisualViewport handler for iOS keyboard
+  // VisualViewport handler for iOS keyboard — hide tabs when keyboard opens
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
-      document.documentElement.style.setProperty('--vvh', `${window.visualViewport.height}px`);
+      const vvh = window.visualViewport.height;
+      document.documentElement.style.setProperty('--vvh', `${vvh}px`);
+      const keyboardUp = vvh < window.innerHeight * 0.75;
+      tabBar.style.display = keyboardUp ? 'none' : 'flex';
+      // Resize shell to visible viewport when keyboard is up
+      shell.style.height = keyboardUp ? `${vvh}px` : '';
     });
   }
 
@@ -8890,9 +8895,13 @@ function switchMobileTab(tab) {
   // Remove any existing mobile view (except canvas-container which stays)
   content.querySelectorAll('.mobile-view').forEach(v => v.remove());
 
-  // Show/hide canvas
+  // Show/hide canvas + float controls
   const canvas = document.getElementById('canvas-container');
   if (canvas) canvas.style.display = tab === 'canvas' ? '' : 'none';
+  const floats = content.querySelector('.mobile-float-controls');
+  if (floats) floats.style.display = tab === 'canvas' ? 'flex' : 'none';
+  const mbc = document.getElementById('mobile-breadcrumb');
+  if (mbc) mbc.style.display = tab === 'canvas' && currentLevel().parentPath ? 'flex' : 'none';
 
   if (tab === 'canvas') {
     updateMobileBreadcrumb();
