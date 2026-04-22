@@ -9314,6 +9314,11 @@ async function init() {
   await Promise.all([initGraphView(), initSidebar()]);
   populateTagFilter();
 
+  // On mobile, auto-fit canvas after graph loads so cards are visible
+  if (_mobileActive) {
+    setTimeout(() => { try { fitView(); } catch {} }, 300);
+  }
+
   // Reopen settings panel if flagged (e.g. after remote access restart)
   const reopenTab = sessionStorage.getItem('loom-reopen-settings');
   if (reopenTab) {
