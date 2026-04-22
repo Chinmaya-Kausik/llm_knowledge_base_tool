@@ -2495,9 +2495,12 @@ function renderChatTranscript(container, rawContent) {
   if (current) sections.push(current);
 
   // Render each section as a chat message
+  debugLog('[transcript] sections:', sections.length, sections.map(s => s.role));
   for (const section of sections) {
     const text = section.lines.join('\n').trim();
+    debugLog('[transcript] rendering', section.role, 'section, length:', text.length);
     if (!text) continue;
+    try {
 
     // Clean raw Python dicts everywhere
     function cleanDicts(s) {
@@ -2512,10 +2515,12 @@ function renderChatTranscript(container, rawContent) {
     }
 
     if (section.role === 'user') {
-      // Extract user text (before any <details>) as the user message
-      const userText = text.replace(/<details>[\s\S]*?<\/details>/g, '')
-        .replace(/^[-*]?\s*\{'type':\s*'text'[\s\S]*/m, '')  // strip raw dicts
-        .trim();
+      // Extract user text: remove <details> blocks AND raw dict lines
+      let userText = text.replace(/<details>[\s\S]*?<\/details>/g, '');
+      // Remove lines starting with raw dicts
+      userText = userText.split('\n').filter(line =>
+        !line.match(/^\s*[-*]?\s*\{'type':\s*'text'/)
+      ).join('\n').trim();
       if (userText) {
         const msgEl = document.createElement('div');
         msgEl.className = 'chat-msg chat-msg-user';
@@ -2551,8 +2556,9 @@ function renderChatTranscript(container, rawContent) {
       msgEl.appendChild(contentEl);
       container.appendChild(msgEl);
     }
-
-    container.appendChild(msgEl);
+    } catch (err) {
+      debugLog('[transcript] Error rendering section:', err);
+    }
   }
 
   // If no sections parsed, fall back to markdown
