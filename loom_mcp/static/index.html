@@ -495,7 +495,19 @@
     var settingsBtn = document.getElementById('btn-toolbar-menu');
     var settingsDD = document.getElementById('settings-dropdown');
     if (settingsBtn && settingsDD) {
-      settingsBtn.onclick = function(e) { e.stopPropagation(); settingsDD.classList.toggle('hidden'); };
+      settingsBtn.onclick = function(e) {
+        e.stopPropagation();
+        settingsDD.classList.toggle('hidden');
+        if (!settingsDD.classList.contains('hidden')) {
+          var toolbar = document.getElementById('toolbar');
+          var fullpage = document.getElementById('fullpage-overlay');
+          var ddComputed = getComputedStyle(settingsDD);
+          console.log('[dropdown] z-index:', ddComputed.zIndex, 'position:', ddComputed.position);
+          console.log('[dropdown] toolbar z-index:', toolbar ? getComputedStyle(toolbar).zIndex : 'n/a');
+          console.log('[dropdown] fullpage z-index:', fullpage ? getComputedStyle(fullpage).zIndex : 'no fullpage');
+          console.log('[dropdown] dropdown parent:', settingsDD.parentElement?.id || settingsDD.parentElement?.tagName);
+        }
+      };
       document.addEventListener('click', function(e) {
         if (!settingsDD.contains(e.target) && e.target !== settingsBtn) settingsDD.classList.add('hidden');
       });
