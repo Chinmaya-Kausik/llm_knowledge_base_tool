@@ -8947,13 +8947,17 @@ function renderMobileFiles(container) {
   for (const child of (node.children || [])) {
     const isDir = child.type === 'folder';
     const esc = child.name.replace(/'/g, "\\'");
+    const size = child.size ? (child.size > 1024 ? `${(child.size/1024).toFixed(0)} KB` : `${child.size} B`) : '';
     if (isDir) {
+      const count = (child.children || []).length;
+      const meta = count ? `<span class="mf-size">${count} items</span>` : '';
       html += `<div class="mf-item" onclick="_mobileFilePath.push('${esc}');switchMobileTab('files')">
-        <span class="mf-icon">${folderIcon}</span><span class="mf-name">${child.name}</span><span class="mf-chevron">\u203A</span></div>`;
+        <span class="mf-icon">${folderIcon}</span><span class="mf-name">${child.name}</span>${meta}<span class="mf-chevron">\u203A</span></div>`;
     } else {
       const path = [..._mobileFilePath, child.name].join('/');
+      const meta = size ? `<span class="mf-size">${size}</span>` : '';
       html += `<div class="mf-item" onclick="expandCard(null,'${path.replace(/'/g, "\\'")}')">
-        <span class="mf-icon">${fileIcon}</span><span class="mf-name">${child.name}</span></div>`;
+        <span class="mf-icon">${fileIcon}</span><span class="mf-name">${child.name}</span>${meta}</div>`;
     }
   }
   if (!(node.children || []).length) html += '<div class="mf-empty">Empty folder</div>';
@@ -8963,8 +8967,14 @@ function renderMobileFiles(container) {
 
 // --- Mobile Chat ---
 function renderMobileChat(container) {
-  // Create a dedicated chat panel for mobile (own WebSocket, not mirroring main)
+  const scopeLevel = getSmartContextDefault();
   container.innerHTML = `
+    <div class="mc-scope-bar">
+      <span class="mc-scope-chip">
+        <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
+        <span class="ctx-scope">${scopeLevel}</span>
+      </span>
+    </div>
     <div class="mc-messages" id="mc-messages"></div>
     <div class="mc-input-bar">
       <textarea class="mc-input" id="mc-input" placeholder="Message..." rows="1"></textarea>
@@ -8995,7 +9005,7 @@ function renderMobileChat(container) {
     msgsEl.appendChild(userEl);
     msgsEl.scrollTop = msgsEl.scrollHeight;
 
-    // Send via main panel's WebSocket (the session is shared)
+    // Send via main panel's WebSocket
     const mainInput = document.getElementById('chat-input');
     if (mainInput) {
       mainInput.value = text;
