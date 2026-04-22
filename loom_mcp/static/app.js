@@ -2448,15 +2448,116 @@ function expandCardFullPage(card, highlightQuery) {
         if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
       });
     });
+  } else if (path.startsWith('raw/chats/') || path.match(/raw\/chats\/.*\.md$/)) {
+    // Render chat transcript as chat UI
+    overlay.querySelector('.fullpage-toggle').style.display = 'none';
+    renderChatTranscript(contentEl, rawContent);
   } else {
     // Render markdown with marked
     contentEl.innerHTML = marked.parse(rawContent);
     renderLatex(contentEl);
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
-    // Highlight search matches
     if (highlightQuery) highlightMatches(contentEl, highlightQuery);
   }
+}
+
+function renderChatTranscript(container, rawContent) {
+  // Parse chat transcript markdown into styled chat UI
+  // Format: frontmatter, then ## You / ## Claude sections with <details> blocks
+  container.className += ' chat-transcript';
+
+  // Strip frontmatter
+  let content = rawContent;
+  if (content.startsWith('---')) {
+    const endFm = content.indexOf('---', 3);
+    if (endFm > 0) content = content.slice(endFm + 3).trim();
+  }
+  // Remove "Session: xxx" line
+  content = content.replace(/^Session:\s*\S+\n*/m, '');
+
+  // Split into sections by ## You / ## Claude
+  const sections = [];
+  const lines = content.split('\n');
+  let current = null;
+
+  for (const line of lines) {
+    if (line.match(/^## (You|User)/i)) {
+      if (current) sections.push(current);
+      current = { role: 'user', lines: [] };
+    } else if (line.match(/^## (Claude|Assistant)/i)) {
+      if (current) sections.push(current);
+      current = { role: 'assistant', lines: [] };
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  if (current) sections.push(current);
+
+  // Render each section as a chat message
+  for (const section of sections) {
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-msg chat-msg-${section.role}`;
+
+    const text = section.lines.join('\n').trim();
+    if (!text) continue;
+
+    if (section.role === 'user') {
+      // User messages: show as-is with the > prefix style
+      const textEl = document.createElement('div');
+      textEl.className = 'chat-msg-content';
+      textEl.textContent = text.replace(/^>\s*/gm, '');
+      msgEl.appendChild(textEl);
+    } else {
+      // Assistant messages: render markdown, preserve <details> blocks
+      const contentEl = document.createElement('div');
+      contentEl.className = 'chat-msg-content chat-text';
+
+      // Split into details blocks and regular text
+      const parts = text.split(/(<details[\s\S]*?<\/details>)/g);
+      for (const part of parts) {
+        if (part.startsWith('<details')) {
+          // Parse the details block
+          const summaryMatch = part.match(/<summary>(.*?)<\/summary>/);
+          const summary = summaryMatch ? summaryMatch[1] : 'Details';
+          const body = part.replace(/<details>[\s\S]*?<\/summary>/, '').replace(/<\/details>$/, '').trim();
+
+          const group = document.createElement('div');
+          group.className = 'chat-activity-group';
+          const header = document.createElement('div');
+          header.className = 'chat-activity-header';
+          header.innerHTML = `<span class="activity-toggle">▶</span> <span class="activity-summary">${escapeHtml(summary)}</span>`;
+          const bodyEl = document.createElement('div');
+          bodyEl.className = 'chat-activity-body';
+          bodyEl.innerHTML = marked.parse(body);
+
+          header.onclick = () => {
+            bodyEl.classList.toggle('open');
+            header.querySelector('.activity-toggle').textContent = bodyEl.classList.contains('open') ? '▼' : '▶';
+          };
+
+          group.appendChild(header);
+          group.appendChild(bodyEl);
+          contentEl.appendChild(group);
+        } else if (part.trim()) {
+          // Regular markdown text
+          const textBlock = document.createElement('div');
+          textBlock.innerHTML = marked.parse(part.trim());
+          contentEl.appendChild(textBlock);
+        }
+      }
+      msgEl.appendChild(contentEl);
+    }
+
+    container.appendChild(msgEl);
+  }
+
+  // If no sections parsed, fall back to markdown
+  if (sections.length === 0) {
+    container.innerHTML = marked.parse(rawContent);
+  }
+
+  renderLatex(container);
 }
 
 function highlightMatches(container, query) {
