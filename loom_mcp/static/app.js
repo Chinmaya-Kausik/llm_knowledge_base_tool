@@ -2557,14 +2557,23 @@ function renderChatTranscript(container, rawContent) {
         group.appendChild(bodyEl);
         contentEl.appendChild(group);
       } else if (part.trim()) {
-        const cleaned = section.role === 'user' ? part.trim().replace(/^[>›]\s?/gm, '').trim() : part.trim();
+        // Clean raw Python dicts from subagent results (can appear outside <details>)
+        let cleaned = part.trim();
+        cleaned = cleaned.split('\n').map(line => {
+          const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
+          if (dm) {
+            let t = dm[1].replace(/['"]\s*\}\s*$/, '');
+            return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+          }
+          return line;
+        }).join('\n');
+
         if (section.role === 'user') {
-          // User text: plain text, no markdown rendering
+          cleaned = cleaned.replace(/^[>›]\s?/gm, '').trim();
           const textBlock = document.createElement('div');
           textBlock.textContent = cleaned;
           contentEl.appendChild(textBlock);
         } else {
-          // Assistant text: render markdown
           const textBlock = document.createElement('div');
           textBlock.innerHTML = marked.parse(cleaned);
           contentEl.appendChild(textBlock);
@@ -7075,10 +7084,18 @@ async function continueSavedChat(path, content) {
         if (part.startsWith('<details>')) {
           el.appendChild(buildDetailsElement(part));
         } else if (part.trim()) {
+          // Clean raw Python dicts from subagent results
+          let cleanedPart = part.split('\n').map(line => {
+            const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
+            if (dm) {
+              let t = dm[1].replace(/['"]\s*\}\s*$/, '');
+              return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+            }
+            return line;
+          }).join('\n');
           const textEl = document.createElement('div');
-          textEl.innerHTML = marked.parse(part);
+          textEl.innerHTML = marked.parse(cleanedPart);
           renderLatex(textEl);
-          // Append children directly to avoid extra wrapper div
           while (textEl.firstChild) el.appendChild(textEl.firstChild);
         }
       }
