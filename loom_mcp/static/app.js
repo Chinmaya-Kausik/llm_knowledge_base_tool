@@ -8271,6 +8271,8 @@ function openFullSettings(initialTab) {
             body: JSON.stringify({ enable }),
           });
           btn.textContent = 'Restarting...';
+          // Remember to reopen settings after restart
+          sessionStorage.setItem('loom-reopen-settings', 'storage');
           await restartServer();
         } catch { btn.textContent = 'Failed'; }
       }
@@ -9307,6 +9309,13 @@ async function init() {
 
   await Promise.all([initGraphView(), initSidebar()]);
   populateTagFilter();
+
+  // Reopen settings panel if flagged (e.g. after remote access restart)
+  const reopenTab = sessionStorage.getItem('loom-reopen-settings');
+  if (reopenTab) {
+    sessionStorage.removeItem('loom-reopen-settings');
+    setTimeout(() => openFullSettings(reopenTab), 500);
+  }
 }
 
 window.navigateToLevel = navigateToLevel;

@@ -831,8 +831,11 @@ async def api_update_page(path: str, request: Request):
 def api_get_settings():
     import subprocess
     # Check Claude auth status
-    auth_check = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True)
-    authenticated = auth_check.returncode == 0
+    try:
+        auth_check = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True, timeout=5)
+        authenticated = auth_check.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        authenticated = False
     # Check Codex availability
     codex_available = shutil.which("codex") is not None
     # Get local IP for remote access URL
