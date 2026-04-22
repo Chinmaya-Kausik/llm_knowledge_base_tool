@@ -5072,7 +5072,7 @@ function initChat() {
               .replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const modal = document.createElement('div');
             modal.className = 'fs-panel';
-            modal.innerHTML = `<div class="fs-card" style="width:min(800px,92vw);height:min(600px,85vh)">
+            modal.innerHTML = `<div class="fs-card" style="width:min(800px,92vw);height:min(600px,85vh);grid-template-columns:1fr">
               <div class="fs-content" style="overflow:hidden;display:flex;flex-direction:column">
                 <div class="fs-content-header">
                   <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context Sent to Agent</h2>
