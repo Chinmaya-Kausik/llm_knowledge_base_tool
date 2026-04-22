@@ -307,7 +307,7 @@ def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str |
         return None
 
     if len(memory_content) > max_chars:
-        memory_content = memory_content[:max_chars] + "\n\n[... more memories available ...]"
+        memory_content = memory_content[:max_chars] + f"\n\n[... truncated at {max_chars} of {len(memory_content)} chars ...]"
 
     log.info("[memory] injecting from %s (%d chars) for page_path=%s", source, len(memory_content), page_path)
     return f"What you know about this workspace and user:\n{memory_content}"
@@ -442,27 +442,48 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
         if files_out is not None:
             files_out.append({"path": path_rel, "block": "location", "chars": chars, "note": note})
 
-    if context_level == "page":
+    def _add_scoped_memory(scope_path):
+        """Include MEMORY.md from the scoped folder if it exists."""
+        if not scope_path:
+            return
+        p = scope_path.split("/")
+        # Try project-level MEMORY.md
+        if len(p) >= 2 and p[0] == "projects":
+            mem_path = loom_root / "projects" / p[1] / "MEMORY.md"
+            if mem_path.exists():
+                try:
+                    mem = mem_path.read_text(encoding="utf-8").strip()
+                    if mem:
+                        rel = f"projects/{p[1]}/MEMORY.md"
+                        parts.append(f"\n--- Project memory: `{rel}` ---\n{mem}")
+                        _track(rel, len(mem), "Scoped memory")
+                except Exception:
+                    pass
+
+    # Header: always state where we are
+    parts.append(f"You are working in the loom root at `{loom_root}`.")
+
+    if context_level == "page" and page_path:
         full_path = loom_root / page_path
         if full_path.exists() and config.get("page_content", {}).get("enabled", True):
             content = get_page_content(full_path)
             if content:
                 actual_path = page_path
-                # get_page_content on a dir reads ABOUT.md
                 if full_path.is_dir():
                     actual_path = page_path.rstrip("/") + "/ABOUT.md"
-                if len(content) <= 2000:
-                    parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
-                    _track(actual_path, len(content), "Full content")
-                elif len(content) <= budget - 200:
-                    max_chars = min(len(content), budget - 200)
-                    parts.append(f"The user is currently viewing: `{page_path}`\n\n{content[:max_chars]}\n\n[... truncated ...]")
-                    _track(actual_path, max_chars, "Truncated")
+                total_chars = len(content)
+                if total_chars <= 2000:
+                    parts.append(f"The user is viewing: `{page_path}` (full content, {total_chars} chars)\n\n{content}")
+                    _track(actual_path, total_chars, "Full content")
+                elif total_chars <= budget - 200:
+                    max_chars = min(total_chars, budget - 200)
+                    parts.append(f"The user is viewing: `{page_path}` (first {max_chars} of {total_chars} chars)\n\n{content[:max_chars]}\n\n[... {total_chars - max_chars} chars truncated ...]")
+                    _track(actual_path, max_chars, f"First {max_chars} of {total_chars}")
                 else:
-                    parts.append(f"The user is currently viewing: `{page_path}` (large file — read on demand)")
-                    _track(actual_path, 0, "Path only (too large)")
+                    parts.append(f"The user is viewing: `{page_path}` ({total_chars} chars — too large to inject, read on demand)")
+                    _track(actual_path, 0, f"Path only ({total_chars} chars)")
             else:
-                parts.append(f"The user is currently viewing: `{page_path}`")
+                parts.append(f"The user is viewing: `{page_path}`")
 
             # Parent folder ABOUT.md — only for files (not when page_path is already a folder)
             if not full_path.is_dir() and config.get("folder_readme", {}).get("enabled", True):
@@ -476,30 +497,39 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                             if parent_content:
                                 remaining = budget - current_size - 50
                                 if len(parent_content) <= remaining:
-                                    parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
+                                    parent_rel = str(parent.relative_to(loom_root))
+                                    parts.append(f"\n--- Parent folder: `{parent_rel}/ABOUT.md` ---\n{parent_content}")
                                     _track(str(parent_about.relative_to(loom_root)), len(parent_content), "Parent folder")
 
-    elif context_level == "folder":
+        # Scoped memory for the file's project
+        _add_scoped_memory(page_path)
+
+    elif context_level == "folder" and page_path:
         full_path = loom_root / page_path
         folder = full_path if full_path.is_dir() else full_path.parent
         if folder.exists():
             content = get_page_content(folder)
             if content:
-                if len(content) > budget:
-                    content = content[:budget - 50] + "\n\n[... truncated ...]"
+                total_chars = len(content)
+                if total_chars > budget:
+                    content = content[:budget - 50] + f"\n\n[... {total_chars - budget + 50} chars truncated ...]"
                 folder_rel = str(folder.relative_to(loom_root))
-                parts.append(f"The user is browsing folder: `{folder_rel}`\n\n{content}")
+                parts.append(f"The user is browsing folder: `{folder_rel}/`\n\n--- Folder overview: `{folder_rel}/ABOUT.md` ---\n{content}")
                 about_path = folder / "ABOUT.md"
                 _track(str(about_path.relative_to(loom_root)) if about_path.exists() else folder_rel + "/ABOUT.md", len(content), "Folder overview")
 
+        # Scoped memory for the folder's project
+        _add_scoped_memory(page_path)
+
     elif context_level == "global":
-        # Root ABOUT.md — describes the loom
+        parts.append("The user is at the root canvas (global view).")
+        # Root ABOUT.md
         root_about = loom_root / "ABOUT.md"
         if root_about.exists():
             try:
                 root_content = root_about.read_text(encoding="utf-8").strip()
                 if root_content:
-                    parts.append(f"--- Loom Overview ---\n{root_content}")
+                    parts.append(f"\n--- Loom overview: `ABOUT.md` ---\n{root_content}")
                     _track("ABOUT.md", len(root_content), "Loom overview")
             except Exception:
                 pass
@@ -510,9 +540,10 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
                 from loom_mcp.lib.frontmatter import read_frontmatter
                 _, index_content = read_frontmatter(index_path)
                 remaining = budget - sum(len(p) for p in parts)
-                if len(index_content) > remaining:
-                    index_content = index_content[:remaining - 50] + "\n\n[... truncated ...]"
-                parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
+                total_chars = len(index_content)
+                if total_chars > remaining:
+                    index_content = index_content[:remaining - 50] + f"\n\n[... {total_chars - remaining + 50} chars truncated ...]"
+                parts.append(f"\n--- Master index (wiki page catalog) ---\n{index_content}")
                 _track("wiki/meta/index.md", len(index_content), "Master index")
             except Exception:
                 pass
