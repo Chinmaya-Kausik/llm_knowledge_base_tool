@@ -1104,14 +1104,17 @@ function setFocusedItem(path, element) {
 }
 let edgeRAF = null;         // rAF handle for edge debouncing
 // Centralized z-index management — all layers defined here
+// Fullpage overlay is position:absolute inside #canvas-container (z:200)
+// Toolbar is position:relative z:250 (above #main, so above fullpage)
+// Floating panels inside #canvas-container use bringToFront (201+)
 const Z_LAYERS = {
   canvas: 1,           // Cards on the canvas
-  floatingPanel: 100,  // Floating chat panels, terminals
-  fullpage: 200,       // Fullscreen file overlay
-  toolbar: 250,        // Toolbar stays above fullpage
-  dropdown: 310,       // Settings dropdown, filter menu
-  palette: 300,        // Appearance/model palettes
-  modal: 400,          // Full settings modal, keybinding panel
+  floatingPanel: 100,  // Floating chat panels, terminals (default)
+  fullpage: 200,       // Fullscreen file overlay (inside canvas-container)
+  toolbar: 250,        // Toolbar (above #main entirely)
+  dropdown: 310,       // Settings dropdown, filter menu (inside toolbar)
+  palette: 300,        // Appearance/model palettes (fixed)
+  modal: 400,          // Full settings modal, keybinding panel (fixed)
   tooltip: 500,        // Selection tooltip, toasts
 };
 let topZIndex = Z_LAYERS.floatingPanel; // Counter for bring-to-front within a layer
@@ -2271,9 +2274,15 @@ function expandCardFullPage(card, highlightQuery) {
     </div>
     <div class="fullpage-content"></div>
   `;
-  // Append to body (not canvas-container) so z-index works with toolbar/chat/settings
-  document.body.appendChild(overlay);
+  // Append to canvas-container — fills content area, respects sidebar + toolbar
+  document.getElementById('canvas-container').appendChild(overlay);
   expandedCard = overlay;
+  // Auto-hide sidebar on fullscreen enter
+  const sidebar = document.getElementById('sidebar');
+  expandedCard._sidebarWasOpen = sidebar && !sidebar.classList.contains('collapsed');
+  if (sidebar && !sidebar.classList.contains('collapsed')) {
+    sidebar.classList.add('collapsed');
+  }
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
   overlay.querySelector('.fullpage-chat').onclick = () => {
     createFloatingPanel({ contextPath: path });
@@ -2515,6 +2524,11 @@ let fullpageReturnView = null; // View to return to when closing fullpage
 
 function collapseFullPage() {
   if (expandedCard) {
+    // Restore sidebar if it was open before fullscreen
+    if (expandedCard._sidebarWasOpen) {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.remove('collapsed');
+    }
     expandedCard.remove();
     expandedCard = null;
     if (fullpageReturnView) {
