@@ -6944,6 +6944,19 @@ function buildDetailsElement(html) {
       if (!line) { i++; continue; }
 
       // Match "- **ToolName** — description" or "- **ToolName** — description"
+      // Handle raw Python dict lines from subagent results
+      const dictMatch = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
+      if (dictMatch) {
+        let text = dictMatch[1].replace(/['"]\s*\}\s*$/, '');
+        text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        const resultEl = document.createElement('div');
+        resultEl.className = 'chat-msg-content chat-text';
+        resultEl.innerHTML = marked.parse(text);
+        body.appendChild(resultEl);
+        i++;
+        continue;
+      }
+
       const toolMatch = line.match(/^[-*]\s*\*\*(\w+)\*\*\s*[—–-]\s*(.*)/);
       if (toolMatch) {
         const tName = toolMatch[1];
