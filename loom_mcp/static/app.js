@@ -8944,6 +8944,9 @@ function switchMobileTab(tab) {
   if (mbc) mbc.style.display = tab === 'canvas' && currentLevel().parentPath ? 'flex' : 'none';
 
   if (tab === 'canvas') {
+    // Ensure the desktop graph view is active (may have been switched by tags/health)
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-graph')?.classList.add('active');
     updateMobileBreadcrumb();
     try { fitView(); } catch {}
   } else if (tab === 'files') {
@@ -9075,8 +9078,8 @@ function renderMobileMore(container) {
   const isVM = isVMTarget();
   const items = [
     { label: 'Search', icon: 'search', action: () => openMobileSearch() },
-    ...(!isVM ? [{ label: 'Tags', icon: 'tag', action: () => switchView('tags') }] : []),
-    ...(!isVM ? [{ label: 'Health', icon: 'activity', action: () => switchView('health') }] : []),
+    ...(!isVM ? [{ label: 'Tags', icon: 'tag', action: () => openMobileSubview(container, 'Tags', () => { initTagCloud(); const tc = document.getElementById('view-tags'); return tc ? tc.innerHTML : 'No tags'; }) }] : []),
+    ...(!isVM ? [{ label: 'Health', icon: 'activity', action: () => openMobileSubview(container, 'Health', () => { initHealth(); const hv = document.getElementById('view-health'); return hv ? hv.innerHTML : 'No data'; }) }] : []),
     { label: 'Settings', icon: 'settings', action: () => openFullSettings() },
     { label: 'Appearance', icon: 'palette', action: () => openFullSettings('appearance') },
   ];
@@ -9097,6 +9100,17 @@ function renderMobileMore(container) {
   container.querySelectorAll('.mm-item').forEach((el, i) => {
     el.onclick = () => items[i].action();
   });
+}
+
+// --- Mobile subview (Tags, Health — renders inside More tab) ---
+function openMobileSubview(parentContainer, title, renderFn) {
+  const html = typeof renderFn === 'function' ? renderFn() : '';
+  parentContainer.innerHTML = `
+    <div class="mf-header">
+      <button class="mf-back" onclick="switchMobileTab('more')">\u2190</button>
+      <span class="mf-title">${title}</span>
+    </div>
+    <div style="padding:16px;overflow-y:auto;flex:1">${html}</div>`;
 }
 
 // --- Mobile Search (bottom sheet) ---
