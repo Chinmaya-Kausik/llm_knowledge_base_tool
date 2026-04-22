@@ -484,7 +484,13 @@
             if(view) view.style.display = t==='chat' ? 'flex' : '';
           }
           // Delegate to app.js handler if loaded
-          if(typeof switchMobileTab==='function') switchMobileTab(t);
+          if(typeof switchMobileTab==='function'){
+            switchMobileTab(t);
+          } else {
+            // app.js not loaded — show error in the view
+            var target = t==='canvas' ? null : document.getElementById('mobile-'+t+'-view');
+            if(target && !target.innerHTML.trim()) target.innerHTML='<div style="padding:20px;color:#888">Loading app...</div>';
+          }
         });
       });
     });
@@ -684,6 +690,15 @@
         reg.update();
       });
     }
+  </script>
+  <script>
+  // Mobile JS error overlay — shows errors visually since there's no dev console
+  if(document.documentElement.hasAttribute('data-mobile')){
+    window.onerror=function(msg,src,line){
+      var d=document.getElementById('mobile-more-view');
+      if(d) d.innerHTML='<div style="padding:16px;color:red;font-size:12px;word-break:break-all">JS Error: '+msg+'<br>at '+src+':'+line+'</div>';
+    };
+  }
   </script>
   <script src="/static/app.js"></script>
 </body>
