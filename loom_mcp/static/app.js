@@ -9103,6 +9103,9 @@ function closeBottomSheet() {
 }
 
 async function init() {
+  // Mobile shell must be created first — before any async calls
+  initMobile();
+
   // Try to select backend if multiple are configured
   const backends = getBackends();
   if (backends.length > 0) {
@@ -9110,7 +9113,6 @@ async function init() {
     if (!ok) { showOfflineOverlay(); return; }
   }
 
-  initMobile(); // Must run before initCanvas so shell wraps canvas-container
   initCanvas();
   initFilterDropdowns();
   if (!_mobileActive) initChat(); // Desktop chat panel — mobile has its own
