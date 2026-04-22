@@ -306,9 +306,23 @@ app = FastAPI(title="Loom Knowledge Base", lifespan=lifespan)
 
 # CORS — needed when phone hits a different origin than the server
 if REMOTE_ENABLED:
+    import socket as _sock
+    _local_origins = ["http://localhost", "http://127.0.0.1"]
+    try:
+        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_DGRAM)
+        _s.connect(("8.8.8.8", 80))
+        _local_ip = _s.getsockname()[0]
+        _s.close()
+        _port = int(os.environ.get("LOOM_PORT", 8420))
+        _local_origins.extend([
+            f"http://{_local_ip}:{_port}",
+            f"http://{_local_ip}",
+        ])
+    except Exception:
+        pass
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_local_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -968,13 +982,10 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
     """Return real context assembly breakdown by running build_system_prompt."""
     from loom_mcp.chat import sessions, build_system_prompt
 
-    # Create a temporary session with the given path so build_system_prompt works
-    temp_id = session_id or "__context_preview__"
+    # Always use a temp session to avoid mutating active sessions
+    temp_id = "__context_preview__"
     page_path = path or (sessions.get(session_id, {}).get("page_path", ""))
-    if temp_id not in sessions:
-        sessions[temp_id] = {"page_path": page_path}
-    else:
-        sessions[temp_id]["page_path"] = page_path
+    sessions[temp_id] = {"page_path": page_path}
 
     # Actually run build_system_prompt — this traces what files are read
     build_system_prompt(temp_id, LOOM_ROOT, level)
@@ -983,8 +994,7 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
     meta = sessions[temp_id].get("_prompt_metadata", {})
 
     # Clean up temp session
-    if temp_id == "__context_preview__":
-        sessions.pop(temp_id, None)
+    sessions.pop(temp_id, None)
 
     blocks = meta.get("blocks", [])
     files = meta.get("files", [])

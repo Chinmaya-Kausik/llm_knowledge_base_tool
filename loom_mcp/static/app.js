@@ -2346,7 +2346,7 @@ function expandCardFullPage(card, highlightQuery) {
       compileBtn.textContent = 'Compiling...';
       compileBtn.disabled = true;
       try {
-        const resp = await fetch('/api/compile-tex', {
+        const resp = await authFetch('/api/compile-tex', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path }),
@@ -2369,7 +2369,7 @@ function expandCardFullPage(card, highlightQuery) {
                   recompileBtn.textContent = 'Compiling...';
                   recompileBtn.disabled = true;
                   try {
-                    const r = await fetch('/api/compile-tex', {
+                    const r = await authFetch('/api/compile-tex', {
                       method: 'POST', headers: {'Content-Type': 'application/json'},
                       body: JSON.stringify({ path }),
                     });
@@ -2801,7 +2801,7 @@ async function initGraphView() {
     }
     // Fetch all page contents via bulk endpoint (single request)
     try {
-      const bulk = await fetch('/api/pages/bulk', {
+      const bulk = await authFetch('/api/pages/bulk', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(graphData.nodes.map(n => n.data.id)),
       }).then(r => r.json());
@@ -3027,7 +3027,7 @@ async function refreshFileTree() {
   const newIds = graphData.nodes.map(n => n.data.id).filter(id => !cardMeta.has(id));
   if (newIds.length > 0) {
     try {
-      const bulk = await fetch('/api/pages/bulk', {
+      const bulk = await authFetch('/api/pages/bulk', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(newIds),
       }).then(r => r.json());
@@ -3304,7 +3304,7 @@ function fileIconText(name) {
 }
 
 function openExternal(path) {
-  fetch('/api/open-external', {
+  authFetch('/api/open-external', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),
   }).catch(e => console.error('External open failed:', e));
@@ -3839,7 +3839,7 @@ async function createNewFolder() {
   const parent = level.parentPath || '';
   const path = parent ? `${parent}/${name}` : name;
   try {
-    await fetch('/api/mkdir', {
+    await authFetch('/api/mkdir', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ path }),
     });
@@ -3868,7 +3868,7 @@ async function deleteCurrentFile() {
 
   for (const path of paths) {
     try {
-      await fetch('/api/delete', {
+      await authFetch('/api/delete', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ path }),
       });
@@ -4330,13 +4330,13 @@ function createPanelHeader(panelId, label = 'Chat') {
         if (newMsgs.length > 0) {
           if (panel._continuedFromPath) {
             // Append to original file
-            fetch('/api/chat/append', {
+            authFetch('/api/chat/append', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ path: panel._continuedFromPath, session_id: panel.sessionId, messages: newMsgs }),
             }).then(() => refreshFileTree()).catch(() => {});
           } else {
             const panelTitle = panel._generatedTitle || null;
-            fetch('/api/chat/save', {
+            authFetch('/api/chat/save', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ session_id: panel.sessionId, messages: newMsgs, title: panelTitle, context_path: panel.contextPath || null }),
             }).then(r => r.json()).then(data => {
@@ -5861,7 +5861,7 @@ function wireCheckboxes(container) {
 async function savePlanContent(content) {
   if (!activePlanPath) return;
   try {
-    await fetch('/api/plan', {
+    await authFetch('/api/plan', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: activePlanPath, content }),
@@ -5906,7 +5906,7 @@ async function approvePlan() {
   // Delete plan file
   if (activePlanPath) {
     try {
-      await fetch('/api/plan', {
+      await authFetch('/api/plan', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: activePlanPath }),
@@ -5935,7 +5935,7 @@ async function checkForPlanFile(filePath) {
   // Called when we detect a Write/Edit to a plan file
   // Fetch the plan content and open the panel
   try {
-    const resp = await fetch('/api/plan');
+    const resp = await authFetch('/api/plan');
     const data = await resp.json();
     if (data.ok) {
       openPlanPanel(data.path, data.content);
@@ -6780,7 +6780,7 @@ async function continueSavedChat(path, content) {
       if (files.length > 0) {
         console.log('[Continue] Summarizing', files.length, 'precompact chunks...');
         try {
-          const resp = await fetch('/api/chat/summarize-precompact', {
+          const resp = await authFetch('/api/chat/summarize-precompact', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ precompact_files: files }),
           });
@@ -6891,7 +6891,7 @@ async function maybeGenerateChatTitle(panel) {
 
   panel._titlePending = true;
   try {
-    const resp = await fetch('/api/chat/generate-title', {
+    const resp = await authFetch('/api/chat/generate-title', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ messages: panel.messages.slice(0, 6) }),
     });
@@ -6920,7 +6920,7 @@ async function saveChatTranscript() {
   if (chatIsTemporary || chatMessages.length === 0 || !chatSessionId) return;
   try {
     const title = activePanel?._generatedTitle || null;
-    const resp = await fetch('/api/chat/save', {
+    const resp = await authFetch('/api/chat/save', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages, title, context_path: activePanel?.contextPath || null }),
     });
@@ -6937,13 +6937,13 @@ async function saveChatTranscript() {
 
 async function generateAndUpdateTitle(savedPath, messages) {
   try {
-    const resp = await fetch('/api/chat/generate-title', {
+    const resp = await authFetch('/api/chat/generate-title', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ messages: messages.slice(0, 6) }),
     });
     const data = await resp.json();
     if (data.ok && data.title) {
-      await fetch('/api/chat/update-title', {
+      await authFetch('/api/chat/update-title', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ path: savedPath, title: data.title }),
       });
@@ -7001,7 +7001,7 @@ function setupImagePaste(inputEl, getAttachmentBar, getPendingImages) {
       const dataUrl = reader.result;
 
       try {
-        const resp = await fetch('/api/chat/upload-image', {
+        const resp = await authFetch('/api/chat/upload-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data_url: dataUrl, filename: file.name || '' }),
@@ -7340,7 +7340,7 @@ function initSettings() {
     if (!newRoot) return;
     const btn = document.getElementById('settings-save-root');
     btn.textContent = 'Saving...';
-    const result = await fetch('/api/settings', {
+    const result = await authFetch('/api/settings', {
       method: 'PUT', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ loom_root: newRoot }),
     }).then(r => r.json());
@@ -7356,7 +7356,7 @@ function initSettings() {
   // Claude login
   document.getElementById('settings-login').addEventListener('click', async () => {
     document.getElementById('settings-login').textContent = 'Starting...';
-    const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+    const result = await authFetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
     document.getElementById('settings-auth-status').textContent = result.message || result.error || '';
     document.getElementById('settings-login').textContent = 'Login';
   });
@@ -7387,7 +7387,7 @@ async function restartServer() {
   for (const [id, panel] of chatPanels) {
     if (id !== 'main' && panel.messages.length > 0 && !panel.isTemporary) {
       try {
-        await fetch('/api/chat/save', {
+        await authFetch('/api/chat/save', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ session_id: panel.sessionId, messages: panel.messages, title: panel._generatedTitle || null, context_path: panel.contextPath || null }),
         });
@@ -7397,13 +7397,13 @@ async function restartServer() {
   // Restart — server will os.execv itself, so wait for it to come back
   document.title = 'Restarting...';
   try {
-    await fetch('/api/restart', { method: 'POST' });
+    await authFetch('/api/restart', { method: 'POST' });
   } catch {}
   // Poll until server is fully ready
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
-      const resp = await fetch('/api/ping', { signal: AbortSignal.timeout(2000) });
+      const resp = await authFetch('/api/ping', { signal: AbortSignal.timeout(2000) });
       if (resp.ok) {
         // Wait a bit more for static files to be ready
         await new Promise(r => setTimeout(r, 500));
@@ -7498,7 +7498,7 @@ function showAccountInfo() {
         if (codexLoginBtn) codexLoginBtn.onclick = async () => {
           codexLoginBtn.textContent = 'Opening browser...';
           try {
-            const result = await fetch('/api/codex-auth', { method: 'POST' }).then(r => r.json());
+            const result = await authFetch('/api/codex-auth', { method: 'POST' }).then(r => r.json());
             codexStatus.textContent = result.message || result.error || '';
           } catch {}
           codexLoginBtn.textContent = 'Login with OpenAI';
@@ -7528,7 +7528,7 @@ function showAccountInfo() {
     const statusEl = document.getElementById('account-auth-status');
     if (statusEl) statusEl.textContent = 'Opening browser...';
     try {
-      const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+      const result = await authFetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
       if (statusEl) statusEl.textContent = result.message || result.error || '';
       setTimeout(refreshAuthStatus, 3000);
     } catch { }
@@ -7538,7 +7538,7 @@ function showAccountInfo() {
     const statusEl = document.getElementById('account-auth-status');
     if (statusEl) { statusEl.textContent = 'Logging out...'; statusEl.style.color = 'var(--text-muted)'; }
     try {
-      const result = await fetch('/api/claude-logout', { method: 'POST' }).then(r => r.json());
+      const result = await authFetch('/api/claude-logout', { method: 'POST' }).then(r => r.json());
       if (statusEl) statusEl.textContent = result.message || result.error || '';
       refreshAuthStatus();
     } catch { }
@@ -7634,7 +7634,7 @@ function showWorkspaceInfo() {
     if (!newRoot) return;
     const btn = document.getElementById('ws-save-btn');
     btn.textContent = 'Saving...';
-    const result = await fetch('/api/settings', {
+    const result = await authFetch('/api/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loom_root: newRoot }),
     }).then(r => r.json());
@@ -7787,7 +7787,7 @@ function openFullSettings(initialTab) {
       if (loginBtn) loginBtn.onclick = async () => {
         loginBtn.textContent = 'Starting...';
         try {
-          const result = await fetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
+          const result = await authFetch('/api/claude-auth', { method: 'POST' }).then(r => r.json());
           const el = document.getElementById('fs-auth-status');
           if (el) el.textContent = result.message || result.error || '';
         } catch {}
@@ -7820,7 +7820,7 @@ function openFullSettings(initialTab) {
         if (!newRoot) return;
         const btn = document.getElementById('fs-save-root');
         btn.textContent = 'Saving...';
-        const result = await fetch('/api/settings', {
+        const result = await authFetch('/api/settings', {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ loom_root: newRoot }),
         }).then(r => r.json());
@@ -7980,7 +7980,7 @@ function openFullSettings(initialTab) {
         const btn = document.getElementById('fs-remote-toggle');
         btn.textContent = enable ? 'Enabling...' : 'Disabling...';
         try {
-          await fetch('/api/remote-access', {
+          await authFetch('/api/remote-access', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enable }),
           });
