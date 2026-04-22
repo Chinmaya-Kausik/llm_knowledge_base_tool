@@ -9329,4 +9329,13 @@ async function init() {
 
 window.navigateToLevel = navigateToLevel;
 
+// Wire mobile tab handlers immediately — don't depend on init() succeeding
+(function() {
+  document.querySelectorAll('.mtab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (typeof switchMobileTab === 'function') switchMobileTab(tab.dataset.tab);
+    });
+  });
+})();
+
 init().catch(e => console.error('[init] FATAL:', e));
