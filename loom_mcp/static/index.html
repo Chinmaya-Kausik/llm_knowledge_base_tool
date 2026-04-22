@@ -467,7 +467,29 @@
   </div>
 
   <!-- Set mobile mode immediately before JS loads -->
-  <script>if(window.innerWidth<=768)document.documentElement.setAttribute('data-mobile','');</script>
+  <script>
+  if(window.innerWidth<=768){
+    document.documentElement.setAttribute('data-mobile','');
+    // Wire mobile tabs inline — no dependency on app.js loading
+    document.addEventListener('DOMContentLoaded', function(){
+      document.querySelectorAll('.mtab').forEach(function(tab){
+        tab.addEventListener('click', function(){
+          var t = tab.dataset.tab;
+          document.querySelectorAll('.mtab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===t);});
+          document.querySelectorAll('.mobile-view').forEach(function(v){v.style.display='none';});
+          var canvas = document.getElementById('canvas-container');
+          if(canvas) canvas.style.display = t==='canvas' ? '' : 'none';
+          if(t!=='canvas'){
+            var view = document.getElementById('mobile-'+t+'-view');
+            if(view) view.style.display = t==='chat' ? 'flex' : '';
+          }
+          // Delegate to app.js handler if loaded
+          if(typeof switchMobileTab==='function') switchMobileTab(t);
+        });
+      });
+    });
+  }
+  </script>
 
   <!-- Mobile bottom tab bar (hidden on desktop via CSS) -->
   <nav class="mobile-tab-bar" id="mobile-tab-bar">
