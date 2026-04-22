@@ -7233,6 +7233,8 @@ function initActionMenu() {
   const btn = document.getElementById('btn-action-menu');
   const menu = document.getElementById('action-menu');
   if (!btn || !menu) return;
+  // Move to body so it's not trapped in toolbar's stacking context
+  document.body.appendChild(menu);
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     // Close settings menu if open
@@ -7271,6 +7273,8 @@ function initSettings() {
   const toolbarMenu = document.getElementById('toolbar-menu');
 
   if (filterBtn && toolbarMenu) {
+    // Move to body so it's not trapped in toolbar's stacking context
+    document.body.appendChild(toolbarMenu);
     filterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toolbarMenu.classList.toggle('open');
