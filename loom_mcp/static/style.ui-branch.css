@@ -2103,9 +2103,8 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 }
 .mobile-content {
   flex: 1; overflow: hidden; position: relative;
-  /* In Safari browser over HTTP, env(safe-area-inset-top) returns 0.
-     Use 20px as minimum to clear the status bar clock. */
-  padding-top: max(env(safe-area-inset-top, 0px), 20px);
+  padding-top: 48px; /* clear iPhone status bar */
+  padding-top: calc(env(safe-area-inset-top, 48px) + 4px); /* override if env() works */
 }
 .mobile-content #canvas-container {
   position: absolute; inset: 0;
