@@ -655,11 +655,17 @@
   })();
   </script>
   <script>
-    // Register SW and force update check on each page load
+    // Service worker: register on desktop, skip on mobile (caching causes stale code issues)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(reg => {
-        reg.update();
-      });
+      if (document.documentElement.hasAttribute('data-mobile')) {
+        // Mobile: unregister all SWs and clear caches for fresh loads
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+      } else {
+        navigator.serviceWorker.register('/sw.js').then(reg => { reg.update(); });
+      }
     }
   </script>
   <script src="/static/app.js"></script>
