@@ -187,7 +187,8 @@ class ClaudeCodeAdapter(AgentAdapter):
                                 data={"sdk_session_id": data["session_id"]},
                             )
 
-            except Exception:
+            except Exception as e:
+                log.warning("Event parse error (skipped): %s", e)
                 continue
 
     async def stop(self) -> None:

@@ -38,7 +38,7 @@ def _build_rsync_args(vm_config: dict[str, Any], local_path: str, remote_path: s
     if key_path:
         expanded = str(Path(key_path).expanduser())
         ssh_cmd += f" -i {expanded}"
-    ssh_cmd += " -o StrictHostKeyChecking=no"
+    ssh_cmd += " -o StrictHostKeyChecking=accept-new"  # Accept on first connect, verify after
 
     args = [
         "rsync", "-avz", "--progress",

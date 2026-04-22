@@ -58,7 +58,7 @@ class SSHPool:
                     "host": vm_config["host"],
                     "port": vm_config.get("port", 22),
                     "username": vm_config.get("user", ""),
-                    "known_hosts": None,  # Accept any host key (user manages trust)
+                    "known_hosts": str(Path.home() / ".ssh" / "known_hosts") if (Path.home() / ".ssh" / "known_hosts").exists() else None,
                 }
                 key_path = vm_config.get("key_path", "")
                 if key_path:

@@ -285,55 +285,7 @@ def _memory_block(loom_root: Path, page_path: str | None, config: dict) -> str |
     return f"What you know about this workspace and user:\n{memory_content}"
 
 
-def _location_block(loom_root: Path, page_path: str | None, context_level: str, config: dict) -> str | None:
-    """Dynamic context: page content, folder README, or master index."""
-    if not page_path:
-        return None
-
-    page_content_enabled = config.get("page_content", {}).get("enabled", True)
-    page_content_max = config.get("page_content", {}).get("max_chars", 8000)
-    folder_readme_enabled = config.get("folder_readme", {}).get("enabled", True)
-
-    parts = []
-
-    if context_level == "page":
-        full_path = loom_root / page_path
-        if full_path.exists() and page_content_enabled:
-            content = get_page_content(full_path)
-            if content:
-                if len(content) > page_content_max:
-                    content = content[:page_content_max] + "\n\n[... truncated ...]"
-                parts.append(f"The user is currently viewing: `{page_path}`\n\n{content}")
-
-            # Parent folder README for local context
-            if folder_readme_enabled:
-                parent = full_path.parent
-                if parent != loom_root:
-                    parent_readme = parent / "ABOUT.md"
-                    if parent_readme.exists():
-                        parent_content = get_page_content(parent)
-                        if parent_content:
-                            parts.append(f"\n--- Parent folder: `{parent.relative_to(loom_root)}` ---\n{parent_content}")
-
-    elif context_level == "folder":
-        full_path = loom_root / page_path
-        folder = full_path if full_path.is_dir() else full_path.parent
-        if folder.exists():
-            content = get_page_content(folder)
-            folder_rel = str(folder.relative_to(loom_root))
-            parts.append(f"The user is browsing folder: `{folder_rel}`\n\n{content}")
-
-    elif context_level == "global":
-        index_path = loom_root / "wiki" / "meta" / "index.md"
-        if index_path.exists():
-            try:
-                from loom_mcp.lib.frontmatter import read_frontmatter
-                _, index_content = read_frontmatter(index_path)
-                parts.append(f"--- Master Index (all loom pages) ---\n{index_content}")
-            except Exception:
-                pass
-
-    return "\n\n".join(parts) if parts else None
+# _location_block removed — replaced by _location_block_adaptive
 
 
 def build_system_prompt(session_id: str, loom_root: Path, context_level: str = "page") -> str | dict:

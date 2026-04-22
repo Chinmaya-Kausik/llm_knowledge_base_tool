@@ -1,6 +1,10 @@
 // === Loom Knowledge Base UI v3 ===
 // Canvas stack with drill-in sub-canvases, edge aggregation, border resizing
 
+// Debug mode — enable with localStorage.setItem('loom-debug', '1')
+const LOOM_DEBUG = localStorage.getItem('loom-debug') === '1';
+function debugLog(...args) { if (LOOM_DEBUG) debugLog(...args); }
+
 // --- Keybindings ---
 const DEFAULT_KEYBINDINGS = {
   'view-canvas':    { key: '1', mod: true, label: 'Canvas view' },
@@ -134,7 +138,7 @@ async function selectBackend() {
     if (probe.ok) {
       activeBackend = backend;
       localStorage.setItem('loom-active-backend', backend.label);
-      console.log(`[backend] Connected to ${backend.label} (${probe.latencyMs}ms)`);
+      debugLog(`[backend] Connected to ${backend.label} (${probe.latencyMs}ms)`);
       return true;
     }
   }
@@ -168,9 +172,9 @@ async function retryBackendConnection() {
 }
 
 const api = {
-  graph:       () => { const url = `${getBaseUrl()}/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] graph:', url); return authFetch(url).then(r => r.json()); },
+  graph:       () => { const url = `${getBaseUrl()}/api/graph?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; debugLog('[API] graph:', url); return authFetch(url).then(r => r.json()); },
   page:        (p) => authFetch(`${getBaseUrl()}/api/page/${p}`).then(r => r.json()),
-  tree:        () => { const url = `${getBaseUrl()}/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; console.log('[API] tree:', url); return authFetch(url).then(r => r.json()); },
+  tree:        () => { const url = `${getBaseUrl()}/api/tree?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`; debugLog('[API] tree:', url); return authFetch(url).then(r => r.json()); },
   search:      (q, s='all', mode='both') => authFetch(`${getBaseUrl()}/api/search?q=${encodeURIComponent(q)}&scope=${s}&mode=${mode}`).then(r => r.json()),
   health:      () => authFetch(`${getBaseUrl()}/api/health`).then(r => r.json()),
   brokenLinks: () => authFetch(`${getBaseUrl()}/api/broken-links`).then(r => r.json()),
@@ -519,7 +523,7 @@ function showCardContextMenu(e, path, isFolder) {
       if (newName && newName !== path.split('/').pop()) {
         const newPath = path.split('/').slice(0, -1).concat(newName).join('/');
         // TODO: implement rename API
-        console.log('Rename:', path, '→', newPath);
+        debugLog('Rename:', path, '→', newPath);
       }
     }},
     { label: 'Delete', action: () => {
@@ -1809,7 +1813,7 @@ async function drillInto(parentPath) {
             }
           }
         }
-        console.log(`[Drill] Lazy-loaded ${data.children.length} children for ${parentPath}`);
+        debugLog(`[Drill] Lazy-loaded ${data.children.length} children for ${parentPath}`);
       }
     } catch (e) {
       console.warn('[Drill] Failed to lazy-load children:', e);
@@ -2848,7 +2852,7 @@ async function initGraphView() {
     saveCanvasStack();
     renderCurrentLevel();
 
-    console.log(`Loom: rendered ${cardElements.size} cards`);
+    debugLog(`Loom: rendered ${cardElements.size} cards`);
     renderPinboard();
   } catch (err) {
     console.error('Loom initGraphView error:', err);
@@ -3009,7 +3013,7 @@ function sortItems(items) {
 }
 
 async function refreshFileTree() {
-  console.log('[View] refreshFileTree called');
+  debugLog('[View] refreshFileTree called');
   // Refresh sidebar tree
   const treeData = await api.tree();
   const sidebarContainer = document.getElementById('sidebar-tree');
@@ -3896,7 +3900,7 @@ function openNewChat() {
 
 function focusChatPanel(panelId) {
   const fullpageOpen = !!expandedCard;
-  console.log('[focusChat]', panelId, 'fullpageOpen:', fullpageOpen, 'topZIndex:', topZIndex);
+  debugLog('[focusChat]', panelId, 'fullpageOpen:', fullpageOpen, 'topZIndex:', topZIndex);
 
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
@@ -3910,7 +3914,7 @@ function focusChatPanel(panelId) {
     if (fullpageOpen) {
       topZIndex = Math.max(topZIndex, 400);
       cp.style.setProperty('z-index', String(topZIndex), 'important');
-      console.log('[focusChat] main elevated to', topZIndex);
+      debugLog('[focusChat] main elevated to', topZIndex);
     }
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
@@ -3922,11 +3926,11 @@ function focusChatPanel(panelId) {
       if (fullpageOpen) {
         topZIndex = Math.max(topZIndex, 400);
         p.container.style.setProperty('z-index', String(topZIndex), 'important');
-        console.log('[focusChat] floating elevated to', topZIndex);
+        debugLog('[focusChat] floating elevated to', topZIndex);
       }
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
     } else {
-      console.log('[focusChat] panel not found:', panelId);
+      debugLog('[focusChat] panel not found:', panelId);
     }
   }
 }
@@ -4022,7 +4026,7 @@ function dockPanel(panelId, action) {
   }
 
   const _computed = getComputedStyle(chatPanelEl);
-  console.log('[dockPanel] action:', action, 'expandedCard:', !!expandedCard, 'topZIndex:', topZIndex,
+  debugLog('[dockPanel] action:', action, 'expandedCard:', !!expandedCard, 'topZIndex:', topZIndex,
     'inline-z:', chatPanelEl.style.getPropertyValue('z-index'),
     'computed-z:', _computed.zIndex, 'position:', _computed.position,
     'w:', chatPanelEl.offsetWidth, 'h:', chatPanelEl.offsetHeight);
@@ -4901,12 +4905,12 @@ function createTerminalPanel() {
   if (fitAddon) fitAddon.fit();
 
   // WebSocket to backend PTY
-  console.log('[TERM] connecting to ws/terminal');
+  debugLog('[TERM] connecting to ws/terminal');
   const ws = new WebSocket(`${getWsUrl()}/ws/terminal?${getTokenParam()}`);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
-    console.log('[TERM] ws connected');
+    debugLog('[TERM] ws connected');
     ws.send(`RESIZE:${term.cols}:${term.rows}`);
   };
   ws.onerror = (e) => { console.error('[TERM] ws error:', e); };
@@ -4919,7 +4923,7 @@ function createTerminalPanel() {
     }
   };
 
-  ws.onclose = (e) => { console.log('[TERM] ws closed, code:', e.code, 'reason:', e.reason); term.write('\r\n[Session ended]\r\n'); };
+  ws.onclose = (e) => { debugLog('[TERM] ws closed, code:', e.code, 'reason:', e.reason); term.write('\r\n[Session ended]\r\n'); };
 
   term.onData((data) => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
   term.onResize(({ cols, rows }) => { if (ws.readyState === WebSocket.OPEN) ws.send(`RESIZE:${cols}:${rows}`); });
@@ -6042,7 +6046,7 @@ function buildRedirectMessage(generalText) {
 function handleChatEvent(msg) {
   const messages = chatMessagesContainer || document.getElementById('chat-messages');
 
-  if (msg.type !== 'text') console.log('Chat event:', msg.type, msg);
+  if (msg.type !== 'text') debugLog('Chat event:', msg.type, msg);
 
   // Status bar is created at dispatch time in sendChatMessage() — no swap needed here
 
@@ -6778,7 +6782,7 @@ async function continueSavedChat(path, content) {
     if (pcMatch) {
       const files = pcMatch[1].match(/-\s*(.+)/g)?.map(l => l.replace(/^-\s*/, '').trim()) || [];
       if (files.length > 0) {
-        console.log('[Continue] Summarizing', files.length, 'precompact chunks...');
+        debugLog('[Continue] Summarizing', files.length, 'precompact chunks...');
         try {
           const resp = await authFetch('/api/chat/summarize-precompact', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -6787,7 +6791,7 @@ async function continueSavedChat(path, content) {
           const data = await resp.json();
           if (data.ok && data.summary) {
             precompactSummary = data.summary;
-            console.log('[Continue] Summary generated:', precompactSummary.length, 'chars');
+            debugLog('[Continue] Summary generated:', precompactSummary.length, 'chars');
           }
         } catch (e) {
           console.warn('[Continue] Failed to summarize precompact:', e);
@@ -6925,7 +6929,7 @@ async function saveChatTranscript() {
       body: JSON.stringify({ session_id: chatSessionId, messages: chatMessages, title, context_path: activePanel?.contextPath || null }),
     });
     const data = await resp.json();
-    console.log('Chat saved:', data);
+    debugLog('Chat saved:', data);
     refreshFileTree();
 
     // If title wasn't generated yet, trigger async generation and update the file
@@ -8584,7 +8588,7 @@ async function init() {
       const focusedChatId = chatFocusHistory[0] || 'main';
       const focusedEl = focusedChatId === 'main' ? document.getElementById('chat-panel') : chatPanels.get(focusedChatId)?.container;
       if (focusedEl && parseInt(focusedEl.style.zIndex) >= 350) {
-        console.log('[Escape] sending chat behind fullpage, was z-index:', focusedEl.style.zIndex);
+        debugLog('[Escape] sending chat behind fullpage, was z-index:', focusedEl.style.zIndex);
         focusedEl.style.setProperty('z-index', '100', 'important');
         return;
       }
@@ -8628,7 +8632,7 @@ async function init() {
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
       const alive = getAlivePanels();
-      console.log('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
+      debugLog('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
 
       if (alive.length === 0) {
         // Try reopening a closed panel first, else create new
@@ -8645,7 +8649,7 @@ async function init() {
     if (matchesBinding(e, 'cycle-chat-solo')) {
       e.preventDefault();
       const alive = getAlivePanels();
-      console.log('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
+      debugLog('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
 
       if (alive.length === 0) {
         reopenAnyPanel();
