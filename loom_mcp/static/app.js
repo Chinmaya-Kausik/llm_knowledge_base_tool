@@ -1853,9 +1853,29 @@ function navigateToLevel(index) {
   renderCurrentLevel();
 }
 
+function syncEmptyChatScopes() {
+  // Update all chat panels with no messages to match the current canvas location
+  const level = currentLevel();
+  const path = level.parentPath || '';
+  const smartLevel = getSmartContextDefault();
+
+  for (const [id, panel] of chatPanels) {
+    const msgs = panel.messages || [];
+    if (msgs.length === 0) {
+      panel.contextLevel = smartLevel;
+      panel.contextPath = path || null;
+      // Update chip display if this is the active panel
+      if (id === 'main') {
+        updateContextChip();
+      }
+    }
+  }
+}
+
 function renderCurrentLevel() {
   const level = currentLevel();
   updateBreadcrumb();
+  syncEmptyChatScopes();
 
   const world = document.getElementById('world');
   world.innerHTML = '';
