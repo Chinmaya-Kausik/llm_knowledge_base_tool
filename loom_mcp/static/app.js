@@ -8858,13 +8858,16 @@ function initMobile() {
 
   // VisualViewport handler for iOS keyboard — hide tabs when keyboard opens
   if (window.visualViewport) {
+    const _vvBar = tabBar;
+    const _vvShell = shell;
     window.visualViewport.addEventListener('resize', () => {
       const vvh = window.visualViewport.height;
+      const ih = window.innerHeight;
+      const keyboardUp = vvh < ih * 0.8;
+      if (typeof _mdbg !== 'undefined') _mdbg.push(`vv: ${Math.round(vvh)}/${ih} kb=${keyboardUp}`);
       document.documentElement.style.setProperty('--vvh', `${vvh}px`);
-      const keyboardUp = vvh < window.innerHeight * 0.75;
-      tabBar.style.display = keyboardUp ? 'none' : 'flex';
-      // Resize shell to visible viewport when keyboard is up
-      shell.style.height = keyboardUp ? `${vvh}px` : '';
+      _vvBar.style.display = keyboardUp ? 'none' : 'flex';
+      _vvShell.style.height = keyboardUp ? `${vvh}px` : '';
     });
   }
 
@@ -9064,7 +9067,10 @@ function renderMobileChat(container) {
     _mcWs.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
-        handleMobileChatMessage(msg, msgsEl);
+        // Find current messages element dynamically (survives tab switches)
+        const currentMsgs = document.getElementById('mc-messages');
+        if (currentMsgs) handleMobileChatMessage(msg, currentMsgs);
+        if (typeof _mdbg !== 'undefined' && msg.type !== 'text') _mdbg.push('ws:' + msg.type);
       } catch {}
     };
     _mcWs.onerror = () => {
@@ -9092,6 +9098,7 @@ function renderMobileChat(container) {
     // Send via WebSocket
     if (_mcWs && _mcWs.readyState === WebSocket.OPEN) {
       const level = currentLevel();
+      if (typeof _mdbg !== 'undefined') _mdbg.push('send: ' + text.slice(0, 30));
       _mcWs.send(JSON.stringify({
         type: 'message',
         text,
