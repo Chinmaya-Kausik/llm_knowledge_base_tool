@@ -2496,25 +2496,12 @@ function renderChatTranscript(container, rawContent) {
 
   // Render each section as a chat message
   for (const section of sections) {
-    const msgEl = document.createElement('div');
-    msgEl.className = `chat-msg chat-msg-${section.role}`;
-
     const text = section.lines.join('\n').trim();
     if (!text) continue;
 
-    const contentEl = document.createElement('div');
-    contentEl.className = 'chat-msg-content' + (section.role === 'assistant' ? ' chat-text' : '');
-
-    if (section.role === 'user') {
-      // User: strip <details> blocks (tool calls belong to assistant), show plain text
-      const userText = text.replace(/<details>[\s\S]*?<\/details>/g, '').trim();
-      contentEl.textContent = userText;
-    } else {
-      // Assistant: clean up subagent dicts, then render as HTML
-      // The <details><summary> tags render natively as collapsible sections
-      let cleaned = text;
-      // Clean raw Python dicts
-      cleaned = cleaned.split('\n').map(line => {
+    // Clean raw Python dicts everywhere
+    function cleanDicts(s) {
+      return s.split('\n').map(line => {
         const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
         if (dm) {
           let t = dm[1].replace(/['"]\s*\}\s*$/, '');
@@ -2522,12 +2509,48 @@ function renderChatTranscript(container, rawContent) {
         }
         return line;
       }).join('\n');
-      // Strip line numbers from file output
-      cleaned = cleaned.replace(/^\d+\t/gm, '');
-      // Render markdown but preserve HTML (details/summary tags pass through)
-      contentEl.innerHTML = marked.parse(cleaned);
     }
-    msgEl.appendChild(contentEl);
+
+    if (section.role === 'user') {
+      // Extract user text (before any <details>) as the user message
+      const userText = text.replace(/<details>[\s\S]*?<\/details>/g, '')
+        .replace(/^[-*]?\s*\{'type':\s*'text'[\s\S]*/m, '')  // strip raw dicts
+        .trim();
+      if (userText) {
+        const msgEl = document.createElement('div');
+        msgEl.className = 'chat-msg chat-msg-user';
+        msgEl.textContent = userText;
+        container.appendChild(msgEl);
+      }
+      // Render <details> blocks as activity (between user text and Claude response)
+      const detailsBlocks = text.match(/<details>[\s\S]*?<\/details>/g) || [];
+      for (const block of detailsBlocks) {
+        container.appendChild(buildDetailsElement(block));
+      }
+      // Render any raw dicts outside <details> as assistant content
+      const afterDetails = text.replace(/<details>[\s\S]*?<\/details>/g, '').replace(/^[^{]*$/m, '');
+      const dictContent = cleanDicts(afterDetails).trim();
+      if (dictContent && dictContent !== userText) {
+        const dictEl = document.createElement('div');
+        dictEl.className = 'chat-msg chat-msg-assistant';
+        const inner = document.createElement('div');
+        inner.className = 'chat-msg-content chat-text';
+        inner.innerHTML = marked.parse(dictContent);
+        dictEl.appendChild(inner);
+        container.appendChild(dictEl);
+      }
+    } else {
+      // Assistant: render as HTML with native <details>
+      const msgEl = document.createElement('div');
+      msgEl.className = 'chat-msg chat-msg-assistant';
+      const contentEl = document.createElement('div');
+      contentEl.className = 'chat-msg-content chat-text';
+      let cleaned = cleanDicts(text);
+      cleaned = cleaned.replace(/^\d+\t/gm, '');
+      contentEl.innerHTML = marked.parse(cleaned);
+      msgEl.appendChild(contentEl);
+      container.appendChild(msgEl);
+    }
 
     container.appendChild(msgEl);
   }
