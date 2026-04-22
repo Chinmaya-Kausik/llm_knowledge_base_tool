@@ -2106,8 +2106,8 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 }
 .mobile-content #canvas-container {
   position: absolute; left: 0; right: 0; bottom: 0;
-  top: 48px;
-  top: calc(env(safe-area-inset-top, 48px) + 4px);
+  top: 44px;
+  top: env(safe-area-inset-top, 44px);
 }
 
 /* --- Tab bar (flex child, not fixed) --- */
@@ -2130,8 +2130,8 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 /* --- Mobile views (fill content area, clear status bar) --- */
 .mobile-view {
   position: absolute;
-  top: 48px; /* fallback */
-  top: calc(env(safe-area-inset-top, 48px) + 4px);
+  top: 44px; /* fallback */
+  top: env(safe-area-inset-top, 44px);
   left: 0; right: 0; bottom: 0;
   background: var(--bg);
   overflow-y: auto; overscroll-behavior: contain;
