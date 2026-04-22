@@ -978,7 +978,7 @@ async def api_claude_logout():
 
 
 @app.get("/api/context-info")
-def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
+def api_context_info(session_id: str = "", level: str = "page", path: str = "", include_prompt: bool = False):
     """Return real context assembly breakdown by running build_system_prompt."""
     from loom_mcp.chat import sessions, build_system_prompt
 
@@ -990,8 +990,11 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
     # Actually run build_system_prompt — this traces what files are read
     build_system_prompt(temp_id, LOOM_ROOT, level)
 
-    # Read the metadata it stored
+    # Read the metadata and prompt text
     meta = sessions[temp_id].get("_prompt_metadata", {})
+    prompt_text = None
+    if include_prompt:
+        prompt_text = build_system_prompt(temp_id, LOOM_ROOT, level)
 
     # Clean up temp session
     sessions.pop(temp_id, None)
@@ -1013,6 +1016,7 @@ def api_context_info(session_id: str = "", level: str = "page", path: str = ""):
         ],
         "total_tokens": meta.get("total_tokens", 0),
         "max_tokens": 200000,
+        "prompt": prompt_text if include_prompt else None,
     }
 
 

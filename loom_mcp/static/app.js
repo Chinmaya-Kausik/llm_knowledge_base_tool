@@ -5051,9 +5051,40 @@ function initChat() {
         <div class="ctx-popover-footer">
           <div class="ctx-usage-bar"><div class="ctx-usage-fill" id="ctx-usage-fill"></div></div>
           <span class="ctx-usage-text" id="ctx-usage-text"></span>
+          <button class="fs-btn" id="ctx-view-full" style="font-size:9px;padding:2px 6px;margin-left:auto">View prompt</button>
         </div>
       `;
       ctxChip.parentElement.appendChild(popover);
+
+      // "View prompt" button — shows the full assembled system prompt
+      document.getElementById('ctx-view-full').onclick = (ev) => {
+        ev.stopPropagation();
+        const ctxPath = activePanel?.contextPath || document.getElementById('fullpage-overlay')?.dataset?.path || currentLevel()?.parentPath || '';
+        const sessionId = activePanel?.sessionId || chatSessionId || '';
+        const level = activePanel.contextLevel || 'page';
+        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}&include_prompt=true`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data?.prompt) return;
+            // Show in a modal
+            const modal = document.createElement('div');
+            modal.className = 'fs-panel';
+            modal.innerHTML = `<div class="fs-card" style="width:min(700px,90vw);height:min(500px,80vh)">
+              <div class="fs-content" style="overflow:hidden">
+                <div class="fs-content-header">
+                  <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context</h2></div>
+                  <button class="fs-close" onclick="this.closest('.fs-panel').remove()">✕</button>
+                </div>
+                <div class="fs-content-body" style="overflow-y:auto;padding:16px">
+                  <pre style="white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11px;line-height:1.5;color:var(--text)">${data.prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+                </div>
+              </div>
+            </div>`;
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            document.body.appendChild(modal);
+          })
+          .catch(() => {});
+      };
 
       // Wire scope buttons — locked after first message
       const hasMessages = (activePanel.messages?.length || chatMessages?.length || 0) > 0;
