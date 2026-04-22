@@ -619,7 +619,15 @@
     }
   })();
   </script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script>
+    // Register SW with cache-bust so updates are always detected
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js?v=' + Date.now()).then(reg => {
+        // Force update check on page load
+        reg.update();
+      });
+    }
+  </script>
   <script src="/static/app.js"></script>
 </body>
 </html>
