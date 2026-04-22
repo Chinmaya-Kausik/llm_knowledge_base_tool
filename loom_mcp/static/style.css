@@ -1293,7 +1293,7 @@ body {
   display: flex; align-items: center; gap: 4px; white-space: nowrap;
 }
 #target-btn:hover { border-color: var(--accent); background: var(--bg-surface2); }
-#target-btn.target-vm { border-color: #4fc3f7; background: #1e3a4d; }
+#target-btn.target-vm { border-color: var(--accent); background: var(--accent-soft); }
 .target-caret { font-size: 10px; opacity: 0.5; }
 #target-dropdown {
   position: absolute; top: 100%; left: 0; margin-top: 4px;
@@ -1307,7 +1307,7 @@ body {
   font-size: 13px; color: var(--text);
 }
 .target-item:hover { background: var(--bg-hover); }
-.target-item.active { background: #1e3a4d; }
+.target-item.active { background: var(--accent-soft); color: var(--accent); }
 .target-dot { font-size: 8px; }
 .target-host { font-size: 11px; color: var(--text-muted); margin-left: auto; }
 .target-separator { height: 1px; background: var(--border); margin: 4px 8px; }
