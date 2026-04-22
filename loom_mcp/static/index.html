@@ -489,22 +489,7 @@
       });
     }
     applyTheme(getTheme());
-    document.addEventListener('DOMContentLoaded', function() {
-      const btn = document.getElementById('theme-toggle');
-      const menu = document.getElementById('theme-menu');
-      if (btn && menu) {
-        btn.textContent = icons[getTheme()] || '\u263E';
-        // Toggle dropdown
-        btn.onclick = function(e) { e.stopPropagation(); menu.classList.toggle('hidden'); };
-        // Theme selection
-        menu.querySelectorAll('.tb-theme-option').forEach(opt => {
-          opt.onclick = function() { applyTheme(opt.dataset.theme); menu.classList.add('hidden'); };
-        });
-        // Close on outside click
-        document.addEventListener('click', function() { menu.classList.add('hidden'); });
-        menu.onclick = function(e) { e.stopPropagation(); };
-      }
-    });
+    // Theme dropdown removed — theme switching is in Settings > Appearance palette
 
     // Settings dropdown
     var settingsBtn = document.getElementById('btn-toolbar-menu');

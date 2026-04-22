@@ -369,13 +369,11 @@ async function initVMGraphView() {
 }
 
 // --- VM Files View ---
-let vmFilesTreeData = null;
 
 async function initVMFilesView() {
   const vm = currentTarget;
   try {
-    vmFilesTreeData = await api.vmTree(vm.id);
-    filesTreeData = vmFilesTreeData; // Reuse existing files view rendering
+    filesTreeData = await api.vmTree(vm.id);
     filesInitialized = true;
     filesTilePath = [];
     setFilesMode(filesMode);
@@ -1817,6 +1815,7 @@ async function drillInto(parentPath) {
         for (const child of data.children) {
           if (!nodeById(child.data.id)) {
             graphData.nodes.push(child);
+            _nodeMap.set(child.data.id, child.data);
             if (child.data.content) {
               cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
             }
@@ -2039,27 +2038,9 @@ function updateBreadcrumb() {
 // Layout (WebCoLa — constraint-based with non-overlap)
 // ========================================
 function computeLayout(nodes, saved) {
-  const positions = {};
-  const cardW = 400, cardH = 280, pad = 40;
-
-  // Use saved positions where available
-  const unsaved = [];
-  for (const node of nodes) {
-    if (saved[node.data.id]) {
-      positions[node.data.id] = saved[node.data.id];
-    } else {
-      unsaved.push(node.data.id);
-    }
-  }
-  if (unsaved.length === 0) return positions;
-
-  // Try d3-force layout first (organic, non-overlapping)
+  // d3-force is always available (vendored). Grid as fallback.
   if (typeof d3.forceSimulation === 'function') {
     return computeLayoutForce(nodes, saved);
-  }
-  // Fall back to CoLa if d3-force not available
-  if (typeof cola !== 'undefined') {
-    return computeLayoutCola(nodes, saved);
   }
   return computeLayoutGrid(nodes, saved);
 }
@@ -2142,43 +2123,6 @@ function computeLayoutForce(nodes, saved) {
       x: Math.round(sn.x - cardW / 2),
       y: Math.round(sn.y - cardH / 2),
     };
-  }
-  return positions;
-}
-
-function computeLayoutCola(nodes, saved) {
-  const positions = {};
-  const cardW = 400, cardH = 280, pad = 40;
-  const idToIndex = {};
-  const cols = Math.max(2, Math.ceil(Math.sqrt(nodes.length * 1.5)));
-  const colaNodes = nodes.map((node, i) => {
-    idToIndex[node.data.id] = i;
-    const s = saved[node.data.id];
-    return {
-      x: s ? s.x + cardW/2 : (i % cols) * (cardW + pad) + cardW/2,
-      y: s ? s.y + cardH/2 : Math.floor(i / cols) * (cardH + pad) + cardH/2,
-      width: cardW + pad, height: cardH + pad,
-      fixed: !!saved[node.data.id],
-    };
-  });
-  const edges = (graphData?.top_edges || graphData?.edges || []);
-  const colaLinks = [];
-  for (const e of edges) {
-    const si = idToIndex[e.data.source], ti = idToIndex[e.data.target];
-    if (si !== undefined && ti !== undefined) colaLinks.push({ source: si, target: ti });
-  }
-  try {
-    new cola.Layout()
-      .size([nodes.length * (cardW + pad), nodes.length * (cardH + pad)])
-      .nodes(colaNodes).links(colaLinks)
-      .avoidOverlaps(true).linkDistance(cardW + pad)
-      .start(30, 20, 10, 0, false);
-    for (const node of nodes) {
-      const cn = colaNodes[idToIndex[node.data.id]];
-      positions[node.data.id] = { x: Math.round(cn.x - cardW/2), y: Math.round(cn.y - cardH/2) };
-    }
-  } catch (e) {
-    return computeLayoutGrid(nodes, saved);
   }
   return positions;
 }
@@ -2530,7 +2474,7 @@ async function toggleFullPageEdit(overlay, path) {
       }
       contentEl.classList.remove('editing');
       // Render based on file type
-      const isCode = path.endsWith('.py') || path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.rs') || path.endsWith('.go') || path.endsWith('.java') || path.endsWith('.c') || path.endsWith('.cpp') || path.endsWith('.sh');
+      const isCode = isCodeFile(path);
       if (isCode) {
         contentEl.innerHTML = `<pre><code>${meta.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`;
       } else {
@@ -2811,6 +2755,7 @@ function populateTagFilter() {
 async function initGraphView() {
   try {
     [graphData, layoutData] = await Promise.all([api.graph(), api.getLayout()]);
+    _rebuildNodeMap();
     if (!graphData || graphData.nodes.length === 0) {
       document.getElementById('world').innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">No wiki pages yet.</div>';
       return;
@@ -2849,6 +2794,7 @@ async function initGraphView() {
                 for (const child of data.children) {
                   if (!nodeById(child.data.id)) {
                     graphData.nodes.push(child);
+                    _nodeMap.set(child.data.id, child.data);
                     if (child.data.content) cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
                   }
                 }
