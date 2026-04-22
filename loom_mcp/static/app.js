@@ -2513,7 +2513,12 @@ function renderChatTranscript(container, rawContent) {
         // Parse the details block into a collapsible section
         const summaryMatch = part.match(/<summary>([\s\S]*?)<\/summary>/);
         const summary = summaryMatch ? summaryMatch[1].trim() : 'Details';
-        const body = part.replace(/<details>\s*<summary>[\s\S]*?<\/summary>/, '').replace(/<\/details>\s*$/, '').trim();
+        let body = part.replace(/<details>\s*<summary>[\s\S]*?<\/summary>/, '').replace(/<\/details>\s*$/, '').trim();
+
+        // Clean up raw Python dict strings from subagent results
+        body = body.replace(/\{'type':\s*'text',\s*'text':\s*['"]([\s\S]*?)['"]\s*\}/g, (_, text) => {
+          return text.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        });
 
         const group = document.createElement('div');
         group.className = 'chat-activity-group';
@@ -2533,7 +2538,7 @@ function renderChatTranscript(container, rawContent) {
         group.appendChild(bodyEl);
         contentEl.appendChild(group);
       } else if (part.trim()) {
-        const cleaned = section.role === 'user' ? part.trim().replace(/^>\s?/gm, '') : part.trim();
+        const cleaned = section.role === 'user' ? part.trim().replace(/^[>›]\s?/gm, '').trim() : part.trim();
         if (section.role === 'user') {
           // User text: plain text, no markdown rendering
           const textBlock = document.createElement('div');
