@@ -458,15 +458,24 @@ function createVMTerminalPanel(vmId, vmLabel) {
   header.querySelector('.fcp-close').onclick = (e) => { e.stopPropagation(); ws.close(); ro.disconnect(); _activeTerminals.delete(term); card.remove(); };
 
   // Drag with drag guard for header click
-  let dx, dy, vmDragged = false;
+  let dx, dy, vmStartX, vmStartY, vmDragged = false;
   header.onpointerdown = (e) => {
     if (e.target.closest('button') || e.target.isContentEditable) return;
     vmDragged = false;
+    vmStartX = e.clientX; vmStartY = e.clientY;
     const r = card.getBoundingClientRect();
     dx = e.clientX - r.left; dy = e.clientY - r.top;
     card.style.position = 'fixed';
-    const move = (ev) => { vmDragged = true; card.style.left = (ev.clientX - dx) + 'px'; card.style.top = (ev.clientY - dy) + 'px'; card.style.right = 'auto'; card.style.bottom = 'auto'; };
-    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+    const move = (ev) => {
+      if (!vmDragged && Math.abs(ev.clientX - vmStartX) + Math.abs(ev.clientY - vmStartY) < 5) return;
+      vmDragged = true;
+      card.style.left = (ev.clientX - dx) + 'px'; card.style.top = (ev.clientY - dy) + 'px'; card.style.right = 'auto'; card.style.bottom = 'auto';
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      setTimeout(() => { vmDragged = false; }, 0);
+    };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
   };
@@ -4901,14 +4910,15 @@ function createTerminalPanel() {
     card.style.left = Math.max(0, Math.min(e.clientX - dx, window.innerWidth - 100)) + 'px';
     card.style.top = Math.max(0, Math.min(e.clientY - dy, window.innerHeight - 50)) + 'px';
   });
-  header.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
+  header.addEventListener('pointerup', () => { dragReady = false; });
+  // Reset dragging flag after click event fires (click fires after pointerup)
+  header.addEventListener('pointerup', () => { setTimeout(() => { dragging = false; }, 0); });
 
   // Close / minimize
   header.querySelector('.panel-close').onclick = (e) => { e.stopPropagation(); if (ws) ws.close(); _activeTerminals.delete(term); card.remove(); };
   header.querySelector('.panel-minimize').onclick = (e) => { e.stopPropagation(); card.classList.toggle('minimized'); };
 
   // Header click toggles minimize (with drag guard)
-  let _termLastClick = 0;
   header.addEventListener('click', (e) => {
     if (dragging) return;
     if (e.target.closest('button') || e.target.closest('[contenteditable]')) return;
