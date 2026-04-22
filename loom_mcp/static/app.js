@@ -429,6 +429,7 @@ function createVMTerminalPanel(vmId, vmLabel) {
   const fitAddon = new XFitAddon();
   term.loadAddon(fitAddon);
   term.open(termContainer);
+  _activeTerminals.add(term);
   requestAnimationFrame(() => fitAddon.fit());
 
   // WebSocket to VM terminal
@@ -453,7 +454,7 @@ function createVMTerminalPanel(vmId, vmLabel) {
     card.classList.toggle('minimized');
     if (!card.classList.contains('minimized')) requestAnimationFrame(() => fitAddon.fit());
   };
-  header.querySelector('.fcp-close').onclick = () => { ws.close(); ro.disconnect(); card.remove(); };
+  header.querySelector('.fcp-close').onclick = () => { ws.close(); ro.disconnect(); _activeTerminals.delete(term); card.remove(); };
 
   // Drag
   let dx, dy;
@@ -4788,6 +4789,16 @@ function connectPanelChat(panel, messagesEl) {
 // ========================================
 let terminalCounter = 0;
 
+const _activeTerminals = new Set();
+
+function updateAllTerminalThemes() {
+  const theme = getTerminalTheme();
+  for (const term of _activeTerminals) {
+    try { term.options.theme = theme; } catch {}
+  }
+}
+window.updateAllTerminalThemes = updateAllTerminalThemes;
+
 function getTerminalTheme() {
   const cs = getComputedStyle(document.documentElement);
   const get = (prop, fallback) => cs.getPropertyValue(prop).trim() || fallback;
@@ -4880,7 +4891,7 @@ function createTerminalPanel() {
   header.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
 
   // Close / minimize
-  header.querySelector('.panel-close').onclick = () => { if (ws) ws.close(); card.remove(); };
+  header.querySelector('.panel-close').onclick = () => { if (ws) ws.close(); _activeTerminals.delete(term); card.remove(); };
   header.querySelector('.panel-minimize').onclick = () => card.classList.toggle('minimized');
 
   // xterm.js loaded via script tags
@@ -4897,6 +4908,7 @@ function createTerminalPanel() {
   const fitAddon = XFitAddon ? new XFitAddon() : null;
   if (fitAddon) term.loadAddon(fitAddon);
   term.open(termContainer);
+  _activeTerminals.add(term);
   if (fitAddon) fitAddon.fit();
 
   // WebSocket to backend PTY

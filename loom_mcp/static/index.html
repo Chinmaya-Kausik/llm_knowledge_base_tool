@@ -487,6 +487,8 @@
       document.querySelectorAll('.tb-theme-check').forEach(el => {
         el.style.display = el.dataset.for === t ? 'inline' : 'none';
       });
+      // Update terminal themes
+      if (typeof updateAllTerminalThemes === 'function') updateAllTerminalThemes();
     }
     applyTheme(getTheme());
     // Theme dropdown removed — theme switching is in Settings > Appearance palette
