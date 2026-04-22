@@ -26,7 +26,6 @@ const PRECACHE_URLS = [
   '/static/vendor/d3-zoom.min.js',
   '/static/vendor/d3-quadtree.min.js',
   '/static/vendor/d3-force.min.js',
-  '/static/vendor/cola.min.js',
 ];
 
 // Install: precache static assets

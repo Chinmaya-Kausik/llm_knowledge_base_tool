@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Loom — Logo Exploration</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Instrument+Serif&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@400;500;600&display=swap');
+  body { margin: 0; font-family: 'Geist', system-ui, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+/* =========================================================
+   LOGO MARKS — all drawn in 64×64 viewBox, ink-only
+   so they can be tinted via `color` in context.
+   ========================================================= */
+
+// 1. THE CROSSING — warp + weft, one over-under interlace
+const MarkCrossing = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* vertical thread */}
+    <path d="M32 8 V28" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M32 36 V56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    {/* horizontal thread — passes OVER the vertical */}
+    <path d="M8 32 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    {/* interlace hint: tiny curve at crossing */}
+  </svg>
+);
+
+// 1b. THE CROSSING — two interlaced strands (more explicit)
+const MarkCrossingB = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* strand A: diagonal going ↘ but bending over strand B at center */}
+    <path d="M10 10 C 22 22, 26 22, 30 26 M 34 38 C 38 42, 42 42, 54 54"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    {/* strand B: diagonal going ↙, continuous */}
+    <path d="M54 10 C 42 22, 22 42, 10 54"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// 2. THE HEDDLE — parallel threads, one lifted
+const MarkHeddle = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M8 24 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".4"/>
+    <path d="M8 32 C 20 32, 28 20, 40 20 L 56 20" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M8 40 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".4"/>
+    <path d="M8 48 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".25"/>
+    <path d="M8 16 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".25"/>
+  </svg>
+);
+
+// 3. THE SPINDLE — radial threads (Loki-flavored)
+const MarkSpindle = ({stroke=1.6, glow=false}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <defs>
+      <radialGradient id="spindle-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="currentColor" stopOpacity=".4"/>
+        <stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
+      </radialGradient>
+    </defs>
+    {glow && <circle cx="32" cy="32" r="22" fill="url(#spindle-glow)"/>}
+    {/* radial threads */}
+    {[0,30,60,90,120,150].map(a => {
+      const rad = a * Math.PI/180;
+      const x1 = 32 + Math.cos(rad)*8, y1 = 32 + Math.sin(rad)*8;
+      const x2 = 32 + Math.cos(rad)*26, y2 = 32 + Math.sin(rad)*26;
+      const x3 = 32 - Math.cos(rad)*8, y3 = 32 - Math.sin(rad)*8;
+      const x4 = 32 - Math.cos(rad)*26, y4 = 32 - Math.sin(rad)*26;
+      return <g key={a}>
+        <path d={`M${x1} ${y1} L ${x2} ${y2}`} stroke="currentColor" strokeWidth={stroke} strokeLinecap="round"/>
+        <path d={`M${x3} ${y3} L ${x4} ${y4}`} stroke="currentColor" strokeWidth={stroke} strokeLinecap="round"/>
+      </g>;
+    })}
+    <circle cx="32" cy="32" r="3" fill="currentColor"/>
+  </svg>
+);
+
+// 4. INTERWOVEN L (logomark extracted) — a single L with interlace
+const MarkInterwovenL = ({stroke=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* vertical stroke of L with a crossing thread at ~2/3 */}
+    <path d="M24 8 V 56 H 56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    {/* cross-thread: one piece goes over, other under */}
+    <path d="M12 36 L 21 36" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M27 36 L 40 36" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// 5. WOVEN O — dense mini grid filling an O counter
+const MarkWovenO = ({stroke=2.5}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <circle cx="32" cy="32" r="22" stroke="currentColor" strokeWidth={stroke} fill="none"/>
+    {/* micro grid inside the O */}
+    <g stroke="currentColor" strokeWidth="1" opacity=".65">
+      {[22,27,32,37,42].map(y => <line key={'h'+y} x1="18" y1={y} x2="46" y2={y}/>)}
+      {[22,27,32,37,42].map(x => <line key={'v'+x} y1="18" x1={x} y2="46" x2={x}/>)}
+    </g>
+  </svg>
+);
+
+/* =========================================================
+   WOVEN MARKS — pure weaving. Warp (vertical) + weft (horizontal)
+   actually interlacing, over-under. This is fabric, not a letter.
+   Drawn with the "split the weft into segments where warp covers it"
+   technique — visually reads as real weaving at small sizes.
+   ========================================================= */
+
+// 5a. Plain weave — 4×4 over-under, square swatch
+const MarkWoven_Plain = ({strokeW = 4.5, pad = 8}) => {
+  const n = 4;
+  const size = 64 - pad*2;
+  const step = size / (n - 1);
+  const lines = [];
+  // Warp (vertical) threads
+  for (let i = 0; i < n; i++) {
+    const x = pad + i * step;
+    lines.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+  }
+  // Weft (horizontal) threads, broken into segments so they pass
+  // OVER some warps and UNDER others (over-under alternating, checkered)
+  for (let r = 0; r < n; r++) {
+    const y = pad + r * step;
+    for (let c = 0; c < n - 1; c++) {
+      // on even (r+c) the weft is on top → draw it
+      if ((r + c) % 2 === 0) {
+        const x1 = pad + c * step;
+        const x2 = pad + (c+1) * step;
+        lines.push(<line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{lines}</svg>;
+};
+
+// 5b. Plain weave — 6×6 denser
+const MarkWoven_Dense = ({strokeW = 2.8, pad = 6}) => {
+  const n = 6;
+  const size = 64 - pad*2;
+  const step = size / (n - 1);
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    const x = pad + i * step;
+    lines.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+  }
+  for (let r = 0; r < n; r++) {
+    const y = pad + r * step;
+    for (let c = 0; c < n - 1; c++) {
+      if ((r + c) % 2 === 0) {
+        const x1 = pad + c * step;
+        const x2 = pad + (c+1) * step;
+        lines.push(<line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{lines}</svg>;
+};
+
+// 5c. Two-thread weave — the absolute minimum. Two warps × two wefts.
+// Reads as a tiny "#" but with real over-under interlace.
+const MarkWoven_Minimum = ({strokeW = 6}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* 2 warps (vertical) */}
+    <line x1="22" y1="8"  x2="22" y2="56" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    <line x1="42" y1="8"  x2="42" y2="56" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    {/* top weft: over first warp, under second */}
+    <line x1="8"  y1="22" x2="22" y2="22" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    <line x1="42" y1="22" x2="56" y2="22" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    {/* bottom weft: under first warp, over second → drawn continuous across center */}
+    <line x1="8"  y1="42" x2="56" y2="42" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+  </svg>
+);
+
+// 5d. Twill weave — diagonal bias. Each row shifts by 1.
+const MarkWoven_Twill = ({strokeW = 3, pad = 7}) => {
+  const n = 5;
+  const size = 64 - pad*2;
+  const step = size / (n - 1);
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    const x = pad + i * step;
+    lines.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+  }
+  for (let r = 0; r < n; r++) {
+    const y = pad + r * step;
+    for (let c = 0; c < n - 1; c++) {
+      // shift by row to create diagonal "stairs"
+      if (((c - r) % 2 + 2) % 2 === 0) {
+        const x1 = pad + c * step;
+        const x2 = pad + (c+1) * step;
+        lines.push(<line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{lines}</svg>;
+};
+
+// 5e. Monogram weave — 3×3 inside a squared frame. Sigil-like.
+const MarkWoven_Sigil = () => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* frame */}
+    <rect x="8" y="8" width="48" height="48" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+    {/* 3 warps */}
+    {[20,32,44].map(x => <line key={'v'+x} x1={x} y1="14" x2={x} y2="50"
+      stroke="currentColor" strokeWidth="3.5" strokeLinecap="round"/>)}
+    {/* 3 wefts, broken for over-under, checker pattern */}
+    {[20,32,44].map((y, r) => (
+      [0,1,2].map(c => {
+        if ((r + c) % 2 !== 0) return null;
+        const x1 = [14,26,38][c];
+        const x2 = [26,38,50][c];
+        return <line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth="3.5" strokeLinecap="round"/>;
+      })
+    ))}
+  </svg>
+);
+
+// 5f. Thread-and-shadow weave — adds subtle shadow under each over-thread
+// for dimension. Feels tactile, like real cloth.
+const MarkWoven_Tactile = ({strokeW = 4.5, pad = 8}) => {
+  const n = 4;
+  const size = 64 - pad*2;
+  const step = size / (n - 1);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const x = pad + i * step;
+    out.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" opacity=".55"/>);
+  }
+  for (let r = 0; r < n; r++) {
+    const y = pad + r * step;
+    for (let c = 0; c < n - 1; c++) {
+      if ((r + c) % 2 === 0) {
+        const x1 = pad + c * step;
+        const x2 = pad + (c+1) * step;
+        out.push(<line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{out}</svg>;
+};
+
+// Woven wordmark: Woven mark placed as the "o" counter-swatch, or to the left of the name
+const WordmarkWoven = ({size = 72, weight = 500, font = 'Fraunces', mark = 'plain'}) => {
+  const Mark = mark === 'dense' ? MarkWoven_Dense : mark === 'twill' ? MarkWoven_Twill : mark === 'sigil' ? MarkWoven_Sigil : MarkWoven_Plain;
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:size*0.18, color:'currentColor', fontFamily:font, fontSize:size, fontWeight:weight, letterSpacing:'-0.02em', lineHeight:1}}>
+      <div style={{width:size*0.88, height:size*0.88, display:'flex'}}><Mark/></div>
+      <span>loom</span>
+    </div>
+  );
+};
+
+// 6. THE SHUTTLE — lens with trailing thread
+const MarkShuttle = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* lens shape */}
+    <path d="M12 32 C 20 18, 44 18, 52 32 C 44 46, 20 46, 12 32 Z" stroke="currentColor" strokeWidth={stroke} fill="none" strokeLinejoin="round"/>
+    {/* thread trail */}
+    <path d="M4 28 C 8 30, 10 31, 12 32" stroke="currentColor" strokeWidth={stroke*.7} strokeLinecap="round" fill="none" opacity=".55"/>
+    <path d="M52 32 C 54 33, 56 34, 60 36" stroke="currentColor" strokeWidth={stroke*.7} strokeLinecap="round" fill="none" opacity=".55"/>
+  </svg>
+);
+
+// 6b. SHUTTLE — filled/more distinctive
+const MarkShuttleB = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M12 32 C 20 18, 44 18, 52 32 C 44 46, 20 46, 12 32 Z" fill="currentColor"/>
+    <circle cx="32" cy="32" r="3" fill="white"/>
+    <path d="M4 29 C 8 31, 10 31, 12 32 M 52 32 C 54 33, 56 33, 60 35"
+      stroke="currentColor" strokeWidth={stroke*.7} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// 8. STACKED WEAVE — minimal 3-thread braid
+const MarkBraid = ({stroke=2.4}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M20 8 C 20 20, 44 28, 44 40 C 44 50, 30 54, 20 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M44 8 C 44 20, 20 28, 20 40 C 20 50, 34 54, 44 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M32 8 V 24 M 32 32 V 44 M 32 50 V 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".5"/>
+  </svg>
+);
+
+/* =========================================================
+   NEW MARKS — expanded exploration
+   ========================================================= */
+
+// 9. NEGATIVE-SPACE WEAVE — solid block with weave cut out
+const MarkNegWeave = ({pad = 8}) => {
+  const n = 4, size = 64 - pad*2, step = size/(n-1);
+  const cuts = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n-1; c++) {
+    if ((r+c)%2===0) cuts.push(
+      <rect key={`h${r}-${c}`} x={pad+c*step+3} y={pad+r*step-2.5} width={step-6} height="5" fill="var(--bg)" rx="1"/>
+    );
+  }
+  return (
+    <svg viewBox="0 0 64 64" width="100%" height="100%" style={{'--bg':'#fff'}}>
+      <rect x="6" y="6" width="52" height="52" rx="3" fill="currentColor"/>
+      {/* cut warp channels */}
+      {[0,1,2,3].map(i => {
+        const x = pad + i*step;
+        return <rect key={'v'+i} x={x-2.5} y={pad-3} width="5" height={size+6} fill="var(--bg)" rx="1"/>;
+      })}
+      {cuts}
+    </svg>
+  );
+};
+
+// 10. SINGLE-THREAD LOOM — one continuous line weaves itself
+const MarkSingleThread = ({strokeW=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M 10 14 L 54 14 Q 58 18, 54 22 L 10 22 Q 6 26, 10 30 L 54 30 Q 58 34, 54 38 L 10 38 Q 6 42, 10 46 L 54 46 Q 58 50, 54 54 L 10 54"
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+  </svg>
+);
+
+// 11. KNOT — weaver's knot, minimal
+const MarkKnot = ({strokeW=3.5}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M 8 32 C 20 32, 24 20, 32 20 C 40 20, 44 32, 32 32 C 20 32, 24 44, 32 44 C 40 44, 44 32, 56 32"
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// 12. FRAYING EDGE — woven square, right edge unravels
+const MarkFray = ({strokeW=3.5, pad=8}) => {
+  const n = 4, size = 64-pad*2, step = size/(n-1);
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    const x = pad + i*step;
+    lines.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+  }
+  for (let r = 0; r < n; r++) {
+    const y = pad + r*step;
+    for (let c = 0; c < n-1; c++) {
+      if ((r+c)%2===0 && c < 2) {
+        const x1 = pad + c*step, x2 = pad + (c+1)*step;
+        lines.push(<line key={`h${r}-${c}`} x1={x1} y1={y} x2={x2} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+    // fray: loose threads dangling from right edge
+    if (r%2===0) {
+      lines.push(<path key={`fr${r}`} d={`M ${64-pad} ${y} q 4 ${r===0?2:-2}, 8 ${r===0?4:-4}`}
+        stroke="currentColor" strokeWidth={strokeW*.6} strokeLinecap="round" fill="none" opacity=".55"/>);
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{lines}</svg>;
+};
+
+// 13. SELVEDGE BAR — just the edge of textile; bar + looped thread
+const MarkSelvedge = ({strokeW=4}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <line x1="22" y1="8" x2="22" y2="56" stroke="currentColor" strokeWidth={strokeW*1.4} strokeLinecap="round"/>
+    <line x1="42" y1="8" x2="42" y2="56" stroke="currentColor" strokeWidth={strokeW*1.4} strokeLinecap="round"/>
+    {/* looped wefts between them */}
+    {[20, 32, 44].map(y => (
+      <path key={y} d={`M 22 ${y} C 32 ${y-4}, 32 ${y+4}, 42 ${y}`}
+        stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" fill="none"/>
+    ))}
+  </svg>
+);
+
+// 14. PIXEL/IKAT — blocky digital weave
+const MarkPixel = ({pad=10}) => {
+  const blocks = [
+    [1,0,1,0,1],
+    [0,1,0,1,0],
+    [1,0,1,0,1],
+    [0,1,0,1,0],
+    [1,0,1,0,1],
+  ];
+  const n = 5, size = 64-pad*2, step = size/n;
+  return (
+    <svg viewBox="0 0 64 64" width="100%" height="100%">
+      {blocks.map((row, r) => row.map((v, c) => v ? (
+        <rect key={`${r}-${c}`} x={pad+c*step} y={pad+r*step} width={step-1.2} height={step-1.2}
+          fill="currentColor" rx=".5"/>
+      ) : null))}
+    </svg>
+  );
+};
+
+// 15. ASTERISK WEAVE — radial cross (3 axes)
+const MarkAsterisk = ({strokeW=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <line x1="32" y1="10" x2="32" y2="54" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    <line x1="10" y1="32" x2="54" y2="32" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    <line x1="16" y1="16" x2="48" y2="48" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    <line x1="48" y1="16" x2="16" y2="48" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+  </svg>
+);
+
+// 16. TILDE-THREAD — wavy weft through straight warps
+const MarkTilde = ({strokeW=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {[18,26,34,42].map(x => (
+      <line key={x} x1={x} y1="10" x2={x} y2="54" stroke="currentColor" strokeWidth={strokeW*.8} strokeLinecap="round" opacity=".35"/>
+    ))}
+    <path d="M 6 32 C 14 24, 22 40, 30 32 C 38 24, 46 40, 54 32 L 58 32"
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// 17. TENSION — two beams + taut threads
+const MarkTension = ({strokeW=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <circle cx="12" cy="32" r="4" fill="currentColor"/>
+    <circle cx="52" cy="32" r="4" fill="currentColor"/>
+    {[22,28,32,36,42].map((y,i) => (
+      <line key={y} x1="14" y1={32 + (y-32)*.3} x2="50" y2={y}
+        stroke="currentColor" strokeWidth={strokeW*.65} strokeLinecap="round"/>
+    ))}
+  </svg>
+);
+
+// 18. REED — the part that beats weft. Vertical parallel bars with notch
+const MarkReed = ({strokeW=2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {[14,20,26,32,38,44,50].map(x => (
+      <line key={x} x1={x} y1="10" x2={x} y2="54" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>
+    ))}
+    {/* Top + bottom binding bars */}
+    <line x1="10" y1="10" x2="54" y2="10" stroke="currentColor" strokeWidth={strokeW*1.3} strokeLinecap="round"/>
+    <line x1="10" y1="54" x2="54" y2="54" stroke="currentColor" strokeWidth={strokeW*1.3} strokeLinecap="round"/>
+  </svg>
+);
+
+// 19. BASKET WEAVE — 2x2 clustered threads
+const MarkBasket = ({strokeW=3.5, pad=8}) => {
+  const n = 6, size = 64-pad*2, step = size/(n-1);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const x = pad + i*step;
+    out.push(<line key={'v'+i} x1={x} y1={pad} x2={x} y2={64-pad}
+      stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" opacity=".5"/>);
+  }
+  // 2x2 blocks over
+  for (let r = 0; r < n; r++) {
+    const y = pad + r*step;
+    for (let c = 0; c < n-1; c++) {
+      const bR = Math.floor(r/2), bC = Math.floor(c/2);
+      if ((bR+bC)%2===0) {
+        out.push(<line key={`h${r}-${c}`} x1={pad+c*step} y1={y} x2={pad+(c+1)*step} y2={y}
+          stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round"/>);
+      }
+    }
+  }
+  return <svg viewBox="0 0 64 64" width="100%" height="100%">{out}</svg>;
+};
+
+// 20. FOLDED TAG — solid square with notched corner (textile label)
+const MarkTag = ({strokeW=3.5}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M 10 12 H 50 L 56 18 V 52 H 10 Z" fill="currentColor"/>
+    <path d="M 50 12 L 50 18 L 56 18" fill="none" stroke="white" strokeWidth="1.5" opacity=".4"/>
+    {/* mini weave inside */}
+    <g stroke="white" strokeWidth="1.5" strokeLinecap="round">
+      <line x1="18" y1="26" x2="46" y2="26" opacity=".6"/>
+      <line x1="18" y1="34" x2="46" y2="34"/>
+      <line x1="18" y1="42" x2="46" y2="42" opacity=".6"/>
+      <line x1="24" y1="22" x2="24" y2="46"/>
+      <line x1="32" y1="22" x2="32" y2="46" opacity=".6"/>
+      <line x1="40" y1="22" x2="40" y2="46"/>
+    </g>
+  </svg>
+);
+
+// 21. DOUBLE-L LIGATURE — two L's mirrored, forming a weave
+const MarkDoubleL = ({strokeW=5}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* left L */}
+    <path d="M 16 10 V 52 H 32" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" fill="none"/>
+    {/* right L mirrored */}
+    <path d="M 48 54 V 12 H 32" stroke="currentColor" strokeWidth={strokeW} strokeLinecap="round" fill="none"/>
+    {/* crossing thread through the middle */}
+    <circle cx="32" cy="32" r="3" fill="currentColor"/>
+  </svg>
+);
+
+// 22. WARP+BEAM — two horizontal bars (top and bottom beams) with warp threads between
+const MarkBeam = ({strokeW=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    {/* top beam */}
+    <rect x="8" y="10" width="48" height="4" rx="2" fill="currentColor"/>
+    {/* bottom beam */}
+    <rect x="8" y="50" width="48" height="4" rx="2" fill="currentColor"/>
+    {/* warp threads */}
+    {[18,26,32,38,46].map(x => (
+      <line key={x} x1={x} y1="14" x2={x} y2="50" stroke="currentColor" strokeWidth={strokeW*.7} strokeLinecap="round"/>
+    ))}
+    {/* one weft mid-beat */}
+    <line x1="8" y1="32" x2="56" y2="32" stroke="currentColor" strokeWidth={strokeW*.7} strokeLinecap="round" opacity=".55"/>
+  </svg>
+);
+
+/* Variants of existing marks ============================== */
+// Crossing — 3-thread
+const MarkCrossing3 = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M20 8 V 28 M20 36 V 56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M44 8 V 56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M8 32 H56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M8 48 H 38 M 50 48 H 56" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+// Crossing — filled dot at intersection
+const MarkCrossingDot = ({stroke=2.2}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M32 10 V 54" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M10 32 H 54" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <circle cx="32" cy="32" r="3.5" fill="currentColor"/>
+  </svg>
+);
+// Interwoven L — variants with different balance
+const MarkInterwovenL_Short = ({stroke=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M26 14 V 50 H 50" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M14 32 L 23 32 M 29 32 L 42 32" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+const MarkInterwovenL_Double = ({stroke=3}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M22 10 V 54" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M10 28 L 19 28 M 25 28 L 42 28" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M10 40 L 19 40 M 25 40 L 54 40" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".55"/>
+    <path d="M22 54 H 54" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+// New wordmark variants ============
+const WordmarkLigature = ({size=72, font='Instrument Serif'}) => (
+  <div style={{display:'flex', alignItems:'baseline', color:'currentColor', fontFamily:font, fontSize:size, fontWeight:400, letterSpacing:'-0.02em', lineHeight:1, fontStyle:'italic'}}>
+    <span>loom</span>
+  </div>
+);
+const WordmarkSmallCaps = ({size=36}) => (
+  <div style={{fontFamily:'Fraunces', fontSize:size, fontWeight:600, letterSpacing:'.2em', textTransform:'uppercase', color:'currentColor'}}>
+    loom
+  </div>
+);
+const WordmarkWovenMark = ({size=72, font='Fraunces', mark='plain', gap=0.22}) => {
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:size*gap, color:'currentColor', fontFamily:font, fontSize:size, fontWeight:500, letterSpacing:'-0.02em', lineHeight:1}}>
+      <div style={{width:size*0.88, height:size*0.88}}>
+        {mark==='plain' && <MarkWoven_Plain/>}
+        {mark==='dense' && <MarkWoven_Dense/>}
+        {mark==='twill' && <MarkWoven_Twill/>}
+        {mark==='sigil' && <MarkWoven_Sigil/>}
+        {mark==='minimum' && <MarkWoven_Minimum/>}
+        {mark==='tactile' && <MarkWoven_Tactile/>}
+      </div>
+      <span>loom</span>
+    </div>
+  );
+};
+const WordmarkCrossingLeading = ({size=72, font='Instrument Serif'}) => (
+  <div style={{display:'flex', alignItems:'center', gap:size*0.2, color:'currentColor', fontFamily:font, fontSize:size, fontWeight:400, letterSpacing:'-0.02em', lineHeight:1}}>
+    <div style={{width:size*0.76, height:size*0.76}}><MarkCrossing stroke={3}/></div>
+    <span>loom</span>
+  </div>
+);
+const WordmarkBeamLeading = ({size=72, font='Fraunces'}) => (
+  <div style={{display:'flex', alignItems:'center', gap:size*0.18, color:'currentColor', fontFamily:font, fontSize:size, fontWeight:500, letterSpacing:'-0.02em', lineHeight:1}}>
+    <div style={{width:size*0.88, height:size*0.88}}><MarkBeam/></div>
+    <span>loom</span>
+  </div>
+);
+const WordmarkStacked = ({size=56}) => (
+  <div style={{display:'flex', flexDirection:'column', alignItems:'center', color:'currentColor', fontFamily:'Fraunces', lineHeight:.95}}>
+    <div style={{width:size*0.9, height:size*0.9, marginBottom:6}}><MarkWoven_Plain/></div>
+    <span style={{fontSize:size*.42, letterSpacing:'.25em', textTransform:'uppercase', fontWeight:500}}>loom</span>
+  </div>
+);
+
+// 7. INFINITY LOOM — bonus: two threads form a figure-8
+const MarkInfinity = ({stroke=2.5}) => (
+
+// 8. STACKED WEAVE — minimal 3-thread braid
+const MarkBraid = ({stroke=2.4}) => (
+  <svg viewBox="0 0 64 64" width="100%" height="100%">
+    <path d="M20 8 C 20 20, 44 28, 44 40 C 44 50, 30 54, 20 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M44 8 C 44 20, 20 28, 20 40 C 20 50, 34 54, 44 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none"/>
+    <path d="M32 8 V 24 M 32 32 V 44 M 32 50 V 56"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" fill="none" opacity=".5"/>
+  </svg>
+);
+
+/* =========================================================
+   WORDMARKS
+   ========================================================= */
+
+// Wordmark A: Interwoven L in "loom"
+const WordmarkInterwovenL = ({size=72, weight=500, font='Fraunces'}) => (
+  <div style={{display:'flex', alignItems:'baseline', color:'currentColor', fontFamily:font, fontSize:size, fontWeight:weight, letterSpacing:'-0.02em', lineHeight:1}}>
+    <svg viewBox="0 0 40 72" width={size*0.55} height={size} style={{display:'block'}}>
+      {/* L */}
+      <path d={`M 14 ${size*.18} V ${size*.78} H 38`} stroke="currentColor" strokeWidth="5" strokeLinecap="round" fill="none"/>
+      {/* crossing thread passes through vertical bar */}
+      <path d={`M 2 ${size*.53} L 11 ${size*.53}`} stroke="currentColor" strokeWidth="5" strokeLinecap="round" fill="none"/>
+      <path d={`M 17 ${size*.53} L 28 ${size*.53}`} stroke="currentColor" strokeWidth="5" strokeLinecap="round" fill="none" opacity=".55"/>
+    </svg>
+    <span style={{marginLeft:-4}}>oom</span>
+  </div>
+);
+
+// Wordmark B: Woven O's
+const WordmarkWovenO = ({size=72, weight=500, font='Fraunces', glow=false}) => {
+  const gridSize = size*0.5;
+  return (
+    <div style={{display:'flex', alignItems:'center', color:'currentColor', fontFamily:font, fontSize:size, fontWeight:weight, letterSpacing:'-0.02em', lineHeight:1}}>
+      <span>l</span>
+      {[0,1].map(i => (
+        <svg key={i} viewBox="0 0 64 64" width={size*0.62} height={size*0.62} style={{margin:'0 -2px'}}>
+          <circle cx="32" cy="32" r="26" stroke="currentColor" strokeWidth="6" fill="none"/>
+          <g stroke="currentColor" strokeWidth={glow?1.5:1.2} opacity={glow?.85:.55}>
+            {[22,27,32,37,42].map(y => <line key={'h'+y} x1="16" y1={y} x2="48" y2={y}/>)}
+            {[22,27,32,37,42].map(x => <line key={'v'+x} y1="16" x1={x} y2="48" x2={x}/>)}
+          </g>
+          {glow && <circle cx="32" cy="32" r="26" stroke="currentColor" strokeWidth="1" fill="none" opacity=".3" style={{filter:'blur(3px)'}}/>}
+        </svg>
+      ))}
+      <span style={{marginLeft:-2}}>m</span>
+    </div>
+  );
+};
+
+// Wordmark C: plain type + The Crossing as leading bug
+const WordmarkCrossingBug = ({size=72, weight=500, font='Fraunces'}) => (
+  <div style={{display:'flex', alignItems:'center', gap:size*0.2, color:'currentColor', fontFamily:font, fontSize:size, fontWeight:weight, letterSpacing:'-0.02em', lineHeight:1}}>
+    <div style={{width:size*0.78, height:size*0.78}}><MarkCrossing stroke={3.2}/></div>
+    <span>loom</span>
+  </div>
+);
+
+// Wordmark D: tall sans with woven O's
+const WordmarkGrotesk = ({size=72}) => (
+  <div style={{display:'flex', alignItems:'center', color:'currentColor', fontFamily:'Geist, system-ui', fontSize:size, fontWeight:600, letterSpacing:'-0.045em', lineHeight:1, textTransform:'lowercase'}}>
+    <span>l</span>
+    {[0,1].map(i => (
+      <svg key={i} viewBox="0 0 64 64" width={size*0.64} height={size*0.64} style={{margin:'0 -3px', marginBottom:size*0.02}}>
+        <circle cx="32" cy="32" r="24" stroke="currentColor" strokeWidth="9" fill="none"/>
+        <g stroke="currentColor" strokeWidth="1.2" opacity=".5">
+          {[24,30,36].map(y => <line key={'h'+y} x1="20" y1={y} x2="44" y2={y}/>)}
+          {[24,30,36].map(x => <line key={'v'+x} y1="20" x1={x} y2="44" x2={x}/>)}
+        </g>
+      </svg>
+    ))}
+    <span style={{marginLeft:-1}}>m</span>
+  </div>
+);
+
+// Mono wordmark — IBM Plex
+const WordmarkMono = ({size=60, weight=500}) => (
+  <div style={{fontFamily:'"IBM Plex Mono", monospace', fontSize:size, fontWeight:weight, letterSpacing:'-0.02em', color:'currentColor'}}>
+    loom
+  </div>
+);
+
+/* =========================================================
+   LAYOUT HELPERS
+   ========================================================= */
+const MarkCell = ({label, children, bg='#fff', ink='#1a1a1a', size=160}) => (
+  <DCArtboard label={label} width={size} height={size} style={{background:bg, display:'flex', alignItems:'center', justifyContent:'center'}}>
+    <div style={{width:size*0.52, height:size*0.52, color:ink, display:'flex'}}>
+      {children}
+    </div>
+  </DCArtboard>
+);
+
+const SizeSweep = ({label, children, bg='#fff', ink='#1a1a1a'}) => (
+  <DCArtboard label={label} width={360} height={160} style={{background:bg, display:'flex', alignItems:'center', justifyContent:'space-around', padding:'0 24px'}}>
+    {[14,22,40,80].map(s => (
+      <div key={s} style={{width:s, height:s, color:ink, display:'flex', flexDirection:'column', alignItems:'center'}}>
+        <div style={{width:s, height:s}}>{children}</div>
+      </div>
+    ))}
+  </DCArtboard>
+);
+
+const WordmarkCell = ({label, children, bg='#fff', ink='#1a1a1a', w=420, h=160}) => (
+  <DCArtboard label={label} width={w} height={h} style={{background:bg, display:'flex', alignItems:'center', justifyContent:'center'}}>
+    <div style={{color:ink}}>{children}</div>
+  </DCArtboard>
+);
+
+const InAppCell = ({label, mark, wordmark, bg='#faf9f7', ink='#1a1a1a', accent='#c47653'}) => (
+  <DCArtboard label={label} width={420} height={160} style={{background:bg, display:'flex', flexDirection:'column'}}>
+    {/* mocked app toolbar */}
+    <div style={{height:44, display:'flex', alignItems:'center', padding:'0 14px', borderBottom:'1px solid rgba(0,0,0,0.06)', gap:10}}>
+      <div style={{width:22, height:22, color:ink, display:'flex'}}>{mark}</div>
+      <div style={{color:ink, fontFamily:'Fraunces', fontSize:15, fontWeight:500, letterSpacing:'-0.01em'}}>{wordmark}</div>
+      <div style={{flex:1}}/>
+      <div style={{width:60, height:8, background:'rgba(0,0,0,0.08)', borderRadius:2}}/>
+      <div style={{width:20, height:20, borderRadius:4, background:accent, opacity:.8}}/>
+    </div>
+    {/* mocked content */}
+    <div style={{flex:1, padding:14, display:'flex', flexDirection:'column', gap:6}}>
+      <div style={{width:'40%', height:8, background:'rgba(0,0,0,0.1)', borderRadius:2}}/>
+      <div style={{width:'70%', height:6, background:'rgba(0,0,0,0.06)', borderRadius:2}}/>
+      <div style={{width:'55%', height:6, background:'rgba(0,0,0,0.06)', borderRadius:2}}/>
+    </div>
+  </DCArtboard>
+);
+
+/* =========================================================
+   ROOT
+   ========================================================= */
+function App() {
+  return (
+    <DesignCanvas>
+      <div style={{padding:'0 60px 20px', maxWidth:900}}>
+        <div style={{fontFamily:'Fraunces', fontSize:46, fontWeight:500, letterSpacing:'-0.02em', color:'#1a1a1a', marginBottom:8}}>
+          Loom — logo exploration
+        </div>
+        <div style={{fontSize:15, color:'rgba(30,20,10,0.65)', lineHeight:1.55, maxWidth:680}}>
+          Eight marks + four wordmarks. Weaving metaphor leads; Loki's glow appears only as an
+          interaction state (far right of §4). Scroll right within each section — each row is an h-stack.
+        </div>
+        <DCPostIt top={-8} right={60} rotate={-3} width={210}>
+          My pick: <b>#4 Interwoven L wordmark</b> + <b>#1 The Crossing</b> as favicon. Tell me if you disagree.
+        </DCPostIt>
+      </div>
+
+      <DCSection title="1 · The Crossing" subtitle="Warp meets weft. The atom of a loom. Favicon-ready.">
+        <MarkCell label="rectilinear"            ><MarkCrossing/></MarkCell>
+        <MarkCell label="interlaced strands"     ><MarkCrossingB/></MarkCell>
+        <MarkCell label="on ink"      bg="#1a1a1a" ink="#f0eee9"><MarkCrossing/></MarkCell>
+        <MarkCell label="accent"      bg="#faf9f7" ink="#c47653"><MarkCrossingB/></MarkCell>
+        <SizeSweep label="size sweep — 14 / 22 / 40 / 80 px"><MarkCrossing/></SizeSweep>
+      </DCSection>
+
+      <DCSection title="2 · The Heddle" subtitle="Parallel threads, one lifted. Captures the moment of weaving.">
+        <MarkCell label="five-thread"><MarkHeddle/></MarkCell>
+        <MarkCell label="on ink"  bg="#1a1a1a" ink="#f0eee9"><MarkHeddle/></MarkCell>
+        <MarkCell label="accent"  bg="#faf9f7" ink="#c47653"><MarkHeddle/></MarkCell>
+        <SizeSweep label="size sweep"><MarkHeddle/></SizeSweep>
+      </DCSection>
+
+      <DCSection title="3 · The Spindle" subtitle="Loki-first. Radial threads. Dramatic but sci-fi — probably the wrong register.">
+        <MarkCell label="clean"><MarkSpindle/></MarkCell>
+        <MarkCell label="glow"     bg="#0d0d0f" ink="#d4b87a"><MarkSpindle glow/></MarkCell>
+        <MarkCell label="accent"   bg="#faf9f7" ink="#c47653"><MarkSpindle/></MarkCell>
+        <SizeSweep label="size sweep — note: detail collapses at 14px"><MarkSpindle/></SizeSweep>
+      </DCSection>
+
+      <DCSection title="4 · Interwoven L  ★" subtitle="Wordmark-led. Mark and name are one thing. My recommended direction.">
+        <WordmarkCell label="on warm" bg="#faf9f7"><WordmarkInterwovenL/></WordmarkCell>
+        <WordmarkCell label="on ink"  bg="#1a1a1a" ink="#f0eee9"><WordmarkInterwovenL/></WordmarkCell>
+        <WordmarkCell label="accent"  bg="#faf9f7" ink="#c47653"><WordmarkInterwovenL/></WordmarkCell>
+        <WordmarkCell label="smaller · 44px"><WordmarkInterwovenL size={44}/></WordmarkCell>
+        <MarkCell     label="mark only"><MarkInterwovenL/></MarkCell>
+        <MarkCell     label="Loki glow (hover state)" bg="#0d0d0f" ink="#d4b87a">
+          <div style={{filter:'drop-shadow(0 0 4px currentColor)', display:'flex', width:'100%', height:'100%'}}>
+            <MarkInterwovenL/>
+          </div>
+        </MarkCell>
+      </DCSection>
+
+      <DCSection title="5 · Woven O" subtitle="Both o's are tiny woven panels. Rewards close looking.">
+        <WordmarkCell label="Fraunces"><WordmarkWovenO/></WordmarkCell>
+        <WordmarkCell label="on ink" bg="#1a1a1a" ink="#f0eee9"><WordmarkWovenO/></WordmarkCell>
+        <WordmarkCell label="grotesk" bg="#faf9f7"><WordmarkGrotesk/></WordmarkCell>
+        <WordmarkCell label="Loki glow · dark" bg="#0d0d0f" ink="#d4b87a"><WordmarkWovenO glow/></WordmarkCell>
+        <MarkCell     label="just an O"><MarkWovenO/></MarkCell>
+      </DCSection>
+
+      <DCSection title="6 · The Shuttle" subtitle="The instrument, not the output. Distinctive but reads as 'eye' without context.">
+        <MarkCell label="outline"><MarkShuttle/></MarkCell>
+        <MarkCell label="filled"><MarkShuttleB/></MarkCell>
+        <MarkCell label="on ink" bg="#1a1a1a" ink="#f0eee9"><MarkShuttleB/></MarkCell>
+        <SizeSweep label="size sweep"><MarkShuttle/></SizeSweep>
+      </DCSection>
+
+      <DCSection title="7 · Other shapes" subtitle="Worth seeing for contrast. Probably not the answer.">
+        <MarkCell label="figure-8 / infinity"><MarkInfinity/></MarkCell>
+        <MarkCell label="braid"><MarkBraid/></MarkCell>
+        <MarkCell label="crossing + bug wordmark" bg="#faf9f7"><WordmarkCrossingBug size={28}/></MarkCell>
+        <MarkCell label="mono" bg="#faf9f7"><WordmarkMono size={22}/></MarkCell>
+      </DCSection>
+
+      <DCSection title="8 · In context" subtitle="How the top candidates feel inside the actual app toolbar.">
+        <InAppCell label="Interwoven L + wordmark"
+          mark={<MarkInterwovenL/>}
+          wordmark={<span style={{display:'flex', alignItems:'baseline'}}><span style={{fontFamily:'Fraunces', fontWeight:500}}>loom</span></span>}
+        />
+        <InAppCell label="Woven O wordmark" mark={<MarkWovenO/>} wordmark={<WordmarkWovenO size={16}/>}/>
+        <InAppCell label="Crossing + mono" mark={<MarkCrossing/>} wordmark={<span style={{fontFamily:'IBM Plex Mono', fontSize:14, letterSpacing:'-0.02em'}}>loom</span>} />
+        <InAppCell label="Dark · Loki glow"
+          bg="#0d0d0f" ink="#f0eee9" accent="#d4b87a"
+          mark={<div style={{filter:'drop-shadow(0 0 3px #d4b87a)', display:'flex', width:'100%', height:'100%', color:'#d4b87a'}}><MarkInterwovenL/></div>}
+          wordmark={<span style={{fontFamily:'Fraunces', fontWeight:500}}>loom</span>}
+        />
+      </DCSection>
+
+      <div style={{padding:'0 60px 80px', maxWidth:900}}>
+        <div style={{fontFamily:'Fraunces', fontSize:22, fontWeight:500, color:'#1a1a1a', marginBottom:8}}>Notes</div>
+        <ul style={{fontSize:14, color:'rgba(30,20,10,0.7)', lineHeight:1.7, paddingLeft:20}}>
+          <li><b>#1 The Crossing</b> — favicon / app icon. Minimum viable weave; reads at 14px.</li>
+          <li><b>#4 Interwoven L</b> — primary wordmark. The L contains the weave.</li>
+          <li><b>Loki borrow</b> — only a hover glow in dark mode. Don't let it lead.</li>
+          <li><b>Typeface</b> — Fraunces is shown; happy to try Instrument Serif or a grotesk if you want a different voice.</li>
+        </ul>
+      </div>
+
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

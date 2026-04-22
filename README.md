@@ -65,7 +65,7 @@ Loom builds on top of Claude Code (and other coding agents), adding a visual wor
 ## Features
 
 ### Canvas and Views
-- Infinite pan/zoom canvas with document cards (d3-zoom, WebCoLa layout)
+- Infinite pan/zoom canvas with document cards (d3-zoom, d3-force layout with rectangular collision)
 - Files view with tree/tile toggle, Mac-style folder icons, breadcrumb navigation
 - Provenance graph view linking raw sources to wiki pages
 - Cards show rendered markdown, syntax-highlighted code, or PDF content
@@ -87,11 +87,24 @@ Loom builds on top of Claude Code (and other coding agents), adding a visual wor
 - Auto-saves transcripts to `raw/chats/` on close
 - KaTeX rendering in chat and fullpage views
 
+### Settings
+- Two-pane full settings panel (Cmd+,) with 12 sections: Account, Workspace, Storage, Appearance, Model, Permissions, Memory, Indexing, Keyboard, Integrations, Privacy, About
+- Font pickers: UI font, reading font, code font (Inter, JetBrains Mono, Newsreader, system fonts)
+- Font size slider scales entire type scale
+- Density control (compact/standard/roomy) — spacing only, not font sizes
+- Three themes (dark/light/paper) with slate palette variant
+- Context popover with real system prompt tracing (shows exactly what files are injected)
+- Workspace file browser for selecting loom root
+- Custom agent configuration (add any CLI agent)
+- All fonts bundled locally — zero external network calls
+
 ### Permissions
 - Programmatic enforcement via the Agent SDK's `can_use_tool` callback — not just system prompt instructions
 - Per-category rules (file read, file write, shell, MCP tools, destructive operations) configurable from the browser
 - Three modes: Allow, Ask (interactive prompt with Enter to confirm), Deny
-- Destructive command detection (`rm`, `git push --force`, `git reset --hard`) with its own category
+- Destructive command detection (`rm`, `sudo`, `chmod`, `git push --force`, `git reset --hard`) with expanded blocklist
+- Fail-closed on permission check errors (denies by default)
+- Concurrent permission requests supported (keyed by tool_use_id)
 
 ### Editing and Terminal
 - CodeMirror 6 editor with syntax highlighting (Cmd+E to edit, Cmd+S to save)
@@ -130,7 +143,6 @@ All shortcuts are rebindable via Cmd+K.
 |----------|--------|
 | Cmd+1/2/3/4 | Switch views |
 | Cmd+J | Cycle chat focus |
-| Cmd+/ | Solo cycle chats |
 | Cmd+N | New chat |
 | Cmd+Shift+N | Fork chat with context |
 | Cmd+T | Toggle tree/tile |
@@ -144,9 +156,20 @@ All shortcuts are rebindable via Cmd+K.
 | Cmd+0 | Fit view |
 | Cmd+L | Auto layout |
 | Cmd+[/] | Navigate back / drill in |
-| Cmd+Shift+R | Restart server (full process restart) |
+| Cmd+Shift+H | Restart server (clears caches, full reload) |
 | Cmd+, | Open settings |
 | Escape | Collapse or navigate back |
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and the full security architecture.
+
+- Path traversal protection on all file-serving endpoints
+- Auth token + cookie-based remote access with per-origin CORS
+- SSH host key verification enabled by default
+- Shell escaping on all VM command tools
+- Session TTL cleanup (1 hour inactive)
+- No telemetry, no external network calls (fonts bundled locally)
 
 ## Architecture
 
