@@ -2990,7 +2990,7 @@ async function initGraphView() {
 }
 
 async function initSidebar() {
-  const treeData = await api.tree();
+  const treeData = await api.fetchTree();
   const container = document.getElementById('sidebar-tree');
   container.innerHTML = renderTree(treeData.children||[], 0);
   // Single click: focus item, expand/collapse folders
@@ -3144,7 +3144,7 @@ function sortItems(items) {
 async function refreshFileTree() {
   debugLog('[View] refreshFileTree called');
   // Refresh sidebar tree
-  const treeData = await api.tree();
+  const treeData = await api.fetchTree();
   const sidebarContainer = document.getElementById('sidebar-tree');
   if (sidebarContainer) {
     sidebarContainer.innerHTML = renderTree(treeData.children || [], 0);
@@ -3156,10 +3156,10 @@ async function refreshFileTree() {
     else renderFilesTiles();
   }
   // Refresh graph data and re-render canvas
-  graphData = await api.graph();
+  graphData = await api.fetchGraph();
   _rebuildNodeMap();
   const newIds = graphData.nodes.map(n => n.data.id).filter(id => !cardMeta.has(id));
-  if (newIds.length > 0) {
+  if (newIds.length > 0 && !isVMTarget()) {
     try {
       const bulk = await authFetch('/api/pages/bulk', {
         method: 'POST', headers: {'Content-Type': 'application/json'},

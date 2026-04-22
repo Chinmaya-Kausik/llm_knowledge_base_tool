@@ -1984,21 +1984,33 @@ async def api_vm_graph(vm_id: str, show_internals: bool = False,
         excludes += " -not -path '*/__pycache__/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.claude/*'"
     if not include_dotfiles:
         excludes += " -not -name '.*'"
-    cmd = f"find {base} -maxdepth 3{excludes} 2>/dev/null | head -500"
+    # List directories and files separately to distinguish them reliably
+    # Use -exec to append / to dirs (works on both GNU and BSD find)
+    cmd = f"find {base} -maxdepth 3{excludes} -type d -exec echo 'd:{{}}' \\; -o -type f -exec echo 'f:{{}}' \\; 2>/dev/null | head -500"
     r = await ssh_pool.exec_command(vm, cmd, timeout=15)
 
     nodes = []
     edges = []
     top_nodes = []
+    node_ids: set[str] = set()
     children_map: dict[str, list[str]] = {}  # parent -> [child_ids]
 
     for line in r["stdout"].splitlines():
         line = line.strip()
-        if not line or line == base:
+        if not line:
             continue
-        rel = line.replace(base + "/", "", 1) if line.startswith(base) else line
+        # Parse type marker
+        if line.startswith("d:") or line.startswith("f:"):
+            is_folder = line[0] == "d"
+            path = line[2:]
+        else:
+            # Fallback for systems without printf support
+            path = line
+            is_folder = not ("." in path.rsplit("/", 1)[-1]) if "/" in path or "." not in path else False
+        if path == base:
+            continue
+        rel = path.replace(base + "/", "", 1) if path.startswith(base) else path
         parts = rel.split("/")
-        is_folder = not ("." in parts[-1]) if len(parts[-1]) > 0 else True
         name = parts[-1]
         parent = "/".join(parts[:-1]) if len(parts) > 1 else ""
 
@@ -2021,13 +2033,19 @@ async def api_vm_graph(vm_id: str, show_internals: bool = False,
             }
         }
         nodes.append(node)
+        node_ids.add(rel)
 
         if parent:
-            edges.append({"data": {"source": parent, "target": rel}})
             children_map.setdefault(parent, []).append(rel)
 
         if len(parts) == 1:
             top_nodes.append(node)
+
+    # Only create edges where both source and target exist as nodes
+    for parent_id, child_ids in children_map.items():
+        if parent_id in node_ids:
+            for child_id in child_ids:
+                edges.append({"data": {"source": parent_id, "target": child_id}})
 
     # Populate children arrays
     for node in nodes:
