@@ -2516,9 +2516,16 @@ function renderChatTranscript(container, rawContent) {
         let body = part.replace(/<details>\s*<summary>[\s\S]*?<\/summary>/, '').replace(/<\/details>\s*$/, '').trim();
 
         // Clean up raw Python dict strings from subagent results
-        body = body.replace(/\{'type':\s*'text',\s*'text':\s*['"]([\s\S]*?)['"]\s*\}/g, (_, text) => {
-          return text.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-        });
+        // These are single long lines like: - {'type': 'text', 'text': '## Summary\n\nThe...'}
+        body = body.split('\n').map(line => {
+          const dictMatch = line.match(/^-?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
+          if (dictMatch) {
+            // Extract text content — remove trailing '} or "}
+            let text = dictMatch[1].replace(/['"]\s*\}\s*$/, '');
+            return text.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+          }
+          return line;
+        }).join('\n');
 
         // Format tool entries: "- **ToolName** — desc\n  - output" → cleaner display
         body = body.replace(/^- \*\*(\w+)\*\* — (.+)\n((?:  - .+\n?)*)/gm, (_, tool, desc, output) => {

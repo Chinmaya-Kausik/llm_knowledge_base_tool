@@ -1360,12 +1360,14 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 .chat-transcript .chat-msg-user {
   background: var(--bg-sunken);
   border-left: 3px solid var(--accent);
-  padding: 10px 14px;
+  padding: 10px 14px 10px 14px;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--text-bright);
 }
+/* Override the > pseudo-element — transcript already has left border */
+.chat-transcript .chat-msg-user::before { content: none; }
 .chat-transcript .chat-msg-assistant {
   padding: 8px 0;
 }
