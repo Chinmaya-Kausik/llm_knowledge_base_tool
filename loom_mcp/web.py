@@ -1833,7 +1833,8 @@ async def api_delete_vm(vm_id: str):
 
 
 @app.get("/api/vms/{vm_id}/tree")
-async def api_vm_tree(vm_id: str, path: str = ""):
+async def api_vm_tree(vm_id: str, path: str = "", show_internals: bool = False,
+                      include_hidden: bool = False, include_dotfiles: bool = False):
     """Get remote file tree via SFTP."""
     from loom_mcp.vm.config import get_vm
     from loom_mcp.vm.ssh import ssh_pool
@@ -1848,13 +1849,22 @@ async def api_vm_tree(vm_id: str, path: str = ""):
         entries = await ssh_pool.list_dir(vm, dir_path)
         children = []
         for entry in entries:
-            child_path = f"{dir_path}/{entry['name']}"
+            name = entry["name"]
+            # Apply filters
+            if not include_dotfiles and name.startswith("."):
+                continue
+            if not show_internals and name in ("__pycache__", "node_modules", ".git", ".claude"):
+                continue
+            child_path = f"{dir_path}/{name}"
             node = {
                 "id": child_path,
-                "name": entry["name"],
+                "name": name,
+                "title": name,
                 "type": entry["type"],
+                "category": _ext_to_category(name, entry["type"] == "folder"),
                 "size": entry.get("size", 0),
                 "mtime": entry.get("mtime", 0),
+                "ctime": 0,
                 "children": [],
             }
             if entry["type"] == "folder" and depth < max_depth:
@@ -1890,7 +1900,8 @@ async def api_vm_file(vm_id: str, path: str):
 
 
 @app.get("/api/vms/{vm_id}/search")
-async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: str = ""):
+async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: str = "",
+                        scope: str = "all"):
     """Search remote files via grep/find over SSH."""
     from loom_mcp.vm.config import get_vm
     from loom_mcp.vm.ssh import ssh_pool
@@ -1914,8 +1925,7 @@ async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: st
                 results.append({
                     "path": rel,
                     "line": int(parts[1]) if parts[1].isdigit() else 0,
-                    "snippet": parts[2].strip(),
-                    "match_type": "content",
+                    "context": parts[2].strip(),
                 })
 
     if mode in ("name", "both"):
@@ -1928,15 +1938,34 @@ async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: st
                 results.append({
                     "path": rel,
                     "line": 0,
-                    "snippet": "",
-                    "match_type": "name",
+                    "context": "",
                 })
 
     return results
 
 
+def _ext_to_category(name: str, is_folder: bool = False) -> str:
+    """Map a filename to a category based on extension."""
+    if is_folder:
+        return "folder"
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    _cat_map = {
+        "py": "code", "js": "code", "ts": "code", "rs": "code", "go": "code",
+        "jsx": "code", "tsx": "code", "c": "code", "cpp": "code", "h": "code",
+        "sh": "code", "bash": "code", "zsh": "code",
+        "md": "markdown", "txt": "markdown", "rst": "markdown",
+        "json": "data", "yaml": "data", "yml": "data", "toml": "data",
+        "csv": "data", "tsv": "data",
+        "png": "image", "jpg": "image", "jpeg": "image", "svg": "image",
+        "gif": "image", "webp": "image",
+        "pdf": "paper", "tex": "paper", "bib": "paper",
+    }
+    return _cat_map.get(ext, "file")
+
+
 @app.get("/api/vms/{vm_id}/graph")
-async def api_vm_graph(vm_id: str):
+async def api_vm_graph(vm_id: str, show_internals: bool = False,
+                       include_hidden: bool = False, include_dotfiles: bool = False):
     """Build a simple graph from remote file tree (no frontmatter parsing)."""
     from loom_mcp.vm.config import get_vm
     from loom_mcp.vm.ssh import ssh_pool
@@ -1946,14 +1975,19 @@ async def api_vm_graph(vm_id: str):
 
     raw_base = vm.get("sync_dir", "~")
     base = await ssh_pool.resolve_path(vm, raw_base)
-    # Get flat file listing
-    cmd = f"find {base} -maxdepth 3 -not -path '*/.git/*' -not -path '*/__pycache__/*' -not -path '*/node_modules/*' 2>/dev/null | head -500"
+    # Build find exclusions based on filters
+    excludes = ""
+    if not show_internals:
+        excludes += " -not -path '*/__pycache__/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.claude/*'"
+    if not include_dotfiles:
+        excludes += " -not -name '.*'"
+    cmd = f"find {base} -maxdepth 3{excludes} 2>/dev/null | head -500"
     r = await ssh_pool.exec_command(vm, cmd, timeout=15)
 
     nodes = []
     edges = []
     top_nodes = []
-    seen_parents = set()
+    children_map: dict[str, list[str]] = {}  # parent -> [child_ids]
 
     for line in r["stdout"].splitlines():
         line = line.strip()
@@ -1965,16 +1999,7 @@ async def api_vm_graph(vm_id: str):
         name = parts[-1]
         parent = "/".join(parts[:-1]) if len(parts) > 1 else ""
 
-        # Determine category from extension
-        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-        cat_map = {
-            "py": "code", "js": "code", "ts": "code", "rs": "code", "go": "code",
-            "md": "markdown", "txt": "markdown",
-            "json": "data", "yaml": "data", "yml": "data", "toml": "data",
-            "png": "image", "jpg": "image", "svg": "image",
-            "pdf": "paper",
-        }
-        category = "folder" if is_folder else cat_map.get(ext, "file")
+        category = _ext_to_category(name, is_folder)
 
         node = {
             "data": {
@@ -1986,17 +2011,26 @@ async def api_vm_graph(vm_id: str):
                 "type": "folder" if is_folder else "file",
                 "category": category,
                 "children": [],
+                "status": "",
+                "tags": [],
+                "confidence": None,
+                "has_readme": False,
             }
         }
         nodes.append(node)
 
-        if parent and parent not in seen_parents:
+        if parent:
             edges.append({"data": {"source": parent, "target": rel}})
+            children_map.setdefault(parent, []).append(rel)
 
         if len(parts) == 1:
             top_nodes.append(node)
 
-        seen_parents.add(rel)
+    # Populate children arrays
+    for node in nodes:
+        nid = node["data"]["id"]
+        if nid in children_map:
+            node["data"]["children"] = children_map[nid]
 
     return {
         "nodes": nodes, "edges": edges,

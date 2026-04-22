@@ -183,15 +183,35 @@ const api = {
   getLayout:   () => authFetch(`${getBaseUrl()}/api/layout`).then(r => r.json()).catch(() => ({})),
   saveLayout:  (d) => authFetch(`${getBaseUrl()}/api/layout`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}),
   savePage:    (p, fm, c) => authFetch(`${getBaseUrl()}/api/page/${p}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({frontmatter:fm, content:c})}),
-  // VM APIs
+  // Unified APIs — route to local or VM based on current target
+  fetchGraph: () => {
+    const filters = `show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`;
+    const url = isVMTarget()
+      ? `${getBaseUrl()}/api/vms/${currentTarget.id}/graph?${filters}`
+      : `${getBaseUrl()}/api/graph?${filters}`;
+    debugLog('[API] fetchGraph:', url);
+    return authFetch(url).then(r => r.json());
+  },
+  fetchTree: () => {
+    const filters = `show_internals=${localStorage.getItem('loom-show-internals') === 'true'}&include_hidden=${localStorage.getItem('loom-show-hidden') === 'true'}&include_dotfiles=${localStorage.getItem('loom-show-dotfiles') === 'true'}`;
+    const url = isVMTarget()
+      ? `${getBaseUrl()}/api/vms/${currentTarget.id}/tree?${filters}`
+      : `${getBaseUrl()}/api/tree?${filters}`;
+    debugLog('[API] fetchTree:', url);
+    return authFetch(url).then(r => r.json());
+  },
+  fetchSearch: (q, scope='all', mode='both') => {
+    const url = isVMTarget()
+      ? `${getBaseUrl()}/api/vms/${currentTarget.id}/search?q=${encodeURIComponent(q)}&scope=${scope}&mode=${mode}`
+      : `${getBaseUrl()}/api/search?q=${encodeURIComponent(q)}&scope=${scope}&mode=${mode}`;
+    return authFetch(url).then(r => r.json());
+  },
+  // VM-specific APIs
   vms:         () => authFetch(`${getBaseUrl()}/api/vms`).then(r => r.json()),
   vmAdd:       (d) => authFetch(`${getBaseUrl()}/api/vms`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
   vmUpdate:    (id,d) => authFetch(`${getBaseUrl()}/api/vms/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
   vmDelete:    (id) => authFetch(`${getBaseUrl()}/api/vms/${id}`, {method:'DELETE'}).then(r=>r.json()),
-  vmTree:      (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/tree`).then(r=>r.json()),
   vmFile:      (id,p) => authFetch(`${getBaseUrl()}/api/vms/${id}/file?path=${encodeURIComponent(p)}`).then(r=>r.json()),
-  vmSearch:    (id,q,mode='content') => authFetch(`${getBaseUrl()}/api/vms/${id}/search?q=${encodeURIComponent(q)}&mode=${mode}`).then(r=>r.json()),
-  vmGraph:     (id) => authFetch(`${getBaseUrl()}/api/vms/${id}/graph`).then(r=>r.json()),
   vmPush:      (id,d={}) => authFetch(`${getBaseUrl()}/api/vms/${id}/push`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
   vmPull:      (id,d={}) => authFetch(`${getBaseUrl()}/api/vms/${id}/pull`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(r=>r.json()),
   vmSyncStatus:(id) => authFetch(`${getBaseUrl()}/api/vms/${id}/sync-status`).then(r=>r.json()),
@@ -330,18 +350,10 @@ async function switchTarget(target) {
 
 async function refreshCurrentView(viewName) {
   if (viewName === 'graph') {
-    if (isVMTarget()) {
-      await initVMGraphView();
-    } else {
-      await initGraphView();
-    }
+    await initGraphView();
   } else if (viewName === 'files') {
     filesInitialized = false;
-    if (isVMTarget()) {
-      await initVMFilesView();
-    } else {
-      await initFilesView();
-    }
+    await initFilesView();
   } else if (viewName === 'search') {
     const q = document.getElementById('search-input')?.value;
     if (q) doSearch(q);
@@ -352,40 +364,7 @@ async function refreshCurrentView(viewName) {
   }
 }
 
-// --- VM Graph View ---
-async function initVMGraphView() {
-  const world = document.getElementById('world');
-  world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">Loading VM files...</div>';
-  cardElements.clear();
-  cardMeta.clear();
-
-  try {
-    graphData = await api.vmGraph(currentTarget.id);
-    _rebuildNodeMap();
-    if (!graphData || graphData.nodes.length === 0) {
-      world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">No files on VM.</div>';
-      return;
-    }
-    canvasStack = [{ parentPath: null, label: currentTarget.label }];
-    renderCurrentLevel();
-  } catch (err) {
-    world.innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">VM Error: ${err.message}</div>`;
-  }
-}
-
-// --- VM Files View ---
-
-async function initVMFilesView() {
-  const vm = currentTarget;
-  try {
-    filesTreeData = await api.vmTree(vm.id);
-    filesInitialized = true;
-    filesTilePath = [];
-    setFilesMode(filesMode);
-  } catch (err) {
-    document.getElementById('files-tree').innerHTML = `<div class="empty-state">VM Error: ${err.message}</div>`;
-  }
-}
+// VM-specific init functions removed — merged into initGraphView() and initFilesView()
 
 // --- VM Terminal Panel ---
 function createVMTerminalPanel(vmId, vmLabel) {
@@ -1157,7 +1136,19 @@ function saveCanvasStack() {
 function loadCanvasStack() {
   try {
     const saved = sessionStorage.getItem('loom-canvas-stack');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const stack = JSON.parse(saved);
+      // Dedup: remove circular entries
+      const seen = new Set();
+      const deduped = [];
+      for (const entry of stack) {
+        const key = entry.parentPath || '__root__';
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(entry);
+      }
+      return deduped;
+    }
   } catch {}
   return null;
 }
@@ -1865,7 +1856,14 @@ async function drillInto(parentPath) {
     }
   }
 
-  canvasStack.push({ parentPath, label: nd.label });
+  // Guard against circular navigation — don't push if already at this path
+  if (canvasStack.some(e => e.parentPath === parentPath)) {
+    // Already in stack — navigate to it instead of pushing again
+    const idx = canvasStack.findIndex(e => e.parentPath === parentPath);
+    canvasStack = canvasStack.slice(0, idx + 1);
+  } else {
+    canvasStack.push({ parentPath, label: nd.label });
+  }
   saveCanvasStack();
   renderCurrentLevel();
 }
@@ -2912,68 +2910,81 @@ function populateTagFilter() {
 // Initialize
 // ========================================
 async function initGraphView() {
+  const isVM = isVMTarget();
+  const world = document.getElementById('world');
+  if (isVM) world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">Loading VM files...</div>';
   try {
-    [graphData, layoutData] = await Promise.all([api.graph(), api.getLayout()]);
+    if (isVM) {
+      graphData = await api.fetchGraph();
+      layoutData = {};
+    } else {
+      [graphData, layoutData] = await Promise.all([api.fetchGraph(), api.getLayout()]);
+    }
+    cardElements.clear();
+    cardMeta.clear();
     _rebuildNodeMap();
     if (!graphData || graphData.nodes.length === 0) {
-      document.getElementById('world').innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">No wiki pages yet.</div>';
+      world.innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">${isVM ? 'No files on VM.' : 'No wiki pages yet.'}</div>`;
       return;
     }
-    // Fetch all page contents via bulk endpoint (single request)
-    try {
-      const bulk = await authFetch('/api/pages/bulk', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(graphData.nodes.map(n => n.data.id)),
-      }).then(r => r.json());
-      for (const [id, data] of Object.entries(bulk)) {
-        if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
-      }
-    } catch {
-      // Fallback to individual requests
-      const pages = await Promise.all(graphData.nodes.map(n => api.page(n.data.id).then(d=>[n.data.id,d]).catch(()=>[n.data.id,null])));
-      for (const [id, data] of pages) {
-        if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
-      }
-    }
-    // Restore saved position or start at root
-    const savedStack = loadCanvasStack();
-    if (savedStack && savedStack.length > 0) {
-      canvasStack = [{ parentPath: null, label: 'Root' }];
-      // Re-drill to saved position, lazy-loading children along the way
-      for (let i = 1; i < savedStack.length; i++) {
-        const entry = savedStack[i];
-        if (entry.parentPath) {
-          // Lazy-load children if not in graphData
-          const childIds = getChildIds(entry.parentPath);
-          if (childIds.length === 0) {
-            try {
-              const resp = await fetch(`/api/children/${entry.parentPath}?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`);
-              const data = await resp.json();
-              if (data.children) {
-                for (const child of data.children) {
-                  if (!nodeById(child.data.id)) {
-                    graphData.nodes.push(child);
-                    _nodeMap.set(child.data.id, child.data);
-                    if (child.data.content) cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
-                  }
-                }
-              }
-            } catch {}
-          }
-          canvasStack.push(entry);
+    // Fetch page contents (local only — VM has no bulk page endpoint)
+    if (!isVM) {
+      try {
+        const bulk = await authFetch('/api/pages/bulk', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(graphData.nodes.map(n => n.data.id)),
+        }).then(r => r.json());
+        for (const [id, data] of Object.entries(bulk)) {
+          if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
+        }
+      } catch {
+        const pages = await Promise.all(graphData.nodes.map(n => api.page(n.data.id).then(d=>[n.data.id,d]).catch(()=>[n.data.id,null])));
+        for (const [id, data] of pages) {
+          if (data) cardMeta.set(id, { frontmatter: data.frontmatter, content: data.content });
         }
       }
-    } else {
-      canvasStack = [{ parentPath: null, label: 'Root' }];
     }
-    saveCanvasStack();
+    // Restore saved position (local only) or start at root
+    const rootLabel = isVM ? (currentTarget.label || 'VM') : 'Root';
+    if (!isVM) {
+      const savedStack = loadCanvasStack();
+      if (savedStack && savedStack.length > 0) {
+        canvasStack = [{ parentPath: null, label: rootLabel }];
+        for (let i = 1; i < savedStack.length; i++) {
+          const entry = savedStack[i];
+          if (entry.parentPath) {
+            const childIds = getChildIds(entry.parentPath);
+            if (childIds.length === 0) {
+              try {
+                const resp = await fetch(`/api/children/${entry.parentPath}?show_internals=${localStorage.getItem('loom-show-internals') === 'true'}`);
+                const data = await resp.json();
+                if (data.children) {
+                  for (const child of data.children) {
+                    if (!nodeById(child.data.id)) {
+                      graphData.nodes.push(child);
+                      _nodeMap.set(child.data.id, child.data);
+                      if (child.data.content) cardMeta.set(child.data.id, { frontmatter: {}, content: child.data.content });
+                    }
+                  }
+                }
+              } catch {}
+            }
+            canvasStack.push(entry);
+          }
+        }
+      } else {
+        canvasStack = [{ parentPath: null, label: rootLabel }];
+      }
+      saveCanvasStack();
+    } else {
+      canvasStack = [{ parentPath: null, label: rootLabel }];
+    }
     renderCurrentLevel();
-
     debugLog(`Loom: rendered ${cardElements.size} cards`);
-    renderPinboard();
+    if (!isVM) renderPinboard();
   } catch (err) {
     console.error('Loom initGraphView error:', err);
-    document.getElementById('world').innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">Error: ${err.message}</div>`;
+    world.innerHTML = `<div class="empty-state" style="position:absolute;left:50px;top:50px;">${isVM ? 'VM' : ''} Error: ${err.message}</div>`;
   }
 }
 
@@ -3163,8 +3174,15 @@ async function refreshFileTree() {
 }
 
 async function initFilesView() {
-  if (filesInitialized) return;
-  filesTreeData = await api.tree();
+  const isVM = isVMTarget();
+  if (filesInitialized && !isVM) return;
+  try {
+    filesTreeData = await api.fetchTree();
+  } catch (err) {
+    document.getElementById('files-tree').innerHTML = `<div class="empty-state">${isVM ? 'VM' : ''} Error: ${err.message}</div>`;
+    return;
+  }
+  if (isVM) filesTilePath = [];
 
   document.getElementById('files-mode-tree').onclick = () => setFilesMode('tree');
   document.getElementById('files-mode-tiles').onclick = () => setFilesMode('tiles');
@@ -3524,9 +3542,7 @@ async function doSearch(query) {
   const vmLabel = isVMTarget() ? currentTarget.label : null;
   c.appendChild(Object.assign(document.createElement('div'), { className: 'empty-state', textContent: `Searching ${vmLabel || scopeLabel}...` }));
   try {
-    const results = isVMTarget()
-      ? await api.vmSearch(currentTarget.id, query, mode)
-      : await api.search(query, scope, mode);
+    const results = await api.fetchSearch(query, scope, mode);
     // Remove "Searching..." but keep options bar
     c.querySelectorAll('.empty-state').forEach(e => e.remove());
 
@@ -3583,19 +3599,17 @@ function switchView(name) {
   document.getElementById(`view-${name}`)?.classList.add('active');
   document.querySelector(`.view-tab[data-view="${name}"]`)?.classList.add('active');
   if (name==='files') {
-    if (isVMTarget()) {
-      initVMFilesView();
-      return;
+    if (!isVMTarget()) {
+      // Sync tile path to current canvas level
+      const level = currentLevel();
+      filesTilePath = level.parentPath ? level.parentPath.split('/') : [];
+      if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     }
-    // Sync tile path to current canvas level
-    const level = currentLevel();
-    filesTilePath = level.parentPath ? level.parentPath.split('/') : [];
-    if (filesInitialized && filesMode === 'tiles') renderFilesTiles();
     initFilesView();
   }
   if (name==='graph') {
     if (isVMTarget()) {
-      initVMGraphView();
+      initGraphView();
     } else if (filesTilePath.length > 0) {
       // Sync canvas to the folder we were browsing in Files view
       const tilePath = filesTilePath.join('/');
