@@ -8799,11 +8799,13 @@ function initMobile() {
     _mobileActive = mobile;
     if (mobile) {
       document.documentElement.setAttribute('data-mobile', '');
-      switchMobileTab(_mobileTab);
+      // Don't call switchMobileTab here on first init — canvas hasn't loaded yet.
+      // CSS handles visibility via [data-mobile]. Tab switching works after graph loads.
     } else {
       document.documentElement.removeAttribute('data-mobile');
-      // Restore desktop views
       document.querySelectorAll('.mobile-view').forEach(v => v.style.display = 'none');
+      const canvasEl = document.getElementById('canvas-container');
+      if (canvasEl) canvasEl.style.display = '';
     }
   }
   updateMobileMode();
@@ -9071,6 +9073,9 @@ function closeBottomSheet() {
 }
 
 async function init() {
+  // Mobile setup first — wire tab handlers before anything else
+  initMobile();
+
   // Try to select backend if multiple are configured
   const backends = getBackends();
   if (backends.length > 0) {
@@ -9131,7 +9136,6 @@ async function init() {
   initSettings();
   initTargetSelector();
   initActionMenu();
-  initMobile();
 
   document.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
