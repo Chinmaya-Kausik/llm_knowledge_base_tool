@@ -2103,7 +2103,7 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 }
 .mobile-content {
   flex: 1; overflow: hidden; position: relative;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .mobile-content #canvas-container {
   position: absolute; inset: 0;
