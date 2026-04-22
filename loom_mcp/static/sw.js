@@ -1,6 +1,6 @@
 // Loom Service Worker — cache static assets, network-only for API/WS
 
-const CACHE_NAME = 'loom-cache-v3';
+const CACHE_NAME = 'loom-cache-v4';
 
 const PRECACHE_URLS = [
   '/',
