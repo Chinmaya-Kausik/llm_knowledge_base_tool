@@ -1,18 +1,18 @@
 # Loom
 
-A workspace and knowledge base on an infinite canvas. Files as cards, Claude Code as the built-in agent, markdown on disk, git-versioned.
+An interactive workspace and knowledge base on an infinite canvas. Navigate, edit, compile, and run agents across all your files — with Claude Code as the built-in agent. Local-first, markdown on disk, git-versioned.
 
 <!-- ![Loom screenshot](screenshot.png) -->
 
 ## Why
 
-I had papers, code, notes, and half-finished ideas scattered across folders, and the tools I was using didn't share state with each other. Claude Code is good for working with files, but it's a terminal -- you can't see spatial relationships between things. File managers, editors, and AI chat are separate applications.
+I kept running into the same problem: papers, code, notes, and half-finished ideas scattered across folders, with tools that don't talk to each other. Claude Code is great for working with files, but it's a terminal — you lose spatial context and can't see relationships between things. And file managers, editors, and AI chat are all separate applications with no shared state.
 
-I wanted one place where files live on a canvas as cards I can arrange and connect, with Claude Code running inside the same UI -- multiple chat panels, inline diffs, terminals, and programmatic permissions. There's also a knowledge base pipeline: ingest sources, compile them into wiki pages, and the accumulated context carries across conversations.
+Loom is a single workspace that unifies all of this. Your files live on an infinite canvas where documents are cards you can arrange, connect, and drill into. Claude Code operates inside the UI — multiple chat panels, inline diffs, embedded terminals, and a programmatic permission system — with full read/write access to everything in the loom. A built-in knowledge base pipeline lets you ingest sources, compile them into structured wiki pages, and build up persistent context that every future conversation benefits from.
 
-It started as a knowledge base tool and grew into more of a workspace: navigating files, editing code, running agents, compiling papers, and building up structured knowledge.
+It started as a knowledge base tool, but it's grown into something closer to a workspace management system: a visual environment for navigating files, editing code, running agents, compiling papers, and accumulating structured knowledge — all in one place.
 
-A demo loom is included in `demo/`. Its `CLAUDE.md`, `config.yaml`, and `wiki/meta/conventions.md` serve as templates -- bootstrap creates these in any new loom.
+A demo loom is included in the `demo/` directory. Its `CLAUDE.md`, `config.yaml`, and `wiki/meta/conventions.md` serve as templates — bootstrap creates these in any new loom.
 
 ## Quick Start
 
@@ -42,25 +42,25 @@ Produces a Tauri v2 binary that starts the Python server as a sidecar.
 
 ## How Loom extends Claude Code
 
-Loom wraps Claude Code (and other coding agents) in a visual workspace:
+Loom builds on top of Claude Code (and other coding agents), adding a visual workspace layer:
 
 - **Agent-agnostic.** Switch between Claude Code, OpenAI Codex, or any CLI agent per-panel. Agent adapter layer translates each agent's protocol into a common event stream.
 - **VM integration.** Connect to remote VMs via SSH. Target dropdown switches Canvas/Files/Search between local and remote. Full MCP tool suite mirrors built-in tools for VMs (`vm_bash`, `vm_read`, `vm_write`, `vm_edit`, `vm_glob`, `vm_grep`). SSH terminals, live metrics, job management, port forwarding.
 - **Background agents.** Push a running agent to the background and keep chatting. Pop it out into a new panel when it's done.
 - **Selective tool call expansion.** Expand individual tool calls while the agent keeps working. Edit calls show inline diffs. Details preserved in saved transcripts.
-- **Browsable chat transcripts.** Auto-saves to `raw/chats/` as markdown. Browse in the file explorer, open, and continue where you left off.
-- **Fork any conversation.** Branch a chat with full context without losing the original thread.
+- **Browsable chat transcripts.** Auto-saves to `raw/chats/` as markdown. Browse in the file explorer, open, and Continue to pick up where you left off.
+- **Fork any conversation.** Branch a chat with full context. Explore alternatives without losing the original thread.
 - **Redirect with checkpoints.** Set breakpoints on tool calls, intervene with corrective feedback.
 - **Multiple concurrent agents.** Floating, docked, or minimized panels. Each with its own session and agent.
 - **Spatial file navigation.** Files as cards on an infinite canvas with wiki-link edges. Drill into folders, arrange spatially.
 - **Browser-configurable permissions.** Per-category rules (allow/ask/deny) enforced via `can_use_tool` callback.
 - **Terminals.** Local and SSH terminal panels alongside chat and canvas.
-- **Knowledge base pipeline.** Ingest URLs and PDFs, compile into wiki pages with cross-links and a master index.
+- **Knowledge base pipeline.** Ingest URLs and PDFs, compile into structured wiki pages with cross-links and master index.
 - **Selection-to-Claude.** Highlight text anywhere for an "Ask Claude" tooltip with context injection.
 - **Remote access.** Token-based auth for accessing Loom from other devices. CORS support.
-- **Mobile (PWA).** Installable on iPhone/Android. Endpoint switcher tries local WiFi -> Tailscale -> VM fallback -> "turn on your laptop."
-- **Ntfy notifications.** Push notifications when agents finish, jobs complete, or sync happens.
-- **Sync daemon.** Auto-syncs memory/wiki/transcripts between laptop and VM via rsync. Pulls from VM on wake from sleep.
+- **Mobile (PWA).** Installable on iPhone/Android home screen. Smart endpoint switcher tries local WiFi → Tailscale → VM fallback → "turn on your laptop."
+- **Ntfy notifications.** Push notifications to your phone when agents finish, jobs complete, or sync happens. No native app needed.
+- **Sync daemon.** Auto-syncs memory/wiki/transcripts between laptop and VM via rsync. Detects wake from sleep, pulls first.
 
 ## Features
 
@@ -122,7 +122,7 @@ Loom wraps Claude Code (and other coding agents) in a visual workspace:
 - `/lint` — run health checks with scaling trigger monitoring
 - `/file-answer` — write the last answer back to the wiki
 
-The compilation pipeline produces wiki pages with YAML frontmatter, `[[wiki-link]]` cross-references, and a master index.
+The compilation pipeline produces wiki pages with full YAML frontmatter, `[[wiki-link]]` cross-references, and a master index. The more you ingest, the better the context gets.
 
 ### MCP Server (39 tools)
 - **Ingestion**: `ingest_url`, `ingest_pdf`, `ingest_text`, `classify_inbox_item`
@@ -227,16 +227,16 @@ src-tauri/                  <- Tauri v2 native app (optional)
 - **Tools**: uv (package management), ripgrep (search), trafilatura (web extraction), PyMuPDF4LLM (PDF)
 - **Tests**: pytest (330+ tests across 26 files)
 
-## Mobile Access
+## Mobile Access (iPhone/Android)
 
-Loom is a PWA -- installable on your phone's home screen:
+Loom is a PWA — installable on your phone's home screen:
 
 1. **Enable remote access:** `LOOM_REMOTE=1 uv run --extra web python -m loom_mcp.web`
 2. **Set up Tailscale** on laptop and phone (for access outside your home network)
 3. **Open** `http://<laptop-ip>:8420` on your phone, tap "Add to Home Screen"
 4. **Configure backends** in Settings: add local WiFi IP, Tailscale IP, and optionally a VM fallback
 
-The phone tries backends in order: local WiFi (~3ms) -> Tailscale (~30ms) -> VM fallback (~120ms). If nothing responds, shows "Turn on your laptop."
+The phone tries backends in order: local WiFi (~3ms) → Tailscale (~30ms) → VM fallback (~120ms). If nothing responds, shows "Turn on your laptop."
 
 ### Notifications (ntfy)
 
