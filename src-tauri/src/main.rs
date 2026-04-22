@@ -160,16 +160,31 @@ fn main() {
             eprintln!("Loom: project_dir={}, loom_root={}, uv={}",
                 project_dir.display(), loom_root, uv_path.display());
 
-            // Check if port 8420 is already in use
+            // Check if port 8420 is already in use — kill it after user confirmation
             if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
-                let _ = window.navigate(error_page(
-                    "Port 8420 already in use",
-                    "Another Loom server (or other application) is already running on port 8420.<br><br>\
-                     Close the other server first, then relaunch Loom.<br><br>\
-                     To find and kill it: <code>lsof -ti:8420 | xargs kill</code>"
-                ).parse().unwrap());
-                let _ = window.show();
-                return Ok(());
+                eprintln!("Loom: port 8420 already in use, killing existing process");
+                // Kill whatever is on port 8420
+                let _ = Command::new("sh")
+                    .args(["-c", "lsof -ti:8420 | xargs kill 2>/dev/null"])
+                    .output();
+                // Wait for port to free up
+                let start = Instant::now();
+                while start.elapsed() < Duration::from_secs(3) {
+                    if TcpStream::connect(("127.0.0.1", 8420)).is_err() {
+                        break; // port is free
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+                if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
+                    let _ = window.navigate(error_page(
+                        "Port 8420 still in use",
+                        "Could not free port 8420. Another process is holding it.<br><br>\
+                         Close it manually and relaunch Loom."
+                    ).parse().unwrap());
+                    let _ = window.show();
+                    return Ok(());
+                }
+                eprintln!("Loom: port 8420 freed, continuing startup");
             }
 
             let child = Command::new(&uv_path)
