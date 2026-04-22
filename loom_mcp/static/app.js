@@ -218,9 +218,12 @@ async function initTargetSelector() {
   // Move to body to escape toolbar stacking context
   document.body.appendChild(dropdown);
 
-  btn.onclick = async () => {
-    dropdown.classList.toggle('hidden');
-    if (!dropdown.classList.contains('hidden')) {
+  btn.onclick = async (e) => {
+    e.stopPropagation();
+    const wasHidden = dropdown.classList.contains('hidden');
+    closeAllDropdowns();
+    if (wasHidden) {
+      dropdown.classList.remove('hidden');
       await populateTargetDropdown();
     }
   };
@@ -4821,6 +4824,14 @@ function updateAllTerminalThemes() {
 }
 window.updateAllTerminalThemes = updateAllTerminalThemes;
 
+function closeAllDropdowns() {
+  document.getElementById('settings-dropdown')?.classList.add('hidden');
+  document.getElementById('target-dropdown')?.classList.add('hidden');
+  document.getElementById('action-menu')?.classList.remove('open');
+  document.getElementById('toolbar-menu')?.classList.remove('open');
+  document.querySelectorAll('.palette').forEach(p => p.classList.add('hidden'));
+}
+
 function getTerminalTheme() {
   const cs = getComputedStyle(document.documentElement);
   const get = (prop, fallback) => cs.getPropertyValue(prop).trim() || fallback;
@@ -7322,9 +7333,9 @@ function initActionMenu() {
   document.body.appendChild(menu);
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    // Close settings menu if open
-    document.getElementById('toolbar-menu')?.classList.remove('open');
-    menu.classList.toggle('open');
+    const wasOpen = menu.classList.contains('open');
+    closeAllDropdowns();
+    if (!wasOpen) menu.classList.add('open');
     // Update context-dependent items
     const ctxItems = document.getElementById('action-context-items');
     ctxItems.innerHTML = '';
@@ -7362,7 +7373,9 @@ function initSettings() {
     document.body.appendChild(toolbarMenu);
     filterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toolbarMenu.classList.toggle('open');
+      const wasOpen = toolbarMenu.classList.contains('open');
+      closeAllDropdowns();
+      if (!wasOpen) toolbarMenu.classList.add('open');
       updateFilterDot();
     });
     toolbarMenu.addEventListener('click', (e) => e.stopPropagation());

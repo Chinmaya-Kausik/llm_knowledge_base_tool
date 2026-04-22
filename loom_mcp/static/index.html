@@ -500,7 +500,9 @@
       document.body.appendChild(settingsDD);
       settingsBtn.onclick = function(e) {
         e.stopPropagation();
-        settingsDD.classList.toggle('hidden');
+        var wasHidden = settingsDD.classList.contains('hidden');
+        if (typeof closeAllDropdowns === 'function') closeAllDropdowns();
+        if (wasHidden) settingsDD.classList.remove('hidden');
       };
       document.addEventListener('click', function(e) {
         if (!settingsDD.contains(e.target) && e.target !== settingsBtn) settingsDD.classList.add('hidden');

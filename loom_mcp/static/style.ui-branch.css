@@ -1344,7 +1344,9 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 }
 #action-menu { right: 80px; }
 #toolbar-menu { right: 50px; }
-#target-dropdown { left: 120px; }
+#target-dropdown { left: 120px; background: var(--bg-surface); border: 1px solid var(--border); }
+.target-item.active { background: var(--accent-soft) !important; color: var(--accent); }
+.target-item:hover { background: var(--bg-hover); }
 
 /* Sleeker checkboxes in filter menus */
 .toolbar-menu label {
