@@ -2170,6 +2170,9 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 
 /* --- Chat view --- */
 .mobile-chat { display: flex !important; flex-direction: column; }
+/* When chat input is focused, hide tabs and fill viewport */
+.mobile-chat:has(.mc-input:focus) ~ .mobile-tab-bar,
+.mobile-shell:has(.mc-input:focus) > .mobile-tab-bar { display: none !important; }
 .mc-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px;

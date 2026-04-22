@@ -9059,7 +9059,9 @@ function renderMobileChat(container) {
   // Connect WebSocket for mobile chat
   if (!_mcWs || _mcWs.readyState !== WebSocket.OPEN) {
     _mcSessionId = crypto.randomUUID();
-    _mcWs = new WebSocket(getWsUrl());
+    const tokenParam = getTokenParam();
+    const mcWsUrl = `${getWsUrl()}/ws/chat${tokenParam ? '?' + tokenParam : ''}`;
+    _mcWs = new WebSocket(mcWsUrl);
     _mcWs.onopen = () => {
       _mcWs.send(JSON.stringify({ type: 'init', session_id: _mcSessionId }));
       if (typeof _mdbg !== 'undefined') _mdbg.push('WS connected');
