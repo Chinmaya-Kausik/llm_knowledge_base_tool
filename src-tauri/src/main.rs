@@ -160,6 +160,18 @@ fn main() {
             eprintln!("Loom: project_dir={}, loom_root={}, uv={}",
                 project_dir.display(), loom_root, uv_path.display());
 
+            // Check if port 8420 is already in use
+            if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
+                let _ = window.navigate(error_page(
+                    "Port 8420 already in use",
+                    "Another Loom server (or other application) is already running on port 8420.<br><br>\
+                     Close the other server first, then relaunch Loom.<br><br>\
+                     To find and kill it: <code>lsof -ti:8420 | xargs kill</code>"
+                ).parse().unwrap());
+                let _ = window.show();
+                return Ok(());
+            }
+
             let child = Command::new(&uv_path)
                 .args(["run", "--extra", "web", "python", "-m", "loom_mcp.web"])
                 .current_dir(&project_dir)
