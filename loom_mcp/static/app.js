@@ -8846,20 +8846,27 @@ function switchMobileTab(tab) {
   const canvasEl = document.getElementById('canvas-container');
   if (canvasEl) canvasEl.style.display = tab === 'canvas' ? '' : 'none';
 
-  if (tab === 'canvas') {
-    updateMobileBreadcrumb();
-  } else if (tab === 'files') {
-    const view = document.getElementById('mobile-files-view');
-    view.style.display = '';
-    renderMobileFiles();
-  } else if (tab === 'chat') {
-    const view = document.getElementById('mobile-chat-view');
-    view.style.display = 'flex';
-    initMobileChat();
-  } else if (tab === 'more') {
-    const view = document.getElementById('mobile-more-view');
-    view.style.display = '';
-    renderMobileMore();
+  try {
+    if (tab === 'canvas') {
+      updateMobileBreadcrumb();
+      fitView();
+    } else if (tab === 'files') {
+      const view = document.getElementById('mobile-files-view');
+      view.style.display = '';
+      renderMobileFiles();
+    } else if (tab === 'chat') {
+      const view = document.getElementById('mobile-chat-view');
+      view.style.display = 'flex';
+      initMobileChat();
+    } else if (tab === 'more') {
+      const view = document.getElementById('mobile-more-view');
+      view.style.display = '';
+      renderMobileMore();
+    }
+  } catch (e) {
+    console.error('[Mobile] switchTab error:', e);
+    const errView = document.getElementById('mobile-' + tab + '-view');
+    if (errView) errView.innerHTML = `<div style="padding:20px;color:red;font-size:12px">${e.message}</div>`;
   }
 }
 
@@ -8878,7 +8885,7 @@ function updateMobileBreadcrumb() {
 }
 
 // Mobile Files — push navigation
-let _mobileFilePath = [];
+var _mobileFilePath = [];
 function renderMobileFiles() {
   const view = document.getElementById('mobile-files-view');
   if (!filesTreeData) {
@@ -8924,22 +8931,33 @@ function renderMobileFiles() {
 }
 
 // Mobile Chat
-let _mobileChatInit = false;
+var _mobileChatInit = false;
 function initMobileChat() {
   const view = document.getElementById('mobile-chat-view');
   if (_mobileChatInit) return;
   _mobileChatInit = true;
 
+  // Use the main panel's messages container — mirror it into mobile view
+  const mainPanel = chatPanels.get('main');
+
   // Scope chip
   const scopeChip = document.createElement('div');
   scopeChip.className = 'chat-context-chip';
   scopeChip.style.cssText = 'margin: 8px 12px; font-size: 12px; cursor: pointer;';
-  const level = getSmartContextDefault();
-  scopeChip.innerHTML = `<span class="ctx-label">ctx:</span> <span class="ctx-scope">${level}</span>`;
+  const level = mainPanel?.contextLevel || getSmartContextDefault();
+  scopeChip.innerHTML = `<svg class="ctx-icon" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
+    <span class="ctx-label">ctx:</span> <span class="ctx-scope">${level}</span>`;
 
-  // Messages container
+  // Move main panel's messages container into mobile view
   const msgs = document.createElement('div');
   msgs.className = 'mobile-chat-messages';
+  // Clone existing messages from main panel
+  const mainMsgs = document.getElementById('chat-messages');
+  if (mainMsgs) {
+    for (const child of [...mainMsgs.children]) {
+      msgs.appendChild(child.cloneNode(true));
+    }
+  }
 
   // Input bar
   const inputBar = document.createElement('div');
@@ -8959,12 +8977,33 @@ function initMobileChat() {
     if (!text) return;
     textarea.value = '';
     textarea.style.height = 'auto';
-    // Route to main chat panel send
-    focusChatPanel('main');
-    const mainInput = document.getElementById('chat-input');
-    if (mainInput) {
-      mainInput.value = text;
-      document.getElementById('chat-send')?.click();
+    // Use the main panel's WebSocket to send
+    const mp = chatPanels.get('main');
+    if (mp?.ws && mp.ws.readyState === WebSocket.OPEN) {
+      // Add user message to mobile view
+      const userEl = document.createElement('div');
+      userEl.className = 'chat-msg chat-msg-user';
+      userEl.textContent = text;
+      msgs.appendChild(userEl);
+      msgs.scrollTop = msgs.scrollHeight;
+      // Send via main panel
+      const mainInput = document.getElementById('chat-input');
+      if (mainInput) {
+        mainInput.value = text;
+        document.getElementById('chat-send')?.click();
+      }
+    } else {
+      // No WebSocket — show error
+      const errEl = document.createElement('div');
+      errEl.style.cssText = 'padding:8px 12px;color:var(--text-muted);font-size:13px';
+      errEl.textContent = 'Connecting to chat...';
+      msgs.appendChild(errEl);
+      // Try to init chat
+      const mainInput = document.getElementById('chat-input');
+      if (mainInput) {
+        mainInput.value = text;
+        document.getElementById('chat-send')?.click();
+      }
     }
   };
   inputBar.appendChild(textarea);
@@ -8973,6 +9012,26 @@ function initMobileChat() {
   view.appendChild(scopeChip);
   view.appendChild(msgs);
   view.appendChild(inputBar);
+
+  // Observe main panel messages and mirror to mobile
+  if (mainMsgs) {
+    const observer = new MutationObserver(() => {
+      // Sync new messages
+      while (msgs.children.length > mainMsgs.children.length + 1) {
+        // +1 for scope chip — don't remove that
+      }
+      // Simple approach: copy last message if different
+      const lastMain = mainMsgs.lastElementChild;
+      if (lastMain) {
+        const lastMobile = msgs.lastElementChild;
+        if (!lastMobile || lastMobile.className !== lastMain.className || lastMobile.innerHTML !== lastMain.innerHTML) {
+          msgs.appendChild(lastMain.cloneNode(true));
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+      }
+    });
+    observer.observe(mainMsgs, { childList: true, subtree: true });
+  }
 
   // iOS keyboard handling
   if (window.visualViewport) {
@@ -8992,7 +9051,7 @@ function renderMobileMore() {
     ...(!isVM ? [{ label: 'Tags', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>', action: 'switchView("tags")' }] : []),
     ...(!isVM ? [{ label: 'Health', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>', action: 'switchView("health")' }] : []),
     { label: 'Settings', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>', action: 'openFullSettings()' },
-    { label: 'Theme', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', action: 'openAppearancePalette()' },
+    { label: 'Theme', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', action: 'openFullSettings("appearance")' },
   ];
 
   view.innerHTML = `<ul class="mobile-more-list">${items.map(i =>
