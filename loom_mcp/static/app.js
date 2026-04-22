@@ -5066,17 +5066,21 @@ function initChat() {
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data?.prompt) return;
-            // Show in a modal
+            // Clean up internal markers and format for display
+            let promptText = data.prompt
+              .replace(/__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__/g, '── dynamic context below ──')
+              .replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const modal = document.createElement('div');
             modal.className = 'fs-panel';
-            modal.innerHTML = `<div class="fs-card" style="width:min(700px,90vw);height:min(500px,80vh)">
-              <div class="fs-content" style="overflow:hidden">
+            modal.innerHTML = `<div class="fs-card" style="width:min(800px,92vw);height:min(600px,85vh)">
+              <div class="fs-content" style="overflow:hidden;display:flex;flex-direction:column">
                 <div class="fs-content-header">
-                  <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context</h2></div>
+                  <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context Sent to Agent</h2>
+                  <p class="fs-content-desc">This is the exact system prompt assembled for the current scope.</p></div>
                   <button class="fs-close" onclick="this.closest('.fs-panel').remove()">✕</button>
                 </div>
-                <div class="fs-content-body" style="overflow-y:auto;padding:16px">
-                  <pre style="white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11px;line-height:1.5;color:var(--text)">${data.prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+                <div class="fs-content-body" style="flex:1;overflow-y:auto;padding:16px 24px">
+                  <pre style="white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--text)">${promptText}</pre>
                 </div>
               </div>
             </div>`;
