@@ -2510,52 +2510,8 @@ function renderChatTranscript(container, rawContent) {
     const parts = text.split(/(<details>[\s\S]*?<\/details>)/g);
     for (const part of parts) {
       if (part.startsWith('<details>')) {
-        // Parse the details block into a collapsible section
-        const summaryMatch = part.match(/<summary>([\s\S]*?)<\/summary>/);
-        const summary = summaryMatch ? summaryMatch[1].trim() : 'Details';
-        let body = part.replace(/<details>\s*<summary>[\s\S]*?<\/summary>/, '').replace(/<\/details>\s*$/, '').trim();
-
-        // Clean up raw Python dict strings from subagent results
-        // These are single long lines like: - {'type': 'text', 'text': '## Summary\n\nThe...'}
-        body = body.split('\n').map(line => {
-          const dictMatch = line.match(/^-?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
-          if (dictMatch) {
-            // Extract text content — remove trailing '} or "}
-            let text = dictMatch[1].replace(/['"]\s*\}\s*$/, '');
-            return text.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-          }
-          return line;
-        }).join('\n');
-
-        // Format tool entries: "- **ToolName** — desc\n  - output" → cleaner display
-        body = body.replace(/^- \*\*(\w+)\*\* — (.+)\n((?:  - .+\n?)*)/gm, (_, tool, desc, output) => {
-          const cleanOutput = output.replace(/^  - /gm, '').trim();
-          if (cleanOutput) {
-            return `**${tool}**: ${desc}\n\`\`\`\n${cleanOutput}\n\`\`\`\n`;
-          }
-          return `**${tool}**: ${desc}\n`;
-        });
-
-        // Clean up line-numbered output (1\tcontent → just content)
-        body = body.replace(/^\d+\t/gm, '');
-
-        const group = document.createElement('div');
-        group.className = 'chat-activity-group';
-        const header = document.createElement('div');
-        header.className = 'chat-activity-header';
-        header.innerHTML = `<span class="activity-toggle">▶</span> <span class="activity-summary">${escapeHtml(summary)}</span>`;
-        const bodyEl = document.createElement('div');
-        bodyEl.className = 'chat-activity-body';
-        bodyEl.innerHTML = marked.parse(body);
-
-        header.onclick = () => {
-          bodyEl.classList.toggle('open');
-          header.querySelector('.activity-toggle').textContent = bodyEl.classList.contains('open') ? '▼' : '▶';
-        };
-
-        group.appendChild(header);
-        group.appendChild(bodyEl);
-        contentEl.appendChild(group);
+        // Use shared buildDetailsElement for identical DOM to live chat
+        contentEl.appendChild(buildDetailsElement(part));
       } else if (part.trim()) {
         // Clean raw Python dicts from subagent results (can appear outside <details>)
         let cleaned = part.trim();
@@ -6926,7 +6882,7 @@ function buildDetailsElement(html) {
     wrapper.className = 'chat-thinking-wrapper';
     const header = document.createElement('div');
     header.className = 'chat-thinking-header';
-    header.innerHTML = `<span class="chat-thinking-toggle">▶</span> ${escapeHtml(summary)}`;
+    header.innerHTML = `<span class="chat-thinking-toggle">▶</span> <span class="pondering">${escapeHtml(summary)}</span>`;
     const body = document.createElement('div');
     body.className = 'chat-thinking-body';
     body.textContent = content;
@@ -6980,14 +6936,26 @@ function buildDetailsElement(html) {
         const toolResult = document.createElement('div');
         toolResult.className = 'chat-tool-result';
 
-        // Collect indented result lines
-        let resultText = '';
-        while (i + 1 < lines.length && /^\s{2,}[-*]?\s*/.test(lines[i + 1]) && !lines[i + 1].trim().startsWith('**')) {
+        // Collect ALL result lines until next tool entry, dict, or blank gap before tool
+        let resultLines = [];
+        while (i + 1 < lines.length) {
+          const next = lines[i + 1];
+          const nextTrimmed = next.trim();
+          // Stop at next tool entry
+          if (nextTrimmed.match(/^[-*]\s*\*\*\w+\*\*\s*[—–-]/)) break;
+          // Stop at subagent dict
+          if (nextTrimmed.match(/^[-*]?\s*\{'type'/)) break;
+          // Stop at blank followed by tool entry
+          if (nextTrimmed === '' && i + 2 < lines.length && lines[i + 2].trim().match(/^[-*]\s*\*\*\w+\*\*/)) break;
           i++;
-          resultText += lines[i].trim().replace(/^[-*]\s*/, '') + '\n';
+          resultLines.push(next.replace(/^\s{0,4}[-*]?\s*/, ''));
         }
-        if (resultText.trim()) {
-          toolResult.textContent = resultText.trim().slice(0, 500);
+        const resultText = resultLines.join('\n').trim();
+        if (resultText) {
+          const pre = document.createElement('pre');
+          pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.4;margin:0;color:var(--text-muted)';
+          pre.textContent = resultText.length > 500 ? resultText.slice(0, 500) + '\n...' : resultText;
+          toolResult.appendChild(pre);
         }
 
         toolEntry.addEventListener('click', (e) => {
