@@ -11,6 +11,13 @@ def auto_commit(loom_root: Path, message: str) -> dict:
     """
     wiki_dir = loom_root / "wiki"
 
+    # Safety: skip if wiki contains symlinks that point outside loom
+    for item in wiki_dir.rglob("*"):
+        if item.is_symlink():
+            target = item.resolve()
+            if not str(target).startswith(str(loom_root.resolve())):
+                return {"committed": False, "reason": f"Symlink escapes loom root: {item}"}
+
     # Stage wiki changes
     subprocess.run(
         ["git", "add", str(wiki_dir)],

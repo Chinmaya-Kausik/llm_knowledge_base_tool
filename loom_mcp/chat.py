@@ -731,6 +731,9 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
         session = sessions.get(session_id, {})
         msg_snapshot = session.setdefault("messages_snapshot", [])
         msg_snapshot.append({"role": "user", "content": prompt})
+        # Cap snapshot to prevent unbounded memory growth
+        if len(msg_snapshot) > 200:
+            msg_snapshot[:] = msg_snapshot[-200:]
 
         await adapter.query(prompt)
 

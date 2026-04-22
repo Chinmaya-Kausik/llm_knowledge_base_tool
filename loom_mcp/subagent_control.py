@@ -152,7 +152,10 @@ class SubagentController:
             try:
                 await asyncio.wait_for(state.pause_event.wait(), timeout=300)
             except asyncio.TimeoutError:
-                pass  # Resume after timeout
+                import logging
+                logging.getLogger("loom.subagent").warning(
+                    "Subagent %s paused for 5 minutes — auto-resuming", state.task_id
+                )
 
             if state.pending_result:
                 result = state.pending_result

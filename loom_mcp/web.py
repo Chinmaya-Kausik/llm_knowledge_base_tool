@@ -1493,7 +1493,7 @@ async def api_mkdir(request: Request):
 
 @app.post("/api/delete")
 async def api_delete(request: Request):
-    """Delete a file or empty folder from the loom."""
+    """Delete a file or folder (including contents) from the loom."""
     body = await request.json()
     rel_path = body.get("path", "")
     if not rel_path:
