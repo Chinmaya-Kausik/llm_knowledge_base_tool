@@ -477,7 +477,7 @@
       _mdbg.push('DOMContentLoaded fired');
       var d=document.createElement('div');
       d.id='mobile-debug';
-      d.style.cssText='position:fixed;bottom:60px;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:11px monospace;padding:8px;z-index:9999;max-height:30vh;overflow:auto;pointer-events:none';
+      d.style.cssText='position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:11px monospace;padding:4px 8px;z-index:9999;max-height:20vh;overflow:auto;pointer-events:none';
       document.body.appendChild(d);
       setInterval(function(){d.textContent=_mdbg.join('\\n');},500);
     });

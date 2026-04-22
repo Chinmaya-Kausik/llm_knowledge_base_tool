@@ -8801,6 +8801,7 @@ var _mobileActive = false;
 var _mobileTab = 'canvas';
 
 function initMobile() {
+  if (typeof _mdbg !== 'undefined') _mdbg.push('initMobile called, isMobile=' + isMobile());
   if (!isMobile()) return;
   _mobileActive = true;
   document.documentElement.setAttribute('data-mobile', '');
@@ -8853,6 +8854,7 @@ function initMobile() {
   shell.appendChild(content);
   shell.appendChild(tabBar);
   document.body.appendChild(shell);
+  if (typeof _mdbg !== 'undefined') _mdbg.push('shell created, tabs=' + tabBar.children.length);
 
   // VisualViewport handler for iOS keyboard
   if (window.visualViewport) {
