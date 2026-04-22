@@ -8825,13 +8825,13 @@ function initMobile() {
   floatControls.innerHTML = `
     <button class="mobile-float-btn" onclick="fitView()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
     <button class="mobile-float-btn" onclick="autoLayout()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>`;
-  content.appendChild(floatControls);
+  if (canvas) canvas.appendChild(floatControls);
 
-  // Mobile breadcrumb
+  // Mobile breadcrumb — inside canvas so it respects canvas top offset
   const bc = document.createElement('div');
   bc.className = 'mobile-breadcrumb';
   bc.id = 'mobile-breadcrumb';
-  content.appendChild(bc);
+  if (canvas) canvas.appendChild(bc);
 
   // Tab bar
   const tabBar = document.createElement('nav');
