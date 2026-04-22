@@ -467,7 +467,7 @@
   </div>
 
   <!-- Mobile: set data-mobile early so CSS hides toolbar before JS loads -->
-  <script>if(window.matchMedia('(max-width:768px)').matches)document.documentElement.setAttribute('data-mobile','');</script>
+  <script>if(window.innerWidth<=768)document.documentElement.setAttribute('data-mobile','');</script>
 
   <script>
   // Theme switcher — dropdown with preview swatches

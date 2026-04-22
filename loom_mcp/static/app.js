@@ -8788,7 +8788,7 @@ function renderKeybindingEditor(container) {
 // ========================================
 // Mobile UI (v2)
 // ========================================
-function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+function isMobile() { return window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches; }
 var _mobileActive = false;
 var _mobileTab = 'canvas';
 
