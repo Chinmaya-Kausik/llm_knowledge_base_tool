@@ -8789,8 +8789,8 @@ function renderKeybindingEditor(container) {
 // Mobile UI
 // ========================================
 function isMobile() { return window.innerWidth <= 768; }
-let _mobileActive = false;
-let _mobileTab = 'canvas';
+var _mobileActive = false;
+var _mobileTab = 'canvas';
 
 function initMobile() {
   function updateMobileMode() {

@@ -484,12 +484,11 @@
             if(view) view.style.display = t==='chat' ? 'flex' : '';
           }
           // Delegate to app.js handler if loaded
-          if(typeof switchMobileTab==='function'){
-            switchMobileTab(t);
-          } else {
-            // app.js not loaded — show error in the view
+          try {
+            if(typeof switchMobileTab==='function') switchMobileTab(t);
+          } catch(e) {
             var target = t==='canvas' ? null : document.getElementById('mobile-'+t+'-view');
-            if(target && !target.innerHTML.trim()) target.innerHTML='<div style="padding:20px;color:#888">Loading app...</div>';
+            if(target) target.innerHTML='<div style="padding:20px;color:red;font-size:12px">'+e.message+'</div>';
           }
         });
       });
