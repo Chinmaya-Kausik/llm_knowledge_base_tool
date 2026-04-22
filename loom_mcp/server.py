@@ -4,6 +4,11 @@ import json
 import os
 from pathlib import Path
 
+
+def _shell_escape(s: str) -> str:
+    """Escape a string for safe use in shell commands."""
+    return "'" + s.replace("'", "'\\''") + "'"
+
 from mcp.server.fastmcp import FastMCP
 
 # Resolve loom root: env var > config file > default
@@ -512,7 +517,7 @@ def vm_glob(vm_id: str, pattern: str, path: str = ".") -> str:
     if not vm:
         return json.dumps({"error": f"VM '{vm_id}' not found"})
     base = path if path != "." else vm.get("sync_dir", "~")
-    cmd = f"find {base} -path '*{pattern}' -not -path '*/.git/*' 2>/dev/null | head -200"
+    cmd = f"find {_shell_escape(base)} -path {_shell_escape('*' + pattern)} -not -path '*/.git/*' 2>/dev/null | head -200"
     result = asyncio.get_event_loop().run_until_complete(
         ssh_pool.exec_command(vm, cmd, timeout=15)
     )
@@ -535,10 +540,12 @@ def vm_grep(vm_id: str, pattern: str, path: str = ".", file_glob: str = "") -> s
     if not vm:
         return json.dumps({"error": f"VM '{vm_id}' not found"})
     base = path if path != "." else vm.get("sync_dir", "~")
-    glob_arg = f"--include='{file_glob}'" if file_glob else ""
+    glob_arg = f"--include={_shell_escape(file_glob)}" if file_glob else ""
+    escaped_pattern = _shell_escape(pattern)
+    escaped_base = _shell_escape(base)
     # Try ripgrep first, fall back to grep
-    cmd = (f"(command -v rg >/dev/null && rg -n --no-heading {glob_arg} -- '{pattern}' {base} 2>/dev/null "
-           f"|| grep -rn {glob_arg} -- '{pattern}' {base} 2>/dev/null) | head -100")
+    cmd = (f"(command -v rg >/dev/null && rg -n --no-heading {glob_arg} -- {escaped_pattern} {escaped_base} 2>/dev/null "
+           f"|| grep -rn {glob_arg} -- {escaped_pattern} {escaped_base} 2>/dev/null) | head -100")
     result = asyncio.get_event_loop().run_until_complete(
         ssh_pool.exec_command(vm, cmd, timeout=15)
     )

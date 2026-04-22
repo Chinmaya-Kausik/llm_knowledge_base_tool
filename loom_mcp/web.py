@@ -1895,7 +1895,7 @@ async def api_vm_search(vm_id: str, q: str, mode: str = "content", file_glob: st
                 })
 
     if mode in ("name", "both"):
-        cmd = f"find {base} -iname '*{q}*' -not -path '*/.git/*' 2>/dev/null | head -50"
+        cmd = f"find {base} -iname {_shell_escape('*' + q + '*')} -not -path '*/.git/*' 2>/dev/null | head -50"
         r = await ssh_pool.exec_command(vm, cmd, timeout=10)
         for line in r["stdout"].splitlines():
             line = line.strip()
