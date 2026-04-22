@@ -2502,52 +2502,52 @@ function renderChatTranscript(container, rawContent) {
     const text = section.lines.join('\n').trim();
     if (!text) continue;
 
-    if (section.role === 'user') {
-      // User messages: show as-is with the > prefix style
-      const textEl = document.createElement('div');
-      textEl.className = 'chat-msg-content';
-      textEl.textContent = text.replace(/^>\s*/gm, '');
-      msgEl.appendChild(textEl);
-    } else {
-      // Assistant messages: render markdown, preserve <details> blocks
-      const contentEl = document.createElement('div');
-      contentEl.className = 'chat-msg-content chat-text';
+    // Both user and assistant messages can contain <details> blocks
+    const contentEl = document.createElement('div');
+    contentEl.className = 'chat-msg-content' + (section.role === 'assistant' ? ' chat-text' : '');
 
-      // Split into details blocks and regular text
-      const parts = text.split(/(<details[\s\S]*?<\/details>)/g);
-      for (const part of parts) {
-        if (part.startsWith('<details')) {
-          // Parse the details block
-          const summaryMatch = part.match(/<summary>(.*?)<\/summary>/);
-          const summary = summaryMatch ? summaryMatch[1] : 'Details';
-          const body = part.replace(/<details>[\s\S]*?<\/summary>/, '').replace(/<\/details>$/, '').trim();
+    // Split into details blocks and regular text
+    const parts = text.split(/(<details>[\s\S]*?<\/details>)/g);
+    for (const part of parts) {
+      if (part.startsWith('<details>')) {
+        // Parse the details block into a collapsible section
+        const summaryMatch = part.match(/<summary>([\s\S]*?)<\/summary>/);
+        const summary = summaryMatch ? summaryMatch[1].trim() : 'Details';
+        const body = part.replace(/<details>\s*<summary>[\s\S]*?<\/summary>/, '').replace(/<\/details>\s*$/, '').trim();
 
-          const group = document.createElement('div');
-          group.className = 'chat-activity-group';
-          const header = document.createElement('div');
-          header.className = 'chat-activity-header';
-          header.innerHTML = `<span class="activity-toggle">▶</span> <span class="activity-summary">${escapeHtml(summary)}</span>`;
-          const bodyEl = document.createElement('div');
-          bodyEl.className = 'chat-activity-body';
-          bodyEl.innerHTML = marked.parse(body);
+        const group = document.createElement('div');
+        group.className = 'chat-activity-group';
+        const header = document.createElement('div');
+        header.className = 'chat-activity-header';
+        header.innerHTML = `<span class="activity-toggle">▶</span> <span class="activity-summary">${escapeHtml(summary)}</span>`;
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'chat-activity-body';
+        bodyEl.innerHTML = marked.parse(body);
 
-          header.onclick = () => {
-            bodyEl.classList.toggle('open');
-            header.querySelector('.activity-toggle').textContent = bodyEl.classList.contains('open') ? '▼' : '▶';
-          };
+        header.onclick = () => {
+          bodyEl.classList.toggle('open');
+          header.querySelector('.activity-toggle').textContent = bodyEl.classList.contains('open') ? '▼' : '▶';
+        };
 
-          group.appendChild(header);
-          group.appendChild(bodyEl);
-          contentEl.appendChild(group);
-        } else if (part.trim()) {
-          // Regular markdown text
+        group.appendChild(header);
+        group.appendChild(bodyEl);
+        contentEl.appendChild(group);
+      } else if (part.trim()) {
+        const cleaned = section.role === 'user' ? part.trim().replace(/^>\s?/gm, '') : part.trim();
+        if (section.role === 'user') {
+          // User text: plain text, no markdown rendering
           const textBlock = document.createElement('div');
-          textBlock.innerHTML = marked.parse(part.trim());
+          textBlock.textContent = cleaned;
+          contentEl.appendChild(textBlock);
+        } else {
+          // Assistant text: render markdown
+          const textBlock = document.createElement('div');
+          textBlock.innerHTML = marked.parse(cleaned);
           contentEl.appendChild(textBlock);
         }
       }
-      msgEl.appendChild(contentEl);
     }
+    msgEl.appendChild(contentEl);
 
     container.appendChild(msgEl);
   }
