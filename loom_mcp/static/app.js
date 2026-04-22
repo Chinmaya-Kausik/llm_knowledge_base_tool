@@ -8980,10 +8980,11 @@ function renderMobileFiles(container) {
 function renderMobileChat(container) {
   const scopeLevel = getSmartContextDefault();
   container.innerHTML = `
-    <div class="mc-scope-bar">
+    <div class="mc-header">
+      <span class="mc-header-title">Chat</span>
       <span class="mc-scope-chip">
         <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
-        <span class="ctx-scope">${scopeLevel}</span>
+        ${scopeLevel}
       </span>
     </div>
     <div class="mc-messages" id="mc-messages"></div>

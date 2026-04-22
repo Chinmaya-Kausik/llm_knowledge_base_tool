@@ -2103,7 +2103,8 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 }
 .mobile-content {
   flex: 1; overflow: hidden; position: relative;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  /* max() ensures at least 52px even when safe-area returns 0 (HTTP in Safari) */
+  padding-top: max(env(safe-area-inset-top, 0px), 52px);
 }
 .mobile-content #canvas-container {
   position: absolute; inset: 0;
@@ -2137,19 +2138,23 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 
 /* --- Files view --- */
 .mf-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 16px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 16px;
   background: var(--bg-surface);
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   position: sticky; top: 0; z-index: 10;
   border-bottom: 0.5px solid var(--border-soft);
+  min-height: 44px;
 }
 .mf-back {
   background: none; border: none; color: var(--accent);
-  font-size: 20px; padding: 0 8px; min-width: 44px; min-height: 44px;
+  font-size: 22px; padding: 0 4px; min-width: 44px; min-height: 44px;
   display: flex; align-items: center;
 }
-.mf-title { font-weight: 600; font-size: 17px; color: var(--text); flex: 1; }
+.mf-title {
+  font-weight: 700; font-size: 28px; color: var(--text); flex: 1;
+  letter-spacing: -0.02em;
+}
 .mf-list { margin: 0; padding: 0; }
 .mf-item {
   display: flex; align-items: center; gap: 14px;
@@ -2167,28 +2172,34 @@ html[data-mobile] button { touch-action: manipulation; -webkit-user-select: none
 
 /* --- Chat view --- */
 .mobile-chat { display: flex !important; flex-direction: column; }
-.mc-scope-bar {
-  padding: 8px 16px;
+.mc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
   border-bottom: 0.5px solid var(--border-soft);
   background: var(--bg-surface);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   flex-shrink: 0;
+}
+.mc-header-title {
+  font-weight: 700; font-size: 28px; color: var(--text);
+  letter-spacing: -0.02em;
 }
 .mc-scope-chip {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; color: var(--text-muted);
   background: var(--bg-hover); border-radius: 12px;
-  padding: 3px 10px; cursor: pointer;
+  padding: 4px 12px; cursor: pointer;
 }
 .mc-scope-chip svg { opacity: 0.6; }
 .mc-messages {
   flex: 1; overflow-y: auto; overscroll-behavior: contain;
-  padding: 12px 16px;
+  padding: 16px;
   display: flex; flex-direction: column;
-  justify-content: flex-end; /* messages stick to bottom */
+  justify-content: flex-end;
 }
 .mc-messages:empty::after {
   content: 'Start a conversation...';
-  color: var(--text-dim); font-size: 14px;
+  color: var(--text-dim); font-size: 15px;
   align-self: center; margin-top: 40%;
 }
 .mc-input-bar {
