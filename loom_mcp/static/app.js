@@ -2520,6 +2520,18 @@ function renderChatTranscript(container, rawContent) {
           return text.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         });
 
+        // Format tool entries: "- **ToolName** — desc\n  - output" → cleaner display
+        body = body.replace(/^- \*\*(\w+)\*\* — (.+)\n((?:  - .+\n?)*)/gm, (_, tool, desc, output) => {
+          const cleanOutput = output.replace(/^  - /gm, '').trim();
+          if (cleanOutput) {
+            return `**${tool}**: ${desc}\n\`\`\`\n${cleanOutput}\n\`\`\`\n`;
+          }
+          return `**${tool}**: ${desc}\n`;
+        });
+
+        // Clean up line-numbered output (1\tcontent → just content)
+        body = body.replace(/^\d+\t/gm, '');
+
         const group = document.createElement('div');
         group.className = 'chat-activity-group';
         const header = document.createElement('div');
