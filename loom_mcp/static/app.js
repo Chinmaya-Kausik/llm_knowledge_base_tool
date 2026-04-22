@@ -4021,7 +4021,11 @@ function dockPanel(panelId, action) {
     bringToFront(chatPanelEl);
   }
 
-  console.log('[dockPanel] action:', action, 'classes:', [...chatPanelEl.classList], 'style:', chatPanelEl.style.cssText, 'offsetW:', chatPanelEl.offsetWidth, 'offsetH:', chatPanelEl.offsetHeight, 'display:', getComputedStyle(chatPanelEl).display, 'position:', getComputedStyle(chatPanelEl).position, 'zIndex:', getComputedStyle(chatPanelEl).zIndex);
+  const _computed = getComputedStyle(chatPanelEl);
+  console.log('[dockPanel] action:', action, 'expandedCard:', !!expandedCard, 'topZIndex:', topZIndex,
+    'inline-z:', chatPanelEl.style.getPropertyValue('z-index'),
+    'computed-z:', _computed.zIndex, 'position:', _computed.position,
+    'w:', chatPanelEl.offsetWidth, 'h:', chatPanelEl.offsetHeight);
 
   if (!chatWs || chatWs.readyState !== WebSocket.OPEN) connectChat();
 }
