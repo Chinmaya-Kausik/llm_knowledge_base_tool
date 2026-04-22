@@ -9020,18 +9020,23 @@ function renderMobileFiles(container) {
 }
 
 // --- Mobile Chat ---
+var _mcWs = null;
+var _mcSessionId = null;
+var _mcResponseEl = null;
+var _mcResponseText = '';
+
 function renderMobileChat(container) {
   const scopeLevel = getSmartContextDefault();
   container.innerHTML = `
     <div class="mc-header">
       <span class="mc-header-title">Chat</span>
-      <span class="mc-scope-chip">
+      <span class="mc-scope-chip" id="mc-scope-chip">
         <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="4"/><path d="M6 3V6L8 7.5"/></svg>
         ${scopeLevel}
       </span>
     </div>
     <div class="mc-messages" id="mc-messages"></div>
-    <div class="mc-input-bar">
+    <div class="mc-input-bar" id="mc-input-bar">
       <textarea class="mc-input" id="mc-input" placeholder="Message..." rows="1"></textarea>
       <button class="mc-send" id="mc-send">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -9042,10 +9047,34 @@ function renderMobileChat(container) {
   const sendBtn = container.querySelector('#mc-send');
   const msgsEl = container.querySelector('#mc-messages');
 
+  // Auto-grow textarea
   input.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   });
+
+  // Connect WebSocket for mobile chat
+  if (!_mcWs || _mcWs.readyState !== WebSocket.OPEN) {
+    _mcSessionId = crypto.randomUUID();
+    _mcWs = new WebSocket(getWsUrl());
+    _mcWs.onopen = () => {
+      _mcWs.send(JSON.stringify({ type: 'init', session_id: _mcSessionId }));
+      if (typeof _mdbg !== 'undefined') _mdbg.push('WS connected');
+    };
+    _mcWs.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        handleMobileChatMessage(msg, msgsEl);
+      } catch {}
+    };
+    _mcWs.onerror = () => {
+      if (typeof _mdbg !== 'undefined') _mdbg.push('WS error');
+    };
+    _mcWs.onclose = () => {
+      if (typeof _mdbg !== 'undefined') _mdbg.push('WS closed');
+      _mcWs = null;
+    };
+  }
 
   sendBtn.onclick = () => {
     const text = input.value.trim();
@@ -9060,17 +9089,67 @@ function renderMobileChat(container) {
     msgsEl.appendChild(userEl);
     msgsEl.scrollTop = msgsEl.scrollHeight;
 
-    // Send via main panel's WebSocket
-    const mainInput = document.getElementById('chat-input');
-    if (mainInput) {
-      mainInput.value = text;
-      document.getElementById('chat-send')?.click();
+    // Send via WebSocket
+    if (_mcWs && _mcWs.readyState === WebSocket.OPEN) {
+      const level = currentLevel();
+      _mcWs.send(JSON.stringify({
+        type: 'message',
+        text,
+        context_level: scopeLevel,
+        context: { page_path: level.parentPath || '' },
+      }));
+      // Show thinking indicator
+      _mcResponseEl = document.createElement('div');
+      _mcResponseEl.className = 'chat-msg chat-msg-assistant';
+      _mcResponseEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Thinking...</span>';
+      msgsEl.appendChild(_mcResponseEl);
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+      _mcResponseText = '';
     }
   };
 
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
   };
+}
+
+function handleMobileChatMessage(msg, msgsEl) {
+  if (!msgsEl) return;
+  switch (msg.type) {
+    case 'text':
+      if (_mcResponseEl) {
+        _mcResponseText += msg.content || '';
+        _mcResponseEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(_mcResponseText) : _mcResponseText.replace(/\n/g, '<br>');
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+      break;
+    case 'thinking':
+      // Update thinking indicator
+      if (_mcResponseEl && _mcResponseText === '') {
+        _mcResponseEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px;font-style:italic">Thinking...</span>';
+      }
+      break;
+    case 'result':
+      if (msg.content && _mcResponseEl) {
+        _mcResponseEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(msg.content) : msg.content.replace(/\n/g, '<br>');
+      }
+      _mcResponseEl = null;
+      _mcResponseText = '';
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+      break;
+    case 'done':
+    case 'stopped':
+      _mcResponseEl = null;
+      _mcResponseText = '';
+      break;
+    case 'error':
+      if (_mcResponseEl) {
+        _mcResponseEl.innerHTML = `<span style="color:var(--red)">${msg.message || 'Error'}</span>`;
+      }
+      _mcResponseEl = null;
+      _mcResponseText = '';
+      break;
+  }
 }
 
 // --- Mobile More ---
