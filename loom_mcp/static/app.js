@@ -2559,22 +2559,26 @@ function renderChatTranscript(container, rawContent) {
       } else if (part.trim()) {
         // Clean raw Python dicts from subagent results (can appear outside <details>)
         let cleaned = part.trim();
+        let hadDict = false;
         cleaned = cleaned.split('\n').map(line => {
           const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
           if (dm) {
+            hadDict = true;
             let t = dm[1].replace(/['"]\s*\}\s*$/, '');
             return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
           }
           return line;
         }).join('\n');
 
-        if (section.role === 'user') {
+        if (section.role === 'user' && !hadDict) {
           cleaned = cleaned.replace(/^[>›]\s?/gm, '').trim();
           const textBlock = document.createElement('div');
           textBlock.textContent = cleaned;
           contentEl.appendChild(textBlock);
         } else {
+          // Assistant text OR cleaned subagent results: render as markdown
           const textBlock = document.createElement('div');
+          textBlock.className = hadDict ? 'chat-text' : '';
           textBlock.innerHTML = marked.parse(cleaned);
           contentEl.appendChild(textBlock);
         }
