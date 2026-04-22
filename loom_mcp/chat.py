@@ -13,6 +13,27 @@ from loom_mcp.lib.pages import get_page_content, get_page_metadata
 # Active sessions: session_id → state
 sessions: dict[str, dict[str, Any]] = {}
 
+# Session TTL: clean up sessions inactive for more than 1 hour
+_SESSION_TTL = 3600
+
+
+def _cleanup_stale_sessions():
+    """Remove sessions that haven't been active for > TTL seconds."""
+    import time
+    now = time.time()
+    stale = [sid for sid, s in sessions.items()
+             if now - s.get("_last_active", 0) > _SESSION_TTL
+             and sid != "__context_preview__"]
+    for sid in stale:
+        adapter = sessions[sid].get("adapter")
+        if adapter:
+            try:
+                import asyncio
+                asyncio.get_event_loop().create_task(adapter.disconnect())
+            except Exception:
+                pass
+        del sessions[sid]
+
 
 async def ws_chat(websocket: WebSocket, loom_root: Path):
     """WebSocket endpoint bridging browser ↔ Claude Code subprocess.
@@ -46,8 +67,11 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
 
             if msg_type == "init":
                 session_id = msg.get("session_id") or str(uuid.uuid4())
+                import time as _time
+                _cleanup_stale_sessions()
                 sessions[session_id] = {
                     "page_path": msg.get("page_path"),
+                    "_last_active": _time.time(),
                     "history": [],
                     "model": msg.get("model"),
                     "agent_type": msg.get("agent", "claude-code"),
@@ -65,6 +89,10 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
                 if not session_id:
                     await websocket.send_json({"type": "error", "message": "Not initialized"})
                     continue
+                # Mark session active
+                if session_id in sessions:
+                    import time as _time
+                    sessions[session_id]["_last_active"] = _time.time()
 
                 text = msg.get("text", "")
                 if not text:

@@ -207,9 +207,9 @@ class TestPass6CardPolish:
 # -----------------------------------------------------------------------
 
 class TestPass7Toolbar:
-    def test_theme_dropdown_hidden(self, css):
-        assert '#theme-dropdown-wrap' in css
-        assert 'display: none' in css
+    def test_theme_dropdown_removed(self, html):
+        """Theme dropdown HTML should be removed — use Appearance palette instead."""
+        assert 'id="theme-dropdown-wrap"' not in html
 
     def test_icon_buttons_28px(self, css):
         icon_btn = css[css.find('.tb-icon-btn'):]

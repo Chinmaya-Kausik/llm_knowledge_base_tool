@@ -356,6 +356,7 @@ async function initVMGraphView() {
 
   try {
     graphData = await api.vmGraph(currentTarget.id);
+    _rebuildNodeMap();
     if (!graphData || graphData.nodes.length === 0) {
       world.innerHTML = '<div class="empty-state" style="position:absolute;left:50px;top:50px;">No files on VM.</div>';
       return;
@@ -1088,7 +1089,7 @@ marked.use({ extensions: [{
 }]});
 
 // --- State ---
-let graphData = null;       // Full graph from API
+let graphData = null;       // Full graph from API — use nodeById() for O(1) lookup
 let layoutData = {};        // Saved card positions
 let currentTransform = { x:0, y:0, k:1 };
 let cardElements = new Map();
@@ -1127,7 +1128,15 @@ function loadCanvasStack() {
 }
 
 // --- Node helpers ---
-function nodeById(id) { return graphData?.nodes.find(n => n.data.id === id)?.data; }
+// O(1) node lookup Map — rebuilt when graphData changes
+let _nodeMap = new Map();
+function _rebuildNodeMap() {
+  _nodeMap.clear();
+  if (graphData?.nodes) {
+    for (const n of graphData.nodes) _nodeMap.set(n.data.id, n.data);
+  }
+}
+function nodeById(id) { return _nodeMap.get(id) || null; }
 
 function getChildIds(parentPath) {
   if (!graphData) return [];
@@ -1838,6 +1847,9 @@ function renderCurrentLevel() {
   const world = document.getElementById('world');
   world.innerHTML = '';
   cardElements.clear();
+  selectedCards.clear();
+  // Reset z-index counter to prevent inflation
+  topZIndex = 200;
 
   if (level.parentPath === null) {
     renderRootCanvas(world);
@@ -3028,6 +3040,7 @@ async function refreshFileTree() {
   }
   // Refresh graph data and re-render canvas
   graphData = await api.graph();
+  _rebuildNodeMap();
   const newIds = graphData.nodes.map(n => n.data.id).filter(id => !cardMeta.has(id));
   if (newIds.length > 0) {
     try {
@@ -3982,6 +3995,7 @@ function dockPanel(panelId, action) {
     // Transfer docking panel's state + label to main
     mainP.ws = panel.ws;
     mainP.sessionId = panel.sessionId;
+    sessionStorage.setItem('loom-chat-session', panel.sessionId);
     mainP.messages = [...panel.messages];
     mainP.model = panel.model;
     mainP.contextLevel = panel.contextLevel;
