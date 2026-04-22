@@ -107,7 +107,7 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
             elif msg_type == "permission_response":
                 # Browser responded to a permission prompt
                 if session_id:
-                    resolve_permission(session_id, msg.get("decision", "deny"))
+                    resolve_permission(session_id, msg.get("decision", "deny"), msg.get("perm_id", ""))
 
             elif msg_type == "set_permissions":
                 # Browser sends permission rules: {category: "allow"|"ask"|"deny"}
@@ -435,7 +435,7 @@ def _location_block_adaptive(loom_root: Path, page_path: str | None, context_lev
         return None
 
     # VM context — page_path starts with "vm:"
-    if page_path.startswith("vm:"):
+    if page_path and page_path.startswith("vm:"):
         vm_id = page_path[3:]
         try:
             from loom_mcp.vm.config import get_vm
@@ -555,7 +555,7 @@ def _map_tool_to_category(tool_name: str) -> str:
         return "shell"
     if tool_name.startswith("mcp__"):
         return "mcp_tools"
-    return "file_read"  # Default: treat unknown tools as read
+    return "unknown"  # Default: unknown tools treated as "ask" when rules active
 
 
 def _make_permission_handler(session_id: str, websocket: WebSocket):
@@ -579,33 +579,39 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         if tool_name == "Bash":
             cmd = tool_input.get("command", "")
             import re
-            if re.search(r'\brm\b', cmd) or any(
-                p in cmd for p in [
-                    "git push", "git reset --hard", "git clean", "git branch -D",
-                    "git push --force",
-                ]
-            ):
+            destructive_patterns = [
+                r'\brm\s+-', r'\brm\b.*-rf', r'\bsudo\b', r'\bchmod\b', r'\bchown\b',
+                r'\bdd\b\s+', r'\bmkfs\b', r'>\s*/', r'>>\s*/',
+                r'git\s+push', r'git\s+reset\s+--hard', r'git\s+clean',
+                r'git\s+branch\s+-[dD]', r'git\s+push\s+--force',
+            ]
+            if any(re.search(p, cmd) for p in destructive_patterns):
                 category = "destructive_git"
 
-        rule = rules.get(category, "allow")
+        # Unknown tools default to "ask" when any rules are active
+        default_rule = "ask" if category == "unknown" and rules else "allow"
+        rule = rules.get(category, default_rule)
 
         if rule == "allow":
             return PermissionResultAllow()
         if rule == "deny":
             return PermissionResultDeny(message=f"Denied by user permission settings ({category})")
 
-        # rule == "ask": forward to browser and wait for response
+        # rule == "ask" (or "unknown"): forward to browser and wait for response
         try:
+            import uuid as _uuid
+            perm_id = str(_uuid.uuid4())[:8]
             # Send permission prompt to browser
             await websocket.send_json({
                 "type": "permission_request",
                 "tool": tool_name,
                 "input": {k: str(v) for k, v in tool_input.items()},
                 "category": category,
+                "perm_id": perm_id,
             })
             # Wait for browser response (with timeout)
             response = await asyncio.wait_for(
-                _wait_for_permission_response(session_id),
+                _wait_for_permission_response(session_id, perm_id),
                 timeout=120,
             )
             if response == "allow":
@@ -614,29 +620,37 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         except asyncio.TimeoutError:
             return PermissionResultDeny(message="Permission request timed out")
         except Exception:
-            return PermissionResultAllow()  # Fail open on errors
+            return PermissionResultDeny(message="Permission check failed — denied for safety")
 
     return can_use_tool
 
 
-# Pending permission responses: session_id → asyncio.Future
-_permission_futures: dict[str, asyncio.Future] = {}
+# Pending permission responses: (session_id, perm_id) → asyncio.Future
+_permission_futures: dict[tuple[str, str], asyncio.Future] = {}
 
 
-async def _wait_for_permission_response(session_id: str) -> str:
+async def _wait_for_permission_response(session_id: str, perm_id: str) -> str:
     """Wait for a permission response from the browser."""
     loop = asyncio.get_event_loop()
     future: asyncio.Future[str] = loop.create_future()
-    _permission_futures[session_id] = future
+    _permission_futures[(session_id, perm_id)] = future
     try:
         return await future
     finally:
-        _permission_futures.pop(session_id, None)
+        _permission_futures.pop((session_id, perm_id), None)
 
 
-def resolve_permission(session_id: str, decision: str) -> None:
+def resolve_permission(session_id: str, decision: str, perm_id: str = "") -> None:
     """Called when the browser sends a permission response."""
-    future = _permission_futures.get(session_id)
+    # Try exact match first, then fall back to session-only match for backward compat
+    key = (session_id, perm_id)
+    future = _permission_futures.get(key)
+    if not future:
+        # Backward compat: match any pending future for this session
+        for k, f in _permission_futures.items():
+            if k[0] == session_id and not f.done():
+                future = f
+                break
     if future and not future.done():
         future.set_result(decision)
 

@@ -6608,6 +6608,7 @@ function handleChatEvent(msg) {
       const promptEl = document.createElement('div');
       promptEl.className = 'chat-permission-prompt';
       const toolName = msg.tool || 'unknown';
+      const permId = msg.perm_id || '';
       const inputSummary = Object.entries(msg.input || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
       promptEl.innerHTML = `
         <div class="perm-label">Claude wants to use: <strong>${escapeHtml(toolName)}</strong></div>
@@ -6640,7 +6641,7 @@ function handleChatEvent(msg) {
       function resolvePermission(decision) {
         const ws = activePanel?.ws || chatWs;
         if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'permission_response', decision }));
+          ws.send(JSON.stringify({ type: 'permission_response', decision, perm_id: permId }));
         }
         // Replace with compact tool-entry-style line
         const label = decision === 'allow' ? 'Allowed' : 'Denied';
