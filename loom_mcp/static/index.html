@@ -466,6 +466,9 @@
     <button id="selection-ask-btn">Chat with Claude</button>
   </div>
 
+  <!-- Set mobile mode immediately before JS loads -->
+  <script>if(window.innerWidth<=768)document.documentElement.setAttribute('data-mobile','');</script>
+
   <!-- Mobile bottom tab bar (hidden on desktop via CSS) -->
   <nav class="mobile-tab-bar" id="mobile-tab-bar">
     <button class="mtab active" data-tab="canvas">

@@ -2390,10 +2390,17 @@ async def auth_and_cache(request: Request, call_next):
     return response
 
 
+_SERVER_START_TS = str(int(__import__('time').time()))
+
 @app.get("/sw.js")
 def service_worker():
-    """Serve service worker from root scope."""
-    return FileResponse(str(STATIC_DIR / "sw.js"), media_type="application/javascript")
+    """Serve service worker with dynamic cache version (auto-busts on restart)."""
+    content = (STATIC_DIR / "sw.js").read_text()
+    # Inject server start timestamp into cache name so SW updates on every restart
+    content = content.replace("'loom-cache-v4'", f"'loom-cache-{_SERVER_START_TS}'", 1)
+    from starlette.responses import Response
+    return Response(content, media_type="application/javascript",
+                    headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/")
