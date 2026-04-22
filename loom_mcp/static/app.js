@@ -9040,7 +9040,7 @@ function renderMobileChat(container) {
     </div>
     <div class="mc-messages" id="mc-messages"></div>
     <div class="mc-input-bar" id="mc-input-bar">
-      <textarea class="mc-input" id="mc-input" placeholder="Message..." rows="1"></textarea>
+      <textarea class="mc-input" id="mc-input" placeholder="Message..." rows="1" autocomplete="off" autocorrect="on" autocapitalize="sentences"></textarea>
       <button class="mc-send" id="mc-send">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
@@ -9061,10 +9061,11 @@ function renderMobileChat(container) {
     _mcSessionId = crypto.randomUUID();
     const tokenParam = getTokenParam();
     const mcWsUrl = `${getWsUrl()}/ws/chat${tokenParam ? '?' + tokenParam : ''}`;
+    if (typeof _mdbg !== 'undefined') _mdbg.push('WS url: ' + mcWsUrl);
     _mcWs = new WebSocket(mcWsUrl);
     _mcWs.onopen = () => {
       _mcWs.send(JSON.stringify({ type: 'init', session_id: _mcSessionId }));
-      if (typeof _mdbg !== 'undefined') _mdbg.push('WS connected');
+      if (typeof _mdbg !== 'undefined') _mdbg.push('WS open, init sent');
     };
     _mcWs.onmessage = (ev) => {
       try {
@@ -9117,9 +9118,7 @@ function renderMobileChat(container) {
     }
   };
 
-  input.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
-  };
+  // Enter = new line on mobile (send via button only)
 }
 
 function handleMobileChatMessage(msg, msgsEl) {
