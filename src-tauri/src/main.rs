@@ -43,7 +43,12 @@ fn read_loom_root() -> String {
 }
 
 fn save_loom_root(root: &str) {
-    let config = serde_json::json!({"loom_root": root});
+    // Read existing config and merge, don't overwrite other keys
+    let mut config: serde_json::Value = fs::read_to_string(config_path())
+        .ok()
+        .and_then(|data| serde_json::from_str(&data).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    config["loom_root"] = serde_json::json!(root);
     let _ = fs::write(config_path(), serde_json::to_string_pretty(&config).unwrap());
 }
 
