@@ -1160,15 +1160,17 @@ async def api_append_chat(request: Request):
 
 @app.get("/api/chat/list")
 def api_list_chats():
-    """List saved chat transcripts from raw/chats/."""
+    """List saved chat transcripts from raw/chats/ (including subfolders)."""
     chats_dir = LOOM_ROOT / "raw" / "chats"
     if not chats_dir.exists():
         return {"chats": []}
     chats = []
-    for f in sorted(chats_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+    # rglob to find chats in subfolders too
+    for f in sorted(chats_dir.rglob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
         if "_precompact_" in f.name:
             continue
-        # Read frontmatter for title/date
+        # Use path relative to chats_dir (preserves subfolder structure)
+        rel_path = str(f.relative_to(chats_dir))
         try:
             text = f.read_text(encoding="utf-8", errors="replace")
             title = f.stem.replace("_", " ").replace("-", " ")
@@ -1183,7 +1185,7 @@ def api_list_chats():
                     context = line[13:].strip().strip('"')
             msg_count = text.count("\n## User") + text.count("\n## Assistant")
             chats.append({
-                "filename": f.name,
+                "filename": rel_path,
                 "title": title,
                 "date": date,
                 "context": context,
@@ -1196,8 +1198,16 @@ def api_list_chats():
 
 @app.get("/api/chat/load")
 def api_load_chat(filename: str):
-    """Load a saved chat transcript and parse it into messages."""
+    """Load a saved chat transcript and parse it into messages. Supports subfolders."""
     chat_file = LOOM_ROOT / "raw" / "chats" / filename
+    # Prevent path traversal
+    try:
+        resolved = chat_file.resolve()
+        chats_root = (LOOM_ROOT / "raw" / "chats").resolve()
+        if not str(resolved).startswith(str(chats_root)):
+            return {"error": "Invalid path"}
+    except Exception:
+        return {"error": "Invalid path"}
     if not chat_file.exists():
         return {"error": "Chat not found"}
     try:
