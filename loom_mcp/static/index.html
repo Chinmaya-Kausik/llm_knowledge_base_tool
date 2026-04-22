@@ -466,8 +466,27 @@
     <button id="selection-ask-btn">Chat with Claude</button>
   </div>
 
-  <!-- Mobile: set data-mobile early so CSS hides toolbar before JS loads -->
-  <script>if(window.innerWidth<=768)document.documentElement.setAttribute('data-mobile','');</script>
+  <!-- Mobile debug + early detection -->
+  <script>
+  var _mdbg = [];
+  if(window.innerWidth<=768){
+    document.documentElement.setAttribute('data-mobile','');
+    _mdbg.push('width='+window.innerWidth+' data-mobile set');
+    // Show debug overlay after DOM loads
+    document.addEventListener('DOMContentLoaded',function(){
+      _mdbg.push('DOMContentLoaded fired');
+      var d=document.createElement('div');
+      d.id='mobile-debug';
+      d.style.cssText='position:fixed;bottom:60px;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:11px monospace;padding:8px;z-index:9999;max-height:30vh;overflow:auto;pointer-events:none';
+      document.body.appendChild(d);
+      setInterval(function(){d.textContent=_mdbg.join('\\n');},500);
+    });
+    window.onerror=function(msg,src,line){_mdbg.push('ERR: '+msg+' at '+src.split('/').pop()+':'+line);};
+  } else {
+    // Not mobile — log why
+    console.log('[Mobile] skipped: width='+window.innerWidth);
+  }
+  </script>
 
   <script>
   // Theme switcher — dropdown with preview swatches
