@@ -160,31 +160,42 @@ fn main() {
             eprintln!("Loom: project_dir={}, loom_root={}, uv={}",
                 project_dir.display(), loom_root, uv_path.display());
 
-            // Check if port 8420 is already in use — kill it after user confirmation
+            // Check if port 8420 is already in use
             if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
-                eprintln!("Loom: port 8420 already in use, killing existing process");
-                // Kill whatever is on port 8420
-                let _ = Command::new("sh")
-                    .args(["-c", "lsof -ti:8420 | xargs kill 2>/dev/null"])
+                eprintln!("Loom: port 8420 already in use, asking user");
+                // Native macOS dialog via osascript
+                let result = Command::new("osascript")
+                    .args(["-e", r#"display dialog "Another Loom server is already running on port 8420." & return & return & "Kill it and start fresh?" buttons {"Quit", "Kill & Restart"} default button "Kill & Restart" with title "Loom" with icon caution"#])
                     .output();
-                // Wait for port to free up
-                let start = Instant::now();
-                while start.elapsed() < Duration::from_secs(3) {
-                    if TcpStream::connect(("127.0.0.1", 8420)).is_err() {
-                        break; // port is free
+                let chose_kill = result.map_or(false, |o| {
+                    String::from_utf8_lossy(&o.stdout).contains("Kill & Restart")
+                });
+
+                if chose_kill {
+                    eprintln!("Loom: killing existing server on port 8420");
+                    let _ = Command::new("sh")
+                        .args(["-c", "lsof -ti:8420 | xargs kill 2>/dev/null"])
+                        .output();
+                    let start = Instant::now();
+                    while start.elapsed() < Duration::from_secs(3) {
+                        if TcpStream::connect(("127.0.0.1", 8420)).is_err() {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(200));
                     }
-                    std::thread::sleep(Duration::from_millis(200));
+                    if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
+                        let _ = window.navigate(error_page(
+                            "Port 8420 still in use",
+                            "Could not free port 8420. Close it manually and relaunch Loom."
+                        ).parse().unwrap());
+                        let _ = window.show();
+                        return Ok(());
+                    }
+                    eprintln!("Loom: port freed, continuing startup");
+                } else {
+                    eprintln!("Loom: user chose to quit");
+                    std::process::exit(0);
                 }
-                if TcpStream::connect(("127.0.0.1", 8420)).is_ok() {
-                    let _ = window.navigate(error_page(
-                        "Port 8420 still in use",
-                        "Could not free port 8420. Another process is holding it.<br><br>\
-                         Close it manually and relaunch Loom."
-                    ).parse().unwrap());
-                    let _ = window.show();
-                    return Ok(());
-                }
-                eprintln!("Loom: port 8420 freed, continuing startup");
             }
 
             let child = Command::new(&uv_path)
