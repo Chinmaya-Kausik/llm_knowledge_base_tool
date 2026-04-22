@@ -479,7 +479,12 @@
       d.id='mobile-debug';
       d.style.cssText='position:fixed;top:33vh;left:8px;right:8px;background:rgba(0,0,0,0.85);color:#0f0;font:11px monospace;padding:6px 10px;z-index:9999;max-height:20vh;overflow:auto;pointer-events:none;border-radius:8px';
       document.body.appendChild(d);
-      setInterval(function(){d.textContent=_mdbg.join('\\n');},500);
+      setInterval(function(){
+        var mc=document.querySelector('.mobile-content');
+        var pt=mc?getComputedStyle(mc).paddingTop:'no .mobile-content';
+        _mdbg[_mdbg.length>5?5:_mdbg.length]='paddingTop='+pt+' safeArea='+getComputedStyle(document.documentElement).getPropertyValue('--safe-top');
+        d.textContent=_mdbg.join('\\n');
+      },500);
     });
     window.onerror=function(msg,src,line){_mdbg.push('ERR: '+msg+' at '+src.split('/').pop()+':'+line);};
   } else {
