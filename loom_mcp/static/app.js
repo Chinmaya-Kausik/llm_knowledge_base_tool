@@ -1103,11 +1103,23 @@ function setFocusedItem(path, element) {
   if (element) element.classList.add('item-focused');
 }
 let edgeRAF = null;         // rAF handle for edge debouncing
-let topZIndex = 200;        // Counter for bring-to-front
+// Centralized z-index management — all layers defined here
+const Z_LAYERS = {
+  canvas: 1,           // Cards on the canvas
+  floatingPanel: 100,  // Floating chat panels, terminals
+  fullpage: 200,       // Fullscreen file overlay
+  toolbar: 250,        // Toolbar stays above fullpage
+  dropdown: 310,       // Settings dropdown, filter menu
+  palette: 300,        // Appearance/model palettes
+  modal: 400,          // Full settings modal, keybinding panel
+  tooltip: 500,        // Selection tooltip, toasts
+};
+let topZIndex = Z_LAYERS.floatingPanel; // Counter for bring-to-front within a layer
 
 function bringToFront(el) {
   if (!el || !el.parentNode) return;
-  topZIndex++;
+  // Ensure floating panels can get above fullpage overlay (z-index 200)
+  topZIndex = Math.max(topZIndex + 1, Z_LAYERS.fullpage + 1);
   el.style.setProperty('z-index', String(topZIndex), 'important');
 }
 
@@ -2259,7 +2271,8 @@ function expandCardFullPage(card, highlightQuery) {
     </div>
     <div class="fullpage-content"></div>
   `;
-  document.getElementById('canvas-container').appendChild(overlay);
+  // Append to body (not canvas-container) so z-index works with toolbar/chat/settings
+  document.body.appendChild(overlay);
   expandedCard = overlay;
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
   overlay.querySelector('.fullpage-chat').onclick = () => {
@@ -3858,9 +3871,6 @@ function openNewChat() {
 }
 
 function focusChatPanel(panelId) {
-  const fullpageOpen = !!expandedCard;
-  debugLog('[focusChat]', panelId, 'fullpageOpen:', fullpageOpen, 'topZIndex:', topZIndex);
-
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
     // Uncollapse if collapsed
@@ -3869,27 +3879,13 @@ function focusChatPanel(panelId) {
       if (ph) ph.click();
     }
     if (cp.classList.contains('chat-float')) bringToFront(cp);
-    // Bring above fullpage AFTER bringToFront (so we override it)
-    if (fullpageOpen) {
-      topZIndex = Math.max(topZIndex, 400);
-      cp.style.setProperty('z-index', String(topZIndex), 'important');
-      debugLog('[focusChat] main elevated to', topZIndex);
-    }
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
       bringToFront(p.container);
-      // Bring above fullpage AFTER bringToFront
-      if (fullpageOpen) {
-        topZIndex = Math.max(topZIndex, 400);
-        p.container.style.setProperty('z-index', String(topZIndex), 'important');
-        debugLog('[focusChat] floating elevated to', topZIndex);
-      }
       setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
-    } else {
-      debugLog('[focusChat] panel not found:', panelId);
     }
   }
 }
@@ -3978,10 +3974,6 @@ function dockPanel(panelId, action) {
   else if (action === 'dock-bottom') chatPanelEl.classList.add('chat-bottom');
   else {
     chatPanelEl.classList.add('chat-float');
-    // If fullpage is open, ensure we're above it (z-index 300)
-    if (expandedCard) {
-      topZIndex = Math.max(topZIndex, 400);
-    }
     bringToFront(chatPanelEl);
   }
 
@@ -4433,10 +4425,6 @@ function createFloatingPanel(options = {}) {
   document.getElementById('canvas-container').appendChild(card);
   bringToFront(card);
   // If fullpage is open, elevate above it
-  if (expandedCard) {
-    topZIndex = Math.max(topZIndex, 400);
-    card.style.setProperty('z-index', String(topZIndex), 'important');
-  }
   panel.container = card;
   panel.messagesContainer = messagesEl;
   chatPanels.set(panelId, panel);
@@ -8547,9 +8535,8 @@ async function init() {
       // If the focused chat panel is above fullpage, send it back behind
       const focusedChatId = chatFocusHistory[0] || 'main';
       const focusedEl = focusedChatId === 'main' ? document.getElementById('chat-panel') : chatPanels.get(focusedChatId)?.container;
-      if (focusedEl && parseInt(focusedEl.style.zIndex) >= 350) {
-        debugLog('[Escape] sending chat behind fullpage, was z-index:', focusedEl.style.zIndex);
-        focusedEl.style.setProperty('z-index', '100', 'important');
+      if (focusedEl && parseInt(focusedEl.style.zIndex) > Z_LAYERS.fullpage) {
+        focusedEl.style.setProperty('z-index', String(Z_LAYERS.floatingPanel), 'important');
         return;
       }
       if (expandedCard) { collapseFullPage(); return; }

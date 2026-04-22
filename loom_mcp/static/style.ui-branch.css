@@ -619,6 +619,8 @@ html[data-theme="paper"] ::-webkit-scrollbar-thumb:hover { background: oklch(0.7
   align-items: center;
   height: var(--toolbar-height);
   padding: 0 var(--sp-4, 12px);
+  position: relative;
+  z-index: 250;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   gap: var(--sp-4, 12px);
