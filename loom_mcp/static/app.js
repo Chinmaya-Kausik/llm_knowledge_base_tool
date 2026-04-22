@@ -7360,6 +7360,17 @@ async function restartServer() {
       } catch {}
     }
   }
+  // Clear browser caches before restart
+  document.title = 'Clearing caches...';
+  try {
+    // Unregister service worker so stale cache is gone
+    const regs = await navigator.serviceWorker?.getRegistrations();
+    for (const reg of (regs || [])) await reg.unregister();
+    // Clear all SW caches
+    const cacheNames = await caches?.keys();
+    for (const name of (cacheNames || [])) await caches.delete(name);
+  } catch {}
+
   // Restart — server will os.execv itself, so wait for it to come back
   document.title = 'Restarting...';
   try {
@@ -7369,9 +7380,8 @@ async function restartServer() {
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
-      const resp = await authFetch('/api/ping', { signal: AbortSignal.timeout(2000) });
+      const resp = await fetch('/api/ping', { signal: AbortSignal.timeout(2000) });
       if (resp.ok) {
-        // Wait a bit more for static files to be ready
         await new Promise(r => setTimeout(r, 500));
         break;
       }
