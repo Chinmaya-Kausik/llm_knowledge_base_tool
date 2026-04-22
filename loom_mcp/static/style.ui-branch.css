@@ -2259,6 +2259,16 @@ html[data-mobile] .fs-content-title { font-size: 20px; }
 html[data-mobile] .fs-row { padding: 10px 16px; flex-wrap: wrap; }
 html[data-mobile] .fs-close { top: 8px; right: 12px; }
 
+/* Fullscreen file view on mobile — respect safe area */
+html[data-mobile] #fullpage-overlay {
+  padding-top: 44px;
+  padding-top: env(safe-area-inset-top, 44px);
+}
+html[data-mobile] .fullpage-back {
+  font-size: 15px; padding: 8px 14px;
+  min-height: 44px; min-width: 44px;
+}
+
 /* --- Canvas floating controls --- */
 .mobile-float-controls {
   position: absolute; bottom: 12px; right: 12px;

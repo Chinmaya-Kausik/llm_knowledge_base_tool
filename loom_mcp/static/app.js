@@ -8868,6 +8868,28 @@ function initMobile() {
     });
   }
 
+  // Left edge swipe to go back
+  let _swipeStartX = 0, _swipeStartY = 0, _swiping = false;
+  shell.addEventListener('touchstart', (e) => {
+    const x = e.touches[0].clientX;
+    if (x < 25) { // 25px from left edge
+      _swipeStartX = x;
+      _swipeStartY = e.touches[0].clientY;
+      _swiping = true;
+    }
+  }, { passive: true });
+  shell.addEventListener('touchmove', (e) => {
+    if (!_swiping) return;
+    const dy = Math.abs(e.touches[0].clientY - _swipeStartY);
+    if (dy > 30) _swiping = false; // vertical scroll, cancel swipe
+  }, { passive: true });
+  shell.addEventListener('touchend', (e) => {
+    if (!_swiping) return;
+    _swiping = false;
+    const dx = e.changedTouches[0].clientX - _swipeStartX;
+    if (dx > 80) mobileGoBack(); // swipe right > 80px = back
+  }, { passive: true });
+
   // matchMedia listener for orientation/resize changes
   window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
     if (!e.matches && _mobileActive) {
@@ -8879,6 +8901,24 @@ function initMobile() {
       document.getElementById('mobile-shell')?.remove();
     }
   });
+}
+
+// --- Mobile back navigation ---
+function mobileGoBack() {
+  // Priority: fullscreen file → folder in files → canvas drill-down
+  if (expandedCard) {
+    collapseFullPage();
+    return;
+  }
+  if (_mobileTab === 'files' && _mobileFilePath.length > 0) {
+    _mobileFilePath.pop();
+    switchMobileTab('files');
+    return;
+  }
+  if (_mobileTab === 'canvas' && canvasStack.length > 1) {
+    navigateToLevel(canvasStack.length - 2);
+    return;
+  }
 }
 
 // --- Mobile view switching ---
