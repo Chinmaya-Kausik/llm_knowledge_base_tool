@@ -449,25 +449,35 @@ function createVMTerminalPanel(vmId, vmLabel) {
   const ro = new ResizeObserver(() => { try { fitAddon.fit(); } catch {} });
   ro.observe(termContainer);
 
-  // Minimize / Close / Drag
-  header.querySelector('.fcp-minimize').onclick = () => {
+  // Minimize / Close
+  header.querySelector('.fcp-minimize').onclick = (e) => {
+    e.stopPropagation();
     card.classList.toggle('minimized');
     if (!card.classList.contains('minimized')) requestAnimationFrame(() => fitAddon.fit());
   };
-  header.querySelector('.fcp-close').onclick = () => { ws.close(); ro.disconnect(); _activeTerminals.delete(term); card.remove(); };
+  header.querySelector('.fcp-close').onclick = (e) => { e.stopPropagation(); ws.close(); ro.disconnect(); _activeTerminals.delete(term); card.remove(); };
 
-  // Drag
-  let dx, dy;
+  // Drag with drag guard for header click
+  let dx, dy, vmDragged = false;
   header.onpointerdown = (e) => {
     if (e.target.closest('button') || e.target.isContentEditable) return;
+    vmDragged = false;
     const r = card.getBoundingClientRect();
     dx = e.clientX - r.left; dy = e.clientY - r.top;
     card.style.position = 'fixed';
-    const move = (ev) => { card.style.left = (ev.clientX - dx) + 'px'; card.style.top = (ev.clientY - dy) + 'px'; card.style.right = 'auto'; card.style.bottom = 'auto'; };
+    const move = (ev) => { vmDragged = true; card.style.left = (ev.clientX - dx) + 'px'; card.style.top = (ev.clientY - dy) + 'px'; card.style.right = 'auto'; card.style.bottom = 'auto'; };
     const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
   };
+
+  // Header click toggles minimize (if not dragged)
+  header.addEventListener('click', (e) => {
+    if (vmDragged) return;
+    if (e.target.closest('button') || e.target.isContentEditable) return;
+    card.classList.toggle('minimized');
+    if (!card.classList.contains('minimized')) requestAnimationFrame(() => fitAddon.fit());
+  });
 
   // Resize handles
   handles.forEach(h => {
@@ -4891,8 +4901,25 @@ function createTerminalPanel() {
   header.addEventListener('pointerup', () => { dragReady = false; dragging = false; });
 
   // Close / minimize
-  header.querySelector('.panel-close').onclick = () => { if (ws) ws.close(); _activeTerminals.delete(term); card.remove(); };
-  header.querySelector('.panel-minimize').onclick = () => card.classList.toggle('minimized');
+  header.querySelector('.panel-close').onclick = (e) => { e.stopPropagation(); if (ws) ws.close(); _activeTerminals.delete(term); card.remove(); };
+  header.querySelector('.panel-minimize').onclick = (e) => { e.stopPropagation(); card.classList.toggle('minimized'); };
+
+  // Header click toggles minimize (with drag guard)
+  let _termLastClick = 0;
+  header.addEventListener('click', (e) => {
+    if (dragging) return;
+    if (e.target.closest('button') || e.target.closest('[contenteditable]')) return;
+    const now = Date.now();
+    if (now - _termLastClick < 300) {
+      // Double click — ignore (could add fullscreen later)
+    } else {
+      card.classList.toggle('minimized');
+      if (!card.classList.contains('minimized') && typeof fitAddon?.fit === 'function') {
+        requestAnimationFrame(() => fitAddon.fit());
+      }
+    }
+    _termLastClick = now;
+  });
 
   // xterm.js loaded via script tags
   const XTerm = window.Terminal;
