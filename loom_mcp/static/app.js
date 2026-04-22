@@ -2502,43 +2502,30 @@ function renderChatTranscript(container, rawContent) {
     const text = section.lines.join('\n').trim();
     if (!text) continue;
 
-    // Both user and assistant messages can contain <details> blocks
     const contentEl = document.createElement('div');
     contentEl.className = 'chat-msg-content' + (section.role === 'assistant' ? ' chat-text' : '');
 
-    // Split into details blocks and regular text
-    const parts = text.split(/(<details>[\s\S]*?<\/details>)/g);
-    for (const part of parts) {
-      if (part.startsWith('<details>')) {
-        // Use shared buildDetailsElement for identical DOM to live chat
-        contentEl.appendChild(buildDetailsElement(part));
-      } else if (part.trim()) {
-        // Clean raw Python dicts from subagent results (can appear outside <details>)
-        let cleaned = part.trim();
-        let hadDict = false;
-        cleaned = cleaned.split('\n').map(line => {
-          const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
-          if (dm) {
-            hadDict = true;
-            let t = dm[1].replace(/['"]\s*\}\s*$/, '');
-            return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-          }
-          return line;
-        }).join('\n');
-
-        if (section.role === 'user' && !hadDict) {
-          cleaned = cleaned.replace(/^[>›]\s?/gm, '').trim();
-          const textBlock = document.createElement('div');
-          textBlock.textContent = cleaned;
-          contentEl.appendChild(textBlock);
-        } else {
-          // Assistant text OR cleaned subagent results: render as markdown
-          const textBlock = document.createElement('div');
-          textBlock.className = hadDict ? 'chat-text' : '';
-          textBlock.innerHTML = marked.parse(cleaned);
-          contentEl.appendChild(textBlock);
+    if (section.role === 'user') {
+      // User: strip <details> blocks (tool calls belong to assistant), show plain text
+      const userText = text.replace(/<details>[\s\S]*?<\/details>/g, '').trim();
+      contentEl.textContent = userText;
+    } else {
+      // Assistant: clean up subagent dicts, then render as HTML
+      // The <details><summary> tags render natively as collapsible sections
+      let cleaned = text;
+      // Clean raw Python dicts
+      cleaned = cleaned.split('\n').map(line => {
+        const dm = line.match(/^[-*]?\s*\{'type':\s*'text',\s*'text':\s*['"](.*)/);
+        if (dm) {
+          let t = dm[1].replace(/['"]\s*\}\s*$/, '');
+          return t.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         }
-      }
+        return line;
+      }).join('\n');
+      // Strip line numbers from file output
+      cleaned = cleaned.replace(/^\d+\t/gm, '');
+      // Render markdown but preserve HTML (details/summary tags pass through)
+      contentEl.innerHTML = marked.parse(cleaned);
     }
     msgEl.appendChild(contentEl);
 

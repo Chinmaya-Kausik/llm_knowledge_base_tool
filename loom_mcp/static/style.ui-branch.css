@@ -1348,6 +1348,43 @@ html[data-density="roomy"] .chat-msg { line-height: 1.6; }
 .target-item.active { background: var(--accent-soft) !important; color: var(--accent); }
 .target-item:hover { background: var(--bg-hover); }
 
+/* Chat transcript — native <details> styling to match live chat */
+.chat-transcript details {
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  margin: 6px 0;
+  overflow: hidden;
+}
+.chat-transcript details summary {
+  padding: 5px 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-transcript details summary::before {
+  content: "▶";
+  font-size: 8px;
+  transition: transform .15s;
+}
+.chat-transcript details[open] summary::before {
+  transform: rotate(90deg);
+}
+.chat-transcript details summary::-webkit-details-marker { display: none; }
+.chat-transcript details > :not(summary) {
+  padding: 6px 10px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-soft);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* Chat transcript rendering in fullscreen view */
 .chat-transcript {
   max-width: 800px;
