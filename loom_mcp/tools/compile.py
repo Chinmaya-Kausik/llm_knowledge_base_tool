@@ -62,6 +62,14 @@ def get_glossary(loom_root: Path) -> str:
     return content
 
 
+def _validate_path(loom_root: Path, path: str) -> Path:
+    """Resolve a path and ensure it stays within the loom root."""
+    full_path = (loom_root / path).resolve()
+    if not str(full_path).startswith(str(loom_root.resolve()) + "/") and full_path != loom_root.resolve():
+        raise ValueError(f"Path traversal blocked: {path}")
+    return full_path
+
+
 def read_source(loom_root: Path, path: str) -> dict:
     """Read a raw source file, returning frontmatter and content.
 
@@ -70,7 +78,7 @@ def read_source(loom_root: Path, path: str) -> dict:
 
     Returns: {frontmatter: dict, content: str}
     """
-    full_path = loom_root / path
+    full_path = _validate_path(loom_root, path)
     if not full_path.exists():
         raise FileNotFoundError(f"Source not found: {path}")
     metadata, content = read_frontmatter(full_path)
@@ -85,7 +93,7 @@ def read_wiki_page(loom_root: Path, path: str) -> dict:
 
     Returns: {frontmatter: dict, content: str}
     """
-    full_path = loom_root / path
+    full_path = _validate_path(loom_root, path)
     if not full_path.exists():
         raise FileNotFoundError(f"Wiki page not found: {path}")
     metadata, content = read_frontmatter(full_path)
@@ -109,7 +117,7 @@ def write_wiki_page(
 
     Returns: {path, title, is_new}
     """
-    full_path = loom_root / path
+    full_path = _validate_path(loom_root, path)
     registry_path = loom_root / "wiki" / "meta" / "page-registry.json"
 
     # Write the page

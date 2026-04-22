@@ -41,6 +41,18 @@ LOOM_ROOT = _resolve_loom_root()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
+def _safe_resolve(loom_root: Path, rel_path: str) -> Path:
+    """Resolve a relative path and ensure it stays within the loom root.
+
+    Raises ValueError if the path escapes the loom root (path traversal).
+    """
+    full = (loom_root / rel_path).resolve()
+    root = loom_root.resolve()
+    if not str(full).startswith(str(root) + "/") and full != root:
+        raise ValueError(f"Path traversal blocked: {rel_path}")
+    return full
+
+
 # --- Auth config ---
 
 def _load_auth_config() -> tuple[bool, str]:
@@ -676,7 +688,10 @@ def api_registry():
 @app.get("/api/page/{path:path}")
 def api_page(path: str):
     from loom_mcp.lib.pages import get_page_content, get_page_metadata
-    full_path = LOOM_ROOT / path
+    try:
+        full_path = _safe_resolve(LOOM_ROOT, path)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
     if not full_path.exists():
         raise HTTPException(status_code=404, detail=f"Page not found: {path}")
     content = get_page_content(full_path)
@@ -693,7 +708,11 @@ async def api_pages_bulk(request: Request):
         raise HTTPException(status_code=400, detail="Expected JSON array")
     result = {}
     for path in paths:
-        full_path = LOOM_ROOT / path
+        try:
+            full_path = _safe_resolve(LOOM_ROOT, path)
+        except ValueError:
+            result[path] = None
+            continue
         if full_path.exists():
             content = get_page_content(full_path)
             metadata = get_page_metadata(full_path)
@@ -780,7 +799,10 @@ async def api_update_page(path: str, request: Request):
     page_frontmatter = body.get("frontmatter", {})
     content = body.get("content", "")
 
-    full_path = LOOM_ROOT / path
+    try:
+        full_path = _safe_resolve(LOOM_ROOT, path)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
     if not full_path.exists():
         raise HTTPException(status_code=404, detail=f"Page not found: {path}")
 
@@ -2238,7 +2260,10 @@ def _shell_escape(s: str) -> str:
 @app.get("/media/{filepath:path}")
 def serve_media(filepath: str):
     """Serve any file from the loom (for PDFs, images, etc.)."""
-    full_path = LOOM_ROOT / filepath
+    try:
+        full_path = _safe_resolve(LOOM_ROOT, filepath)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
     if not full_path.exists():
         # Fallback to raw/media/ for backward compat
         full_path = LOOM_ROOT / "raw" / "media" / filepath

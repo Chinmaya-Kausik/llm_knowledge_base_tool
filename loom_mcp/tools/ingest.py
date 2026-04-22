@@ -228,8 +228,15 @@ def classify_inbox_item(loom_root: Path, source: str, destination: str) -> dict:
 
     Returns: {old_path, new_path}
     """
-    src = loom_root / source
-    dst = loom_root / destination
+    root = loom_root.resolve()
+    src = (loom_root / source).resolve()
+    dst = (loom_root / destination).resolve()
+
+    # Prevent path traversal
+    if not str(src).startswith(str(root) + "/"):
+        raise ValueError(f"Source path traversal blocked: {source}")
+    if not str(dst).startswith(str(root) + "/"):
+        raise ValueError(f"Destination path traversal blocked: {destination}")
 
     if not src.exists():
         raise FileNotFoundError(f"Source file not found: {source}")
