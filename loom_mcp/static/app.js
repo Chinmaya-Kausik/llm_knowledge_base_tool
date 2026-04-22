@@ -2312,7 +2312,6 @@ function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
-      <button class="fullpage-chat" title="Chat about this file">Chat</button>
       <button class="fullpage-toggle">Edit</button>
     </div>
     <div class="fullpage-content"></div>
@@ -2328,11 +2327,8 @@ function expandCardFullPage(card, highlightQuery) {
     sidebar.classList.add('collapsed');
   }
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
-  overlay.querySelector('.fullpage-chat').onclick = () => {
-    createFloatingPanel({ contextPath: path });
-  };
 
-  // Show "Continue" button for saved chat transcripts
+  // Saved chat transcripts: show "Continue" button
   if (path.startsWith('raw/chats/')) {
     const continueBtn = document.createElement('button');
     continueBtn.className = 'fullpage-chat';
@@ -3896,6 +3892,7 @@ syncFromPanel(activePanel);
 let panelCounter = 0;
 let chatFocusHistory = ['main']; // Ordered by recency of focus
 let chatCycleIndex = -1;
+let _cyclingFocus = false; // suppress focus history updates during Cmd+J/Cmd+/ cycling
 
 function getAlivePanels() {
   // Returns IDs of panels that are actually open/visible (not collapsed/minimized)
@@ -4020,7 +4017,9 @@ function openNewChat() {
   createFloatingPanel();
 }
 
-function focusChatPanel(panelId) {
+function focusChatPanel(panelId, fromCycle = false) {
+  if (!fromCycle) { chatCycleIndex = -1; chatSoloCycleIndex = -1; }
+  if (fromCycle) _cyclingFocus = true;
   if (panelId === 'main') {
     const cp = document.getElementById('chat-panel');
     // Uncollapse if collapsed
@@ -4029,13 +4028,13 @@ function focusChatPanel(panelId) {
       if (ph) ph.click();
     }
     if (cp.classList.contains('chat-float')) bringToFront(cp);
-    setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+    setTimeout(() => { document.getElementById('chat-input')?.focus(); _cyclingFocus = false; }, 100);
   } else {
     const p = chatPanels.get(panelId);
     if (p?.container) {
       p.container.classList.remove('minimized');
       bringToFront(p.container);
-      setTimeout(() => p.container.querySelector('.fcp-input')?.focus(), 100);
+      setTimeout(() => { p.container.querySelector('.fcp-input')?.focus(); _cyclingFocus = false; }, 100);
     }
   }
 }
@@ -4552,13 +4551,13 @@ function createFloatingPanel(options = {}) {
     <span class="ctx-sep">/</span>
     <span class="ctx-max">200K</span>
     <span class="ctx-bar"><span class="ctx-bar-fill" style="width:0%"></span></span>`;
-  ctxChip.onclick = () => {
-    const levels = ['page', 'folder', 'global'];
-    const cur = panel.contextLevel || 'page';
-    panel.contextLevel = levels[(levels.indexOf(cur) + 1) % levels.length];
-    ctxChip.querySelector('.ctx-scope').textContent = panel.contextLevel;
+  ctxChip.onclick = (e) => {
+    e.stopPropagation();
+    openContextPopover(ctxChip, panel);
   };
   pillsRow.appendChild(ctxChip);
+  // Fetch real token count on creation
+  updateChipTokens(ctxChip, panel);
 
   inputArea.appendChild(attachBar);
   inputArea.appendChild(pillsRow);
@@ -4714,9 +4713,9 @@ function createFloatingPanel(options = {}) {
   };
 
   input.addEventListener('focus', () => {
+    if (_cyclingFocus) return;
     chatFocusHistory = chatFocusHistory.filter(id => id !== panelId);
     chatFocusHistory.unshift(panelId);
-    // Don't reset chatCycleIndex here — it breaks Cmd+J cycling
   });
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
@@ -5110,153 +5109,12 @@ function initChat() {
   activePanel.messagesContainer = document.getElementById('chat-messages');
   chatMessagesContainer = activePanel.messagesContainer;
 
-  // Context chip — click to open dropdown
+  // Context chip — click to open popover (uses shared function)
   const ctxChip = document.getElementById('chat-context-chip');
   if (ctxChip) {
     ctxChip.onclick = (e) => {
       e.stopPropagation();
-      let popover = document.getElementById('ctx-popover');
-      if (popover) { popover.remove(); return; }
-      popover = document.createElement('div');
-      popover.id = 'ctx-popover';
-      popover.className = 'ctx-popover';
-
-      const current = activePanel.contextLevel || 'page';
-      const levels = [
-        { val: 'page', label: 'Page' },
-        { val: 'folder', label: 'Folder' },
-        { val: 'global', label: 'Global' },
-      ];
-
-      popover.innerHTML = `
-        <div class="ctx-popover-section">
-          <div class="ctx-popover-label">Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(applies to next new chat)</span></div>
-          <div class="seg ctx-scope-seg">
-            ${levels.map(l => `<button data-val="${l.val}"${l.val === current ? ' class="on"' : ''}>${l.label}</button>`).join('')}
-          </div>
-        </div>
-        <div class="ctx-popover-section ctx-popover-scroll">
-          <div class="ctx-popover-label">Context sent to agent</div>
-          <div id="ctx-breakdown" class="ctx-breakdown"><span style="color:var(--text-dim)">Loading...</span></div>
-        </div>
-        <div class="ctx-popover-footer">
-          <div class="ctx-usage-bar"><div class="ctx-usage-fill" id="ctx-usage-fill"></div></div>
-          <span class="ctx-usage-text" id="ctx-usage-text"></span>
-          <button class="fs-btn" id="ctx-view-full" style="font-size:9px;padding:2px 6px;margin-left:auto">View prompt</button>
-        </div>
-      `;
-      ctxChip.parentElement.appendChild(popover);
-
-      // "View prompt" button — shows the full assembled system prompt
-      document.getElementById('ctx-view-full').onclick = (ev) => {
-        ev.stopPropagation();
-        const ctxPath = activePanel?.contextPath || document.getElementById('fullpage-overlay')?.dataset?.path || currentLevel()?.parentPath || '';
-        const sessionId = activePanel?.sessionId || chatSessionId || '';
-        const level = activePanel.contextLevel || 'page';
-        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}&include_prompt=true`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (!data?.prompt) return;
-            // Clean up internal markers and format for display
-            let promptText = data.prompt
-              .replace(/__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__/g, '── dynamic context below ──')
-              .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const modal = document.createElement('div');
-            modal.className = 'fs-panel';
-            modal.innerHTML = `<div class="fs-card" style="width:min(800px,92vw);height:min(600px,85vh);grid-template-columns:1fr">
-              <div class="fs-content" style="overflow:hidden;display:flex;flex-direction:column">
-                <div class="fs-content-header">
-                  <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context Sent to Agent</h2>
-                  <p class="fs-content-desc">This is the exact system prompt assembled for the current scope.</p></div>
-                  <button class="fs-close" onclick="this.closest('.fs-panel').remove()">✕</button>
-                </div>
-                <div class="fs-content-body" style="flex:1;overflow-y:auto;padding:16px 24px">
-                  <pre style="white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--text)">${promptText}</pre>
-                </div>
-              </div>
-            </div>`;
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            document.body.appendChild(modal);
-          })
-          .catch(() => {});
-      };
-
-      // Wire scope buttons — locked after first message
-      const hasMessages = (activePanel.messages?.length || chatMessages?.length || 0) > 0;
-      popover.querySelectorAll('.ctx-scope-seg button').forEach(btn => {
-        if (hasMessages) {
-          btn.disabled = true;
-          btn.style.opacity = '0.4';
-          btn.style.cursor = 'not-allowed';
-        } else {
-          btn.onclick = (ev) => {
-            ev.stopPropagation();
-            popover.querySelectorAll('.ctx-scope-seg button').forEach(b => b.classList.remove('on'));
-            btn.classList.add('on');
-            activePanel.contextLevel = btn.dataset.val;
-            syncFromPanel(activePanel);
-            updateContextChip();
-            loadContextBreakdown(btn.dataset.val);
-          };
-        }
-      });
-      if (hasMessages) {
-        popover.querySelector('.ctx-popover-label').innerHTML = 'Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(locked for this session)</span>';
-      }
-
-      // Load context breakdown from backend
-      function loadContextBreakdown(level) {
-        const sessionId = activePanel.sessionId || chatSessionId || '';
-        const fpOverlay = document.getElementById('fullpage-overlay');
-        const ctxPath = activePanel?.contextPath || fpOverlay?.dataset?.path || currentLevel()?.parentPath || '';
-        authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (!data) { document.getElementById('ctx-breakdown').innerHTML = '<span style="color:var(--text-dim)">Unavailable</span>'; return; }
-            const bd = document.getElementById('ctx-breakdown');
-            let html = '';
-            for (const block of (data.blocks || [])) {
-              const est = block.estimated ? ' <span style="opacity:.5">est.</span>' : '';
-              html += `<div class="ctx-block-row"><span>${block.name}</span><span class="ctx-block-tokens">~${block.tokens.toLocaleString()} tokens${est}</span></div>`;
-            }
-            if (data.files?.length > 0) {
-              html += '<div class="ctx-popover-label" style="margin-top:6px">Injected at start</div>';
-              for (const f of data.files) {
-                const note = f.note ? `<div style="font-size:9px;color:var(--text-dim);padding-left:8px">${f.note}</div>` : '';
-                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>${note}`;
-              }
-            }
-            // Show files read during this session
-            const readFiles = [...(sessionReadFiles || [])];
-            if (readFiles.length > 0) {
-              html += '<div class="ctx-popover-label" style="margin-top:6px">Read during chat</div>';
-              for (const path of readFiles.slice(0, 30)) {
-                html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${path}</span></div>`;
-              }
-              if (readFiles.length > 30) html += `<div style="font-size:9px;color:var(--text-dim);padding:2px 8px">+${readFiles.length - 30} more</div>`;
-            }
-            bd.innerHTML = html;
-            // Update footer
-            const pct = Math.min(100, (data.total_tokens / data.max_tokens) * 100);
-            const fill = document.getElementById('ctx-usage-fill');
-            const text = document.getElementById('ctx-usage-text');
-            if (fill) fill.style.width = pct + '%';
-            if (text) text.textContent = `~${(data.total_tokens / 1000).toFixed(1)}K / ${(data.max_tokens / 1000).toFixed(0)}K tokens`;
-          })
-          .catch(() => {
-            const bd = document.getElementById('ctx-breakdown');
-            if (bd) bd.innerHTML = '<span style="color:var(--text-dim)">Restart server for context info</span>';
-          });
-      }
-      loadContextBreakdown(current);
-
-      // Close on outside click
-      setTimeout(() => {
-        const close = (ev) => {
-          if (!popover.contains(ev.target) && ev.target !== ctxChip) { popover.remove(); document.removeEventListener('click', close); }
-        };
-        document.addEventListener('click', close);
-      });
+      openContextPopover(ctxChip, activePanel);
     };
     updateContextChip();
   }
@@ -5481,9 +5339,9 @@ function initChat() {
 
   // Track focus for Cmd+J cycling
   input.addEventListener('focus', () => {
+    if (_cyclingFocus) return;
     chatFocusHistory = chatFocusHistory.filter(id => id !== 'main');
     chatFocusHistory.unshift('main');
-    // Don't reset chatCycleIndex here — it breaks Cmd+J cycling
   });
 
   // Send message
@@ -5853,15 +5711,13 @@ function getSmartContextDefault() {
   return 'folder';
 }
 
-function updateContextChip() {
-  const chip = document.getElementById('chat-context-chip');
-  if (!chip) return;
-  const level = activePanel.contextLevel || 'page';
+// Shared: fetch real token count and update any context chip element
+function updateChipTokens(chip, panel) {
+  if (!chip || !panel) return;
+  const level = panel.contextLevel || 'page';
   chip.querySelector('.ctx-scope').textContent = level;
-
-  // Fetch real token count from backend
-  const ctxPath = activePanel?.contextPath || currentLevel()?.parentPath || '';
-  const sessionId = activePanel?.sessionId || chatSessionId || '';
+  const ctxPath = panel.contextPath || currentLevel()?.parentPath || '';
+  const sessionId = panel.sessionId || chatSessionId || '';
   authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}`)
     .then(r => r.ok ? r.json() : null)
     .then(data => {
@@ -5879,6 +5735,156 @@ function updateContextChip() {
     .catch(() => {
       chip.querySelector('.ctx-tokens').textContent = '--';
     });
+}
+
+// Shared: open context popover on any chip for any panel
+function openContextPopover(chip, panel) {
+  // Close existing popover
+  const existing = document.getElementById('ctx-popover');
+  if (existing) { existing.remove(); return; }
+
+  const popover = document.createElement('div');
+  popover.id = 'ctx-popover';
+  popover.className = 'ctx-popover';
+
+  const current = panel.contextLevel || 'page';
+  const levels = [
+    { val: 'page', label: 'Page' },
+    { val: 'folder', label: 'Folder' },
+    { val: 'global', label: 'Global' },
+  ];
+
+  popover.innerHTML = `
+    <div class="ctx-popover-section">
+      <div class="ctx-popover-label">Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(applies to next new chat)</span></div>
+      <div class="seg ctx-scope-seg">
+        ${levels.map(l => `<button data-val="${l.val}"${l.val === current ? ' class="on"' : ''}>${l.label}</button>`).join('')}
+      </div>
+    </div>
+    <div class="ctx-popover-section ctx-popover-scroll">
+      <div class="ctx-popover-label">Context sent to agent</div>
+      <div class="ctx-breakdown"><span style="color:var(--text-dim)">Loading...</span></div>
+    </div>
+    <div class="ctx-popover-footer">
+      <div class="ctx-usage-bar"><div class="ctx-usage-fill"></div></div>
+      <span class="ctx-usage-text"></span>
+      <button class="fs-btn ctx-view-full" style="font-size:9px;padding:2px 6px;margin-left:auto">View prompt</button>
+    </div>
+  `;
+  chip.parentElement.appendChild(popover);
+
+  // "View prompt" button
+  popover.querySelector('.ctx-view-full').onclick = (ev) => {
+    ev.stopPropagation();
+    const ctxPath = panel.contextPath || document.getElementById('fullpage-overlay')?.dataset?.path || currentLevel()?.parentPath || '';
+    const sessionId = panel.sessionId || chatSessionId || '';
+    const level = panel.contextLevel || 'page';
+    authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}&include_prompt=true`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.prompt) return;
+        let promptText = data.prompt
+          .replace(/__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__/g, '── dynamic context below ──')
+          .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const modal = document.createElement('div');
+        modal.className = 'fs-panel';
+        modal.innerHTML = `<div class="fs-card" style="width:min(800px,92vw);height:min(600px,85vh);grid-template-columns:1fr">
+          <div class="fs-content" style="overflow:hidden;display:flex;flex-direction:column">
+            <div class="fs-content-header">
+              <div><div class="fs-content-eyebrow">System Prompt</div><h2 class="fs-content-title">Full Context Sent to Agent</h2>
+              <p class="fs-content-desc">This is the exact system prompt assembled for the current scope.</p></div>
+              <button class="fs-close" onclick="this.closest('.fs-panel').remove()">✕</button>
+            </div>
+            <div class="fs-content-body" style="flex:1;overflow-y:auto;padding:16px 24px">
+              <pre style="white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--text)">${promptText}</pre>
+            </div>
+          </div>
+        </div>`;
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        document.body.appendChild(modal);
+      })
+      .catch(() => {});
+  };
+
+  // Wire scope buttons — locked after first message
+  const hasMessages = (panel.messages?.length || 0) > 0;
+  popover.querySelectorAll('.ctx-scope-seg button').forEach(btn => {
+    if (hasMessages) {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        popover.querySelectorAll('.ctx-scope-seg button').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+        panel.contextLevel = btn.dataset.val;
+        if (panel === activePanel) syncFromPanel(panel);
+        updateChipTokens(chip, panel);
+        loadBreakdown(btn.dataset.val);
+      };
+    }
+  });
+  if (hasMessages) {
+    popover.querySelector('.ctx-popover-label').innerHTML = 'Scope <span style="font-weight:400;text-transform:none;letter-spacing:0">(locked for this session)</span>';
+  }
+
+  // Load context breakdown
+  function loadBreakdown(level) {
+    const sessionId = panel.sessionId || chatSessionId || '';
+    const ctxPath = panel.contextPath || document.getElementById('fullpage-overlay')?.dataset?.path || currentLevel()?.parentPath || '';
+    authFetch(`${getBaseUrl()}/api/context-info?session_id=${encodeURIComponent(sessionId)}&level=${level}&path=${encodeURIComponent(ctxPath)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) { popover.querySelector('.ctx-breakdown').innerHTML = '<span style="color:var(--text-dim)">Unavailable</span>'; return; }
+        const bd = popover.querySelector('.ctx-breakdown');
+        let html = '';
+        for (const block of (data.blocks || [])) {
+          const est = block.estimated ? ' <span style="opacity:.5">est.</span>' : '';
+          html += `<div class="ctx-block-row"><span>${block.name}</span><span class="ctx-block-tokens">~${block.tokens.toLocaleString()} tokens${est}</span></div>`;
+        }
+        if (data.files?.length > 0) {
+          html += '<div class="ctx-popover-label" style="margin-top:6px">Injected at start</div>';
+          for (const f of data.files) {
+            const note = f.note ? `<div style="font-size:9px;color:var(--text-dim);padding-left:8px">${f.note}</div>` : '';
+            html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${f.path}</span><span class="ctx-block-tokens">~${f.tokens}</span></div>${note}`;
+          }
+        }
+        const readFiles = [...(sessionReadFiles || [])];
+        if (readFiles.length > 0) {
+          html += '<div class="ctx-popover-label" style="margin-top:6px">Read during chat</div>';
+          for (const path of readFiles.slice(0, 30)) {
+            html += `<div class="ctx-block-row ctx-file-row"><span class="ctx-file-path">${path}</span></div>`;
+          }
+          if (readFiles.length > 30) html += `<div style="font-size:9px;color:var(--text-dim);padding:2px 8px">+${readFiles.length - 30} more</div>`;
+        }
+        bd.innerHTML = html;
+        const pct = Math.min(100, (data.total_tokens / data.max_tokens) * 100);
+        const fill = popover.querySelector('.ctx-usage-fill');
+        const text = popover.querySelector('.ctx-usage-text');
+        if (fill) fill.style.width = pct + '%';
+        if (text) text.textContent = `~${(data.total_tokens / 1000).toFixed(1)}K / ${(data.max_tokens / 1000).toFixed(0)}K tokens`;
+      })
+      .catch(() => {
+        popover.querySelector('.ctx-breakdown').innerHTML = '<span style="color:var(--text-dim)">Error loading</span>';
+      });
+  }
+  loadBreakdown(current);
+
+  // Close on outside click
+  const closeHandler = (e) => {
+    if (!e.target.closest('#ctx-popover') && !e.target.closest('.chat-context-chip')) {
+      popover.remove();
+      document.removeEventListener('mousedown', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+}
+
+function updateContextChip() {
+  const chip = document.getElementById('chat-context-chip');
+  if (!chip) return;
+  updateChipTokens(chip, activePanel);
 }
 
 function sendQueuedMessage(text) {
@@ -8888,39 +8894,43 @@ async function init() {
     if (matchesBinding(e, 'new-terminal')) { e.preventDefault(); createTerminalPanel(); return; }
     if (matchesBinding(e, 'restart-server')) { e.preventDefault(); restartServer(); return; }
     if (matchesBinding(e, 'delete-file') && !inInput) { e.preventDefault(); deleteCurrentFile(); return; }
-    // Cmd+J: cycle focus between open chats (no minimizing)
+    // Cmd+J: cycle focus between all chats (un-minimizes target, doesn't minimize others)
     if (matchesBinding(e, 'cycle-chat-focus')) {
       e.preventDefault();
-      const alive = getAlivePanels();
-      debugLog('[Cmd+J] alive panels:', alive, 'cycleIndex:', chatCycleIndex);
+      const allIds = [];
+      for (const [id] of chatPanels) allIds.push(id);
+      const ordered = [...new Set([...chatFocusHistory.filter(id => allIds.includes(id)), ...allIds])];
+      debugLog('[Cmd+J] all panels:', ordered, 'cycleIndex:', chatCycleIndex);
 
-      if (alive.length === 0) {
-        // Try reopening a closed panel first, else create new
+      if (ordered.length === 0) {
         reopenAnyPanel();
         return;
       }
-      if (alive.length === 1) { focusChatPanel(alive[0]); return; }
+      if (ordered.length === 1) { focusChatPanel(ordered[0], true); return; }
 
-      chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % alive.length;
-      focusChatPanel(alive[chatCycleIndex]);
+      chatCycleIndex = ((chatCycleIndex < 0 ? 0 : chatCycleIndex) + 1) % ordered.length;
+      focusChatPanel(ordered[chatCycleIndex], true);
       return;
     }
     // Cmd+/: solo cycle — focus one, minimize/close others
     if (matchesBinding(e, 'cycle-chat-solo')) {
       e.preventDefault();
-      const alive = getAlivePanels();
-      debugLog('[Cmd+/] alive panels:', alive, 'soloCycleIndex:', chatSoloCycleIndex);
+      // Get ALL panels (including minimized) for cycling, ordered by focus history
+      const allIds = [];
+      for (const [id] of chatPanels) allIds.push(id);
+      const ordered = [...new Set([...chatFocusHistory.filter(id => allIds.includes(id)), ...allIds])];
+      debugLog('[Cmd+/] all panels:', ordered, 'soloCycleIndex:', chatSoloCycleIndex);
 
-      if (alive.length === 0) {
+      if (ordered.length === 0) {
         reopenAnyPanel();
         return;
       }
 
-      chatSoloCycleIndex = ((chatSoloCycleIndex < 0 ? 0 : chatSoloCycleIndex) + 1) % alive.length;
-      const targetId = alive[chatSoloCycleIndex];
+      chatSoloCycleIndex = ((chatSoloCycleIndex < 0 ? 0 : chatSoloCycleIndex) + 1) % ordered.length;
+      const targetId = ordered[chatSoloCycleIndex];
 
-      // Minimize all others
-      for (const id of alive) {
+      // Minimize all others, un-minimize the target
+      for (const id of ordered) {
         if (id === targetId) continue;
         if (id === 'main') {
           const cp = document.getElementById('chat-panel');
@@ -8935,7 +8945,7 @@ async function init() {
         }
       }
 
-      focusChatPanel(targetId);
+      focusChatPanel(targetId, true);
       return;
     }
     if (matchesBinding(e, 'fit-view') && !inInput) { e.preventDefault(); fitView(); return; }
