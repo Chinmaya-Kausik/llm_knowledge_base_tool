@@ -1311,7 +1311,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
   // Body content: markdown gets full render, files get summary initially
   let bodyHTML;
   if (isMarkdown && content) {
-    bodyHTML = markedWithLatex(content);
+    bodyHTML = marked.parse(content);
   } else if (!isFolder && !isMarkdown) {
     if (content && (category === 'code' || category === 'data')) {
       const preview = content.slice(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1321,7 +1321,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
       bodyHTML = `<div class="file-summary">${summary}</div>`;
     }
   } else {
-    bodyHTML = content ? markedWithLatex(content) : '<em>Empty</em>';
+    bodyHTML = content ? marked.parse(content) : '<em>Empty</em>';
   }
 
   // Footer — path breadcrumb + tags (only if we have either)
@@ -1658,7 +1658,7 @@ async function exitCardEdit(card) {
   if (category === 'code') {
     body.innerHTML = `<pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
   } else if (category === 'markdown' || category === 'folder') {
-    body.innerHTML = markedWithLatex(content);
+    body.innerHTML = marked.parse(content);
   } else {
     body.innerHTML = `<pre>${content.replace(/</g, '&lt;')}</pre>`;
   }
@@ -2456,9 +2456,9 @@ function expandCardFullPage(card, highlightQuery) {
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
     renderChatTranscript(contentEl, rawContent);
   } else {
-    // Render markdown with marked (protect LaTeX from mangling)
-    contentEl.innerHTML = markedWithLatex(rawContent);
-    renderLatex(contentEl);
+    // Render markdown — marked-katex-extension handles $...$ and $$...$$ natively
+    contentEl.innerHTML = marked.parse(rawContent);
+    renderLatex(contentEl); // still needed for \(...\) and \[...\] delimiters
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
     if (highlightQuery) highlightMatches(contentEl, highlightQuery);
@@ -7232,32 +7232,8 @@ function saveChatBeacon() {
   navigator.sendBeacon('/api/chat/save', blob);
 }
 
-// Protect LaTeX math from marked's markdown parser
-// Replaces $...$ and $$...$$ with placeholders before marked, restores after
-function markedWithLatex(src) {
-  const mathBlocks = [];
-  function protect(m) { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; }
-  // First protect code blocks (```) so we don't touch math inside them
-  let s = src.replace(/```[\s\S]*?```/g, protect);
-  // Protect inline code (`...`)
-  s = s.replace(/`[^`]+`/g, protect);
-  // Protect display math ($$...$$) — can span multiple lines
-  s = s.replace(/\$\$([\s\S]*?)\$\$/g, protect);
-  // Protect \[...\] and \(...\)
-  s = s.replace(/\\\[([\s\S]*?)\\\]/g, protect);
-  s = s.replace(/\\\(([\s\S]*?)\\\)/g, protect);
-  // Protect inline math ($...$) — allow anything except unescaped $
-  s = s.replace(/\$([^\$]+?)\$/g, protect);
-  // Parse with marked
-  let html = marked.parse(s);
-  // Restore all protected blocks
-  html = html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
-    const orig = mathBlocks[parseInt(i)];
-    // Code blocks were protected too — they come back as-is
-    return orig;
-  });
-  return html;
-}
+// marked is now bundled with marked-katex-extension — $...$ and $$...$$ are
+// rendered as KaTeX during marked.parse(). No manual protection needed.
 
 function renderLatex(el) {
   if (typeof renderMathInElement === 'function' && el) {
