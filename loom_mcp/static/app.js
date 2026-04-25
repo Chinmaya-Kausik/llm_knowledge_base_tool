@@ -1311,7 +1311,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
   // Body content: markdown gets full render, files get summary initially
   let bodyHTML;
   if (isMarkdown && content) {
-    bodyHTML = marked.parse(content);
+    bodyHTML = markedWithLatex(content);
   } else if (!isFolder && !isMarkdown) {
     if (content && (category === 'code' || category === 'data')) {
       const preview = content.slice(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1321,7 +1321,7 @@ function createDocCard(nodeData, content, pos, options = {}) {
       bodyHTML = `<div class="file-summary">${summary}</div>`;
     }
   } else {
-    bodyHTML = content ? marked.parse(content) : '<em>Empty</em>';
+    bodyHTML = content ? markedWithLatex(content) : '<em>Empty</em>';
   }
 
   // Footer — path breadcrumb + tags (only if we have either)
@@ -1658,7 +1658,7 @@ async function exitCardEdit(card) {
   if (category === 'code') {
     body.innerHTML = `<pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
   } else if (category === 'markdown' || category === 'folder') {
-    body.innerHTML = marked.parse(content);
+    body.innerHTML = markedWithLatex(content);
   } else {
     body.innerHTML = `<pre>${content.replace(/</g, '&lt;')}</pre>`;
   }
@@ -2456,8 +2456,8 @@ function expandCardFullPage(card, highlightQuery) {
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
     renderChatTranscript(contentEl, rawContent);
   } else {
-    // Render markdown with marked
-    contentEl.innerHTML = marked.parse(rawContent);
+    // Render markdown with marked (protect LaTeX from mangling)
+    contentEl.innerHTML = markedWithLatex(rawContent);
     renderLatex(contentEl);
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
@@ -7230,6 +7230,28 @@ function saveChatBeacon() {
     session_id: chatSessionId, messages: chatMessages, title: activePanel?._generatedTitle || null, context_path: activePanel?.contextPath || null,
   })], { type: 'application/json' });
   navigator.sendBeacon('/api/chat/save', blob);
+}
+
+// Protect LaTeX math from marked's markdown parser
+// Replaces $...$ and $$...$$ with placeholders before marked, restores after
+function markedWithLatex(src) {
+  const mathBlocks = [];
+  // Protect display math ($$...$$) first, then inline ($...$)
+  let s = src.replace(/\$\$([\s\S]*?)\$\$/g, (m) => {
+    mathBlocks.push(m);
+    return `%%MATH${mathBlocks.length - 1}%%`;
+  });
+  s = s.replace(/\$([^\$\n]+?)\$/g, (m) => {
+    mathBlocks.push(m);
+    return `%%MATH${mathBlocks.length - 1}%%`;
+  });
+  // Also protect \[...\] and \(...\)
+  s = s.replace(/\\\[([\s\S]*?)\\\]/g, (m) => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
+  s = s.replace(/\\\(([\s\S]*?)\\\)/g, (m) => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
+  let html = marked.parse(s);
+  // Restore math blocks
+  html = html.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+  return html;
 }
 
 function renderLatex(el) {
