@@ -580,11 +580,14 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         tool_input: dict[str, Any],
         context: Any,
     ) -> Any:
+        import logging
+        log = logging.getLogger("loom.chat")
         from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
 
         session = sessions.get(session_id, {})
         rules = session.get("permission_rules", {})
         category = _map_tool_to_category(tool_name)
+        log.info("[perm] tool=%s category=%s rule=%s", tool_name, category, rules.get(category, "?"))
 
         # Check for destructive commands in Bash
         if tool_name == "Bash":
@@ -597,6 +600,7 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
                 r'git\s+branch\s+-[dD]', r'git\s+push\s+--force',
             ]
             if any(re.search(p, cmd) for p in destructive_patterns):
+                log.info("[perm] DESTRUCTIVE: %s -> destructive_git", cmd[:80])
                 category = "destructive_git"
 
         # Unknown tools default to "ask" when any rules are active
@@ -604,11 +608,14 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         rule = rules.get(category, default_rule)
 
         if rule == "allow":
+            log.info("[perm] -> ALLOW (rule=%s category=%s)", rule, category)
             return PermissionResultAllow()
         if rule == "deny":
+            log.info("[perm] -> DENY (rule=%s category=%s)", rule, category)
             return PermissionResultDeny(message=f"Denied by user permission settings ({category})")
 
         # rule == "ask" (or "unknown"): forward to browser and wait for response
+        log.info("[perm] -> ASK (rule=%s category=%s tool=%s)", rule, category, tool_name)
         try:
             import uuid as _uuid
             perm_id = str(_uuid.uuid4())[:8]
@@ -653,6 +660,9 @@ async def _wait_for_permission_response(session_id: str, perm_id: str) -> str:
 
 def resolve_permission(session_id: str, decision: str, perm_id: str = "") -> None:
     """Called when the browser sends a permission response."""
+    import logging
+    log = logging.getLogger("loom.chat")
+    log.info("[perm] resolve: session=%s perm_id=%s decision=%s pending=%d", session_id[:8], perm_id, decision, len(_permission_futures))
     # Try exact match first, then fall back to session-only match for backward compat
     key = (session_id, perm_id)
     future = _permission_futures.get(key)
