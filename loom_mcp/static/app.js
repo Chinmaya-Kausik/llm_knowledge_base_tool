@@ -7236,21 +7236,26 @@ function saveChatBeacon() {
 // Replaces $...$ and $$...$$ with placeholders before marked, restores after
 function markedWithLatex(src) {
   const mathBlocks = [];
-  // Protect display math ($$...$$) first, then inline ($...$)
-  let s = src.replace(/\$\$([\s\S]*?)\$\$/g, (m) => {
-    mathBlocks.push(m);
-    return `%%MATH${mathBlocks.length - 1}%%`;
-  });
-  s = s.replace(/\$([^\$\n]+?)\$/g, (m) => {
-    mathBlocks.push(m);
-    return `%%MATH${mathBlocks.length - 1}%%`;
-  });
-  // Also protect \[...\] and \(...\)
-  s = s.replace(/\\\[([\s\S]*?)\\\]/g, (m) => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
-  s = s.replace(/\\\(([\s\S]*?)\\\)/g, (m) => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
+  function protect(m) { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; }
+  // First protect code blocks (```) so we don't touch math inside them
+  let s = src.replace(/```[\s\S]*?```/g, protect);
+  // Protect inline code (`...`)
+  s = s.replace(/`[^`]+`/g, protect);
+  // Protect display math ($$...$$) — can span multiple lines
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, protect);
+  // Protect \[...\] and \(...\)
+  s = s.replace(/\\\[([\s\S]*?)\\\]/g, protect);
+  s = s.replace(/\\\(([\s\S]*?)\\\)/g, protect);
+  // Protect inline math ($...$) — allow anything except unescaped $
+  s = s.replace(/\$([^\$]+?)\$/g, protect);
+  // Parse with marked
   let html = marked.parse(s);
-  // Restore math blocks
-  html = html.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+  // Restore all protected blocks
+  html = html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
+    const orig = mathBlocks[parseInt(i)];
+    // Code blocks were protected too — they come back as-is
+    return orig;
+  });
   return html;
 }
 
