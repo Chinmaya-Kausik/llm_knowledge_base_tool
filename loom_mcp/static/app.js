@@ -2299,13 +2299,20 @@ function focusCard(card) {
   setTimeout(() => card.classList.remove('focused'), 2000);
 }
 
-function expandCardFullPage(card, highlightQuery) {
+async function expandCardFullPage(card, highlightQuery) {
   if (expandedCard) collapseFullPage();
   // Dismiss any canvas edit
   if (activeEditCard) exitCardEdit(activeEditCard);
   setFocusedItem(card.dataset.path, null);
 
   const path = card.dataset.path;
+  // Fetch content on demand if not in cardMeta
+  if (!cardMeta.has(path) || !cardMeta.get(path)?.content) {
+    try {
+      const data = await api.page(path);
+      cardMeta.set(path, { frontmatter: data.frontmatter, content: data.content || '' });
+    } catch {}
+  }
   const meta = cardMeta.get(path);
   const title = card.querySelector('.doc-title')?.textContent || path;
   const rawContent = meta?.content || '';
