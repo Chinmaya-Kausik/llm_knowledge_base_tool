@@ -6510,6 +6510,11 @@ function handleChatEvent(msg) {
 
   // Status bar is created at dispatch time in sendChatMessage() — no swap needed here
 
+  try { _handleChatEventInner(msg, messages); }
+  catch (e) { console.error('[Chat] ERROR in handleChatEvent for type=' + msg.type + ':', e); }
+}
+
+function _handleChatEventInner(msg, messages) {
   switch (msg.type) {
     case 'thinking': {
       const sub = getEventTarget(msg);
@@ -6571,8 +6576,15 @@ function handleChatEvent(msg) {
       if (msg.content) {
         // Route text to subagent body or parent
         const sub = msg.subagent_id ? activeSubagents.get(msg.subagent_id) : null;
-        const container = sub ? sub.body : currentAssistantEl;
-        if (!container) break;
+        let container = sub ? sub.body : currentAssistantEl;
+        // Recovery: if container is null, create a new assistant element
+        if (!container) {
+          console.warn('[Chat] text event with no container — recovering');
+          container = document.createElement('div');
+          container.className = 'chat-msg chat-msg-assistant';
+          messages.appendChild(container);
+          if (!sub) currentAssistantEl = container;
+        }
 
         chatTokenCount += Math.ceil(msg.content.length / 4);
         currentResponseText += msg.content;
@@ -6589,11 +6601,16 @@ function handleChatEvent(msg) {
           container._currentTextEl = textEl;
         }
         textEl._rawText = (textEl._rawText || '') + msg.content;
-        textEl.innerHTML = marked.parse(textEl._rawText);
-        renderLatex(textEl);
-        textEl.querySelectorAll('.wiki-link').forEach(el => {
-          el.onclick = () => focusCardByTitle(el.dataset.target);
-        });
+        // Debounced markdown rendering — show raw text immediately, render when idle
+        textEl.textContent = textEl._rawText;
+        clearTimeout(textEl._renderTimer);
+        textEl._renderTimer = setTimeout(() => {
+          textEl.innerHTML = marked.parse(textEl._rawText);
+          renderLatex(textEl);
+          textEl.querySelectorAll('.wiki-link').forEach(el => {
+            el.onclick = () => focusCardByTitle(el.dataset.target);
+          });
+        }, 150);
       }
       break;
 
