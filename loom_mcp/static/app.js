@@ -2935,18 +2935,6 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
         saveBtn.style.cssText = 'margin-left:auto;background:var(--accent);color:white;border-color:var(--accent)';
         headerEl.querySelector('span[style*="flex"]').after(saveBtn);
 
-        saveBtn.onclick = async () => {
-          if (meta && currentContent !== meta.content) {
-            try {
-              await api.savePage(path, meta.frontmatter, currentContent);
-              meta.content = currentContent;
-              cardMeta.set(path, meta);
-              saveBtn.textContent = 'Saved';
-              setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
-            } catch { saveBtn.textContent = 'Error'; }
-          }
-        };
-
         // CodeMirror editor
         const cm = await loadCodeMirror();
         const updateListener = cm.EditorView.updateListener.of((update) => {
@@ -2957,6 +2945,21 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
           }
         });
         const view = await createCodeEditor(el, content, path, { extraExtensions: [updateListener] });
+        _splitEditorView = view;
+
+        saveBtn.onclick = async () => {
+          if (meta && currentContent !== meta.content) {
+            try {
+              await api.savePage(path, meta.frontmatter, currentContent);
+              meta.content = currentContent;
+              cardMeta.set(path, meta);
+              saveBtn.textContent = 'Saved';
+              setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
+            } catch { saveBtn.textContent = 'Error'; }
+          }
+          // Scroll preview to match editor cursor position
+          syncPreviewToEditor(view);
+        };
         // Cmd+S to save
         view.dom.addEventListener('keydown', (ev) => {
           if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
@@ -2982,11 +2985,28 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
     sv._sidebarWasOpen = sidebarWasOpen;
   }
 
+  var _splitEditorView = null;
+
   function updatePreview() {
     const previewEl = sv?._rightPane?._content;
     if (!previewEl) return;
     previewEl.innerHTML = marked.parse(currentContent);
     renderLatex(previewEl);
+    // Sync scroll to editor cursor position
+    if (_splitEditorView) syncPreviewToEditor(_splitEditorView);
+  }
+
+  function syncPreviewToEditor(view) {
+    const previewEl = sv?._rightPane?._content;
+    if (!previewEl || !view) return;
+    // Calculate cursor position as a fraction of the document
+    const cursor = view.state.selection.main.head;
+    const totalChars = view.state.doc.length;
+    if (totalChars === 0) return;
+    const fraction = cursor / totalChars;
+    // Scroll preview to the same fraction
+    const scrollMax = previewEl.scrollHeight - previewEl.clientHeight;
+    previewEl.scrollTop = Math.round(fraction * scrollMax);
   }
 }
 
