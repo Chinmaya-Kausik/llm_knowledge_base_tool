@@ -833,6 +833,13 @@ body {
 .fullpage-content ul, .fullpage-content ol { padding-left: 22px; margin: 10px 0; }
 .fullpage-content blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--text-muted); }
 .fullpage-content img { max-width: 100%; border-radius: var(--radius); }
+.fullpage-width-controls { display: flex; gap: 2px; margin-right: 8px; }
+.fp-width-btn {
+  background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
+  padding: 2px 7px; border-radius: 4px; font-size: 11px; cursor: pointer;
+}
+.fp-width-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.fp-width-btn:hover { border-color: var(--accent); }
 .fullpage-content table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
 .fullpage-content th, .fullpage-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
 .fullpage-content th { background: var(--bg-surface); font-weight: 600; }
