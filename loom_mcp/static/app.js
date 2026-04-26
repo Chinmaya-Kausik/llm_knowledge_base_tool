@@ -1130,8 +1130,9 @@ let topZIndex = Z_LAYERS.floatingPanel; // Counter for bring-to-front within a l
 
 function bringToFront(el) {
   if (!el || !el.parentNode) return;
-  // Ensure floating panels can get above fullpage overlay (z-index 200)
-  topZIndex = Math.max(topZIndex + 1, Z_LAYERS.fullpage + 1);
+  // Ensure floating panels can get above fullpage (200) and split overlay (300)
+  const minZ = splitOverlay ? Z_LAYERS.palette + 1 : Z_LAYERS.fullpage + 1;
+  topZIndex = Math.max(topZIndex + 1, minZ);
   el.style.setProperty('z-index', String(topZIndex), 'important');
 }
 
