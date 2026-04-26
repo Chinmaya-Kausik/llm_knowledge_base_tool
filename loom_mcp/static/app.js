@@ -2990,10 +2990,11 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   function updatePreview() {
     const previewEl = sv?._rightPane?._content;
     if (!previewEl) return;
+    // Preserve scroll position during live updates
+    const scrollTop = previewEl.scrollTop;
     previewEl.innerHTML = marked.parse(currentContent);
     renderLatex(previewEl);
-    // Sync scroll to editor cursor position
-    if (_splitEditorView) syncPreviewToEditor(_splitEditorView);
+    previewEl.scrollTop = scrollTop;
   }
 
   function syncPreviewToEditor(view) {
