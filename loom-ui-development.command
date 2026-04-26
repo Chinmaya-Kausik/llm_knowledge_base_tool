@@ -14,7 +14,10 @@ if [ "$current" != "ui" ]; then
 fi
 
 export LOOM_PORT="${LOOM_PORT:-8421}"
-export LOOM_ROOT="${LOOM_ROOT:-$(pwd)/demo}"
+if [ -z "$LOOM_ROOT" ] && [ -f ~/.loom-app-config.json ]; then
+  LOOM_ROOT=$(python3 -c "import json; print(json.load(open('$HOME/.loom-app-config.json')).get('loom_root',''))" 2>/dev/null)
+fi
+export LOOM_ROOT="${LOOM_ROOT:-$HOME/Documents/loom}"
 
 # Check if port is already in use
 if lsof -i ":$LOOM_PORT" -P -sTCP:LISTEN >/dev/null 2>&1; then
