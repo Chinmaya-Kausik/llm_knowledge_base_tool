@@ -556,7 +556,7 @@ body {
 .split-pane-content {
   flex: 1; overflow-y: auto; min-height: 0;
 }
-.split-pane-content.padded { padding: 20px 32px; font-size: 14px; line-height: 1.7; }
+.split-pane-content.padded { padding: 20px 32px; font-size: 14px; line-height: 1.7; font-family: var(--font-read); }
 .split-pane-content .pdf-container { padding: 16px; }
 
 /* TeX compilation */
