@@ -3000,11 +3000,37 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   function syncPreviewToEditor(view) {
     const previewEl = sv?._rightPane?._content;
     if (!previewEl || !view) return;
-    // Match the editor's scroll fraction to the preview
-    const scroller = view.scrollDOM;
-    const editorScrollMax = scroller.scrollHeight - scroller.clientHeight;
-    if (editorScrollMax <= 0) return;
-    const fraction = scroller.scrollTop / editorScrollMax;
+    // Find the nearest heading at or above the editor's visible top
+    const topLine = view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from);
+    const topLineText = topLine.text.trim();
+    // Try to find matching heading in preview
+    if (topLineText.startsWith('#')) {
+      const headingText = topLineText.replace(/^#+\s*/, '');
+      const headings = previewEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      for (const h of headings) {
+        if (h.textContent.trim() === headingText) {
+          h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+      }
+    }
+    // Fallback: scan upward from top line to find nearest heading
+    for (let ln = topLine.number; ln >= 1; ln--) {
+      const line = view.state.doc.line(ln);
+      if (line.text.trim().startsWith('#')) {
+        const headingText = line.text.trim().replace(/^#+\s*/, '');
+        const headings = previewEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        for (const h of headings) {
+          if (h.textContent.trim() === headingText) {
+            h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
+        }
+      }
+    }
+    // Last resort: line fraction
+    const totalLines = view.state.doc.lines;
+    const fraction = topLine.number / totalLines;
     const previewScrollMax = previewEl.scrollHeight - previewEl.clientHeight;
     previewEl.scrollTop = Math.round(fraction * previewScrollMax);
   }
