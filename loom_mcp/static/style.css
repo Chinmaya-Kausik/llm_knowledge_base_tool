@@ -532,6 +532,9 @@ body {
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
   min-width: 0;
 }
+/* More spacious editor in split view */
+.split-pane .cm-editor .cm-scroller { line-height: 1.8; }
+.split-pane .cm-editor .cm-content { padding: 16px 8px; }
 .split-divider {
   width: 8px; flex-shrink: 0; cursor: col-resize;
   background: var(--border-soft); display: flex; align-items: center; justify-content: center;
@@ -556,7 +559,7 @@ body {
 .split-pane-content {
   flex: 1; overflow-y: auto; min-height: 0;
 }
-.split-pane-content.padded { padding: 24px 40px; font-size: 14px; line-height: 1.7; font-family: var(--font-read); }
+.split-pane-content.padded { padding: 24px 40px; font-size: var(--read-font-size, 14px); line-height: 1.7; font-family: var(--font-read); }
 .split-pane-content.padded h1 { font-size: 24px; margin: 20px 0 10px; color: var(--text-bright); }
 .split-pane-content.padded h2 { font-size: 18px; margin: 18px 0 8px; color: var(--text-bright); }
 .split-pane-content.padded h3 { font-size: 15px; margin: 14px 0 6px; color: var(--text-bright); }
@@ -828,7 +831,7 @@ body {
 }
 .fullpage-content {
   flex: 1; overflow-y: auto; padding: 24px 40px;
-  font-size: 14px; line-height: 1.7;
+  font-size: var(--read-font-size, 14px); line-height: 1.7;
 }
 .fullpage-resize-handle {
   width: 8px; flex-shrink: 0; cursor: col-resize;

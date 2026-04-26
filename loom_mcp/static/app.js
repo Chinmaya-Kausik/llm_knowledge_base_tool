@@ -8379,6 +8379,7 @@ function openFullSettings(initialTab) {
         { key: 'threads', label: 'Loom threads', desc: 'Faint lines from chat to focused card.', opts: ['off','on'] },
         { key: 'font-size', label: 'Font size', desc: 'Scales the entire type scale — content, sidebar, chat.', type: 'slider', min: 11, max: 18, prop: '--fs-base', suffix: 'px' },
         { key: 'code-font-size', label: 'Code font size', desc: 'Size of code blocks in wiki cards.', type: 'slider', min: 10, max: 18, prop: '--code-font-size', suffix: 'px' },
+        { key: 'read-font-size', label: 'Reading font size', desc: 'Fullscreen markdown preview and split editor preview.', type: 'slider', min: 12, max: 22, prop: '--read-font-size', suffix: 'px' },
         { key: 'font-ui', label: 'UI font', desc: 'Toolbar, sidebar, labels, settings.', type: 'font', prop: '--font-ui',
           fonts: [
             { val: 'inter', label: 'Inter', stack: "'Inter', system-ui, sans-serif" },
