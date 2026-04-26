@@ -5034,6 +5034,7 @@ function createFloatingPanel(options = {}) {
     sb.className = 'chat-status-bar chat-active-status';
     sb.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${fpModel}"><span class="dot"></span>${fpModel}</span>`;
     assistantEl.appendChild(sb);
+    assistantEl._statusBar = sb;
     messagesEl.appendChild(assistantEl);
     panel.assistantEl = assistantEl;
 
@@ -6015,10 +6016,10 @@ function sendChatMessage() {
   const currentModel = activePanel.model || 'sonnet';
   currentAssistantEl.dataset.model = currentModel;
   const statusBar = document.createElement('div');
-  statusBar.className = 'chat-status-bar';
   statusBar.className = 'chat-status-bar chat-active-status';
   statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${currentModel}"><span class="dot"></span>${currentModel}</span>`;
   currentAssistantEl.appendChild(statusBar);
+  currentAssistantEl._statusBar = statusBar;
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
@@ -6253,10 +6254,10 @@ function sendQueuedMessage(text) {
   const mdl = activePanel.model || 'sonnet';
   currentAssistantEl.dataset.model = mdl;
   const statusBar = document.createElement('div');
-  statusBar.className = 'chat-status-bar';
   statusBar.className = 'chat-status-bar chat-active-status';
   statusBar.innerHTML = `<span class="pondering">${randomPonderingWord()}...</span> <span class="chat-elapsed">0.0s</span> <span class="chat-tokens">0 tokens</span><span class="model-pill" data-model="${mdl}"><span class="dot"></span>${mdl}</span>`;
   currentAssistantEl.appendChild(statusBar);
+  currentAssistantEl._statusBar = statusBar;
   (chatMessagesContainer || document.getElementById('chat-messages')).appendChild(currentAssistantEl);
   currentThinkingEl = null;
   currentThinkingWrapper = null;
@@ -7225,6 +7226,10 @@ function _handleChatEventInner(msg, messages) {
     }
   }
 
+  // Keep the status bar at the bottom of the assistant element
+  if (currentAssistantEl?._statusBar && currentAssistantEl.contains(currentAssistantEl._statusBar)) {
+    currentAssistantEl.appendChild(currentAssistantEl._statusBar);
+  }
 }
 
 function buildDetailsElement(html) {
