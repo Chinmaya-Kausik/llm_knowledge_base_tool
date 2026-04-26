@@ -6,8 +6,11 @@ cd "$(dirname "$0")"
 # Switch to dev branch
 git checkout dev 2>/dev/null || echo "No dev branch yet — running from current branch"
 
-# Dev always serves the demo loom
-export LOOM_ROOT="$(pwd)/demo"
+# Read loom root from config, env var, or default
+if [ -z "$LOOM_ROOT" ] && [ -f ~/.loom-app-config.json ]; then
+  LOOM_ROOT=$(python3 -c "import json; print(json.load(open('$HOME/.loom-app-config.json')).get('loom_root',''))" 2>/dev/null)
+fi
+export LOOM_ROOT="${LOOM_ROOT:-$HOME/Documents/loom}"
 export LOOM_PORT=8421
 export PATH="$HOME/.local/bin:$PATH"
 
