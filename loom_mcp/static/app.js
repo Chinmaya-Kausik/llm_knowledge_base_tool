@@ -3022,7 +3022,7 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
         // Scroll within the preview pane only (don't shift the whole page)
         const target = node.parentElement;
         const targetTop = target.offsetTop;
-        previewEl.scrollTop = Math.max(0, targetTop - previewEl.clientHeight / 3);
+        previewEl.scrollTo({ top: Math.max(0, targetTop - previewEl.clientHeight / 3), behavior: 'smooth' });
         return;
       }
     }
