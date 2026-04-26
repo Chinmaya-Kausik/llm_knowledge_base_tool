@@ -3019,7 +3019,10 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
     let node;
     while ((node = walker.nextNode())) {
       if (node.textContent.includes(cleanText.slice(0, 30))) {
-        node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Scroll within the preview pane only (don't shift the whole page)
+        const target = node.parentElement;
+        const targetTop = target.offsetTop;
+        previewEl.scrollTop = Math.max(0, targetTop - previewEl.clientHeight / 3);
         return;
       }
     }
