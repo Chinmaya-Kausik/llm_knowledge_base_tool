@@ -525,7 +525,7 @@ body {
 
 /* Split-pane overlay (two files side by side) */
 .split-overlay {
-  position: absolute; inset: 0; z-index: 300;
+  position: absolute; inset: 0; z-index: 200;
   background: var(--bg); display: flex; overflow: hidden;
 }
 .split-pane {

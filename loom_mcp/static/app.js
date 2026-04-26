@@ -1130,13 +1130,7 @@ let topZIndex = Z_LAYERS.floatingPanel; // Counter for bring-to-front within a l
 
 function bringToFront(el) {
   if (!el || !el.parentNode) return;
-  // When split/fullpage overlays are open, move panel to document.body
-  // so it's not trapped behind the overlay's opaque background
-  if ((splitOverlay || expandedCard) && el.parentNode !== document.body) {
-    document.body.appendChild(el);
-  }
-  const minZ = splitOverlay ? Z_LAYERS.palette + 1 : Z_LAYERS.fullpage + 1;
-  topZIndex = Math.max(topZIndex + 1, minZ);
+  topZIndex = Math.max(topZIndex + 1, Z_LAYERS.fullpage + 1);
   el.style.setProperty('z-index', String(topZIndex), 'important');
 }
 
