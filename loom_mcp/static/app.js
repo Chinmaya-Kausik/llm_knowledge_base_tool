@@ -2998,7 +2998,25 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   }
 
   function syncPreviewToEditor(view) {
-    // No scroll sync — preview stays where user left it
+    const previewEl = sv?._rightPane?._content;
+    if (!previewEl || !view) return;
+    const cursor = view.state.selection.main.head;
+    const cursorLine = view.state.doc.lineAt(cursor);
+    const searchText = cursorLine.text.trim();
+    if (!searchText || searchText.length < 3) return;
+    const cleanText = searchText
+      .replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/\*/g, '')
+      .replace(/`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim();
+    if (!cleanText || cleanText.length < 3) return;
+    const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.textContent.includes(cleanText.slice(0, 30))) {
+        const target = node.parentElement;
+        previewEl.scrollTop = Math.max(0, target.offsetTop - previewEl.clientHeight / 3);
+        return;
+      }
+    }
   }
 }
 
