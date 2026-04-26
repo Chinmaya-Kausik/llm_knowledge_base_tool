@@ -802,10 +802,18 @@ body {
 .fullpage-back:hover { border-color: var(--accent); color: var(--accent); }
 .fullpage-title { font-weight: 700; font-size: 15px; color: var(--text-bright); }
 .fullpage-path { font-size: 11px; color: var(--text-muted); }
+.fullpage-body {
+  flex: 1; display: flex; overflow: hidden;
+}
 .fullpage-content {
   flex: 1; overflow-y: auto; padding: 24px 40px;
   font-size: 14px; line-height: 1.7;
 }
+.fullpage-resize-handle {
+  width: 6px; flex-shrink: 0; cursor: ew-resize;
+  background: transparent; transition: background 0.15s;
+}
+.fullpage-resize-handle:hover { background: var(--accent-soft); }
 .fullpage-content h1 { font-size: 24px; margin: 20px 0 10px; color: var(--text-bright); }
 .fullpage-content h2 { font-size: 18px; margin: 18px 0 8px; color: var(--text-bright); }
 .fullpage-content h3 { font-size: 15px; margin: 14px 0 6px; color: var(--text-bright); }
@@ -817,13 +825,6 @@ body {
 .fullpage-content ul, .fullpage-content ol { padding-left: 22px; margin: 10px 0; }
 .fullpage-content blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--text-muted); }
 .fullpage-content img { max-width: 100%; border-radius: var(--radius); }
-.fullpage-width-controls { display: flex; gap: 2px; margin-right: 8px; }
-.fp-width-btn {
-  background: var(--bg-surface2); border: 1px solid var(--border); color: var(--text-muted);
-  padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
-}
-.fp-width-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.fp-width-btn:hover { border-color: var(--accent); }
 .fullpage-content table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
 .fullpage-content th, .fullpage-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
 .fullpage-content th { background: var(--bg-surface); font-weight: 600; }

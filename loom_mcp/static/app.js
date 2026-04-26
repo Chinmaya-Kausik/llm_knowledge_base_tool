@@ -2325,21 +2325,18 @@ async function expandCardFullPage(card, highlightQuery) {
   overlay.id = 'fullpage-overlay';
   overlay.dataset.path = path;
   overlay.dataset.mode = 'preview';
-  const savedWidth = localStorage.getItem('loom-fullpage-width') || '100';
   overlay.innerHTML = `
     <div class="fullpage-header">
       <button class="fullpage-back" title="Back (Escape)">← Back</button>
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
-      <div class="fullpage-width-controls">
-        <button class="fp-width-btn${savedWidth==='50'?' active':''}" data-w="50">50%</button>
-        <button class="fp-width-btn${savedWidth==='75'?' active':''}" data-w="75">75%</button>
-        <button class="fp-width-btn${savedWidth==='100'?' active':''}" data-w="100">100%</button>
-      </div>
       <button class="fullpage-toggle">Edit</button>
     </div>
-    <div class="fullpage-content" style="max-width:${savedWidth === '100' ? 'none' : savedWidth + '%'}"></div>
+    <div class="fullpage-body">
+      <div class="fullpage-content"></div>
+      <div class="fullpage-resize-handle" title="Drag to resize"></div>
+    </div>
   `;
   // Append to canvas-container — fills content area, respects sidebar + toolbar
   document.getElementById('canvas-container').appendChild(overlay);
@@ -2353,16 +2350,35 @@ async function expandCardFullPage(card, highlightQuery) {
   }
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
 
-  // Width controls
-  overlay.querySelectorAll('.fp-width-btn').forEach(btn => {
-    btn.onclick = () => {
-      const w = btn.dataset.w;
-      overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const contentEl = overlay.querySelector('.fullpage-content');
-      contentEl.style.maxWidth = w === '100' ? 'none' : w + '%';
-      localStorage.setItem('loom-fullpage-width', w);
-    };
+  // Draggable right edge to resize content pane
+  const resizeHandle = overlay.querySelector('.fullpage-resize-handle');
+  const fpContent = overlay.querySelector('.fullpage-content');
+  const savedFpWidth = localStorage.getItem('loom-fullpage-content-width');
+  if (savedFpWidth) fpContent.style.width = savedFpWidth + 'px';
+
+  let fpResizing = false;
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    fpResizing = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!fpResizing) return;
+    const overlayRect = overlay.getBoundingClientRect();
+    const w = Math.max(400, Math.min(overlayRect.width, e.clientX - overlayRect.left));
+    fpContent.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!fpResizing) return;
+    fpResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    localStorage.setItem('loom-fullpage-content-width', parseInt(fpContent.style.width));
+  });
+  resizeHandle.addEventListener('dblclick', () => {
+    fpContent.style.width = '';
+    localStorage.removeItem('loom-fullpage-content-width');
   });
 
   // Saved chat transcripts: show "Continue" button
