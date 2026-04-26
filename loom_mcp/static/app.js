@@ -2404,7 +2404,7 @@ async function expandCardFullPage(card, highlightQuery) {
   document.addEventListener('mousemove', (e) => {
     if (!fpResizing) return;
     const overlayRect = overlay.getBoundingClientRect();
-    const w = Math.max(400, Math.min(overlayRect.width - 40, e.clientX - overlayRect.left));
+    const w = Math.max(300, Math.min(overlayRect.width - 8, e.clientX - overlayRect.left));
     fpContent.style.width = w + 'px';
     fpContent.style.flex = 'none';
   });
