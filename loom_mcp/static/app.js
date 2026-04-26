@@ -2306,17 +2306,16 @@ async function expandCardFullPage(card, highlightQuery) {
   setFocusedItem(card.dataset.path, null);
 
   const path = card.dataset.path;
-  // Fetch content on demand if not in cardMeta
-  const hadMeta = cardMeta.has(path);
-  const existingLen = cardMeta.get(path)?.content?.length || 0;
-  if (!hadMeta || !existingLen) {
-    try {
-      const data = await api.page(path);
-      cardMeta.set(path, { frontmatter: data.frontmatter, content: data.content || '' });
-      console.log(`[Fullpage] Fetched ${path}: ${(data.content||'').length} chars (was ${existingLen}, hadMeta=${hadMeta})`);
-    } catch (e) {
-      console.error(`[Fullpage] Failed to fetch ${path}:`, e);
+  // Always fetch full content for fullscreen view — cardMeta may have truncated (8000 char) version
+  try {
+    const data = await api.page(path);
+    const prevLen = cardMeta.get(path)?.content?.length || 0;
+    cardMeta.set(path, { frontmatter: data.frontmatter, content: data.content || '' });
+    if ((data.content||'').length !== prevLen) {
+      console.log(`[Fullpage] Fetched full content for ${path}: ${(data.content||'').length} chars (was ${prevLen})`);
     }
+  } catch (e) {
+    console.error(`[Fullpage] Failed to fetch ${path}:`, e);
   }
   const meta = cardMeta.get(path);
   const title = card.querySelector('.doc-title')?.textContent || path;
