@@ -2689,8 +2689,11 @@ async function toggleFullPageEdit(overlay, path) {
   if (overlay.dataset.mode === 'preview') {
     // Markdown files: open split view with editor + live preview
     if (path.endsWith('.md')) {
+      // Transition to split view — don't restore sidebar
+      const sidebarWas = expandedCard?._sidebarWasOpen;
+      if (expandedCard) { expandedCard._sidebarWasOpen = false; }
       collapseFullPage();
-      openMarkdownSplitEdit(path, meta);
+      openMarkdownSplitEdit(path, meta, sidebarWas);
       return;
     }
     // Non-markdown: inline textarea edit
@@ -2889,6 +2892,11 @@ function openSplitView(leftConfig, rightConfig) {
 
 function closeSplitView() {
   if (splitOverlay) {
+    // Restore sidebar if it was open before split view
+    if (splitOverlay._sidebarWasOpen) {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.remove('collapsed');
+    }
     const sourcePath = splitOverlay._sourcePath;
     splitOverlay.remove();
     splitOverlay = null;
@@ -2909,7 +2917,7 @@ function closeSplitView() {
 // ========================================
 // Markdown split edit — editor + live preview
 // ========================================
-function openMarkdownSplitEdit(path, meta) {
+function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   const content = meta?.content || '';
   const fileName = path.split('/').pop();
   let currentContent = content;
@@ -2940,13 +2948,15 @@ function openMarkdownSplitEdit(path, meta) {
         };
 
         // CodeMirror editor
-        const view = await createCodeEditor(el, content, path);
-        // Listen for changes
-        view.dom.addEventListener('input', () => {
-          currentContent = view.state.doc.toString();
-          clearTimeout(previewDebounce);
-          previewDebounce = setTimeout(updatePreview, 300);
+        const cm = await loadCodeMirror();
+        const updateListener = cm.EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            currentContent = update.state.doc.toString();
+            clearTimeout(previewDebounce);
+            previewDebounce = setTimeout(updatePreview, 300);
+          }
         });
+        const view = await createCodeEditor(el, content, path, { extraExtensions: [updateListener] });
         // Cmd+S to save
         view.dom.addEventListener('keydown', (ev) => {
           if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
@@ -2967,7 +2977,10 @@ function openMarkdownSplitEdit(path, meta) {
     }
   );
 
-  if (sv) sv._sourcePath = path;
+  if (sv) {
+    sv._sourcePath = path;
+    sv._sidebarWasOpen = sidebarWasOpen;
+  }
 
   function updatePreview() {
     const previewEl = sv?._rightPane?._content;
@@ -7729,6 +7742,12 @@ async function createCodeEditor(container, content, filename, options = {}) {
   if (options.readOnly) {
     extensions.push(cm.EditorState.readOnly.of(true));
   }
+  // Extra extensions (e.g., update listeners)
+  if (options.extraExtensions) {
+    extensions.push(...options.extraExtensions);
+  }
+  // Text wrapping
+  extensions.push(cm.EditorView.lineWrapping);
 
   const state = cm.EditorState.create({ doc: content, extensions });
   const view = new cm.EditorView({ state, parent: container });
