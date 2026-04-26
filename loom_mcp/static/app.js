@@ -2332,8 +2332,8 @@ async function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
       <div class="fullpage-width-controls">
-        <button class="fp-width-btn" data-w="50">50%</button>
-        <button class="fp-width-btn active" data-w="100">100%</button>
+        <button class="fp-width-btn active" data-w="50">50%</button>
+        <button class="fp-width-btn" data-w="100">100%</button>
       </div>
       <button class="fullpage-toggle">Edit</button>
     </div>
@@ -2366,7 +2366,7 @@ async function expandCardFullPage(card, highlightQuery) {
         c.style.width = '';
         c.style.flex = '';
         if (handle) handle.style.display = 'none';
-        localStorage.removeItem('loom-fullpage-content-width');
+        localStorage.setItem('loom-fullpage-content-width', 'full');
       } else {
         const px = Math.round(overlay.getBoundingClientRect().width * parseInt(w) / 100);
         c.style.width = px + 'px';
@@ -2381,15 +2381,17 @@ async function expandCardFullPage(card, highlightQuery) {
   const resizeHandle = overlay.querySelector('.fullpage-resize-handle');
   const fpContent = overlay.querySelector('.fullpage-content');
   const savedFpWidth = localStorage.getItem('loom-fullpage-content-width');
-  if (savedFpWidth) {
-    fpContent.style.width = savedFpWidth + 'px';
+  if (savedFpWidth === 'full') {
+    // User explicitly chose 100%
+    resizeHandle.style.display = 'none';
+    overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
+    overlay.querySelector('.fp-width-btn[data-w="100"]')?.classList.add('active');
+  } else {
+    // Default to 50% or use saved pixel width
+    const px = savedFpWidth ? parseInt(savedFpWidth) : Math.round(overlay.getBoundingClientRect().width * 0.5);
+    fpContent.style.width = px + 'px';
     fpContent.style.flex = 'none';
     resizeHandle.style.display = '';
-    // Update button state
-    overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
-    overlay.querySelector('.fp-width-btn[data-w="50"]')?.classList.add('active');
-  } else {
-    resizeHandle.style.display = 'none';
   }
 
   let fpResizing = false;
