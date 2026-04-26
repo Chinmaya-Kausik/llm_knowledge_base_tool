@@ -2354,7 +2354,10 @@ async function expandCardFullPage(card, highlightQuery) {
   const resizeHandle = overlay.querySelector('.fullpage-resize-handle');
   const fpContent = overlay.querySelector('.fullpage-content');
   const savedFpWidth = localStorage.getItem('loom-fullpage-content-width');
-  if (savedFpWidth) fpContent.style.width = savedFpWidth + 'px';
+  if (savedFpWidth) {
+    fpContent.style.width = savedFpWidth + 'px';
+    fpContent.style.flex = 'none';
+  }
 
   let fpResizing = false;
   resizeHandle.addEventListener('mousedown', (e) => {
@@ -2366,8 +2369,9 @@ async function expandCardFullPage(card, highlightQuery) {
   document.addEventListener('mousemove', (e) => {
     if (!fpResizing) return;
     const overlayRect = overlay.getBoundingClientRect();
-    const w = Math.max(400, Math.min(overlayRect.width, e.clientX - overlayRect.left));
+    const w = Math.max(400, Math.min(overlayRect.width - 40, e.clientX - overlayRect.left));
     fpContent.style.width = w + 'px';
+    fpContent.style.flex = 'none';
   });
   document.addEventListener('mouseup', () => {
     if (!fpResizing) return;
@@ -2378,6 +2382,7 @@ async function expandCardFullPage(card, highlightQuery) {
   });
   resizeHandle.addEventListener('dblclick', () => {
     fpContent.style.width = '';
+    fpContent.style.flex = '';
     localStorage.removeItem('loom-fullpage-content-width');
   });
 
