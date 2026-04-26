@@ -3002,21 +3002,26 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
     if (!previewEl || !view) return;
     const cursor = view.state.selection.main.head;
     const cursorLine = view.state.doc.lineAt(cursor);
+    // Try text matching first
     const searchText = cursorLine.text.trim();
-    if (!searchText || searchText.length < 3) return;
-    const cleanText = searchText
-      .replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/\*/g, '')
-      .replace(/`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim();
-    if (!cleanText || cleanText.length < 3) return;
-    const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.textContent.includes(cleanText.slice(0, 30))) {
-        const target = node.parentElement;
-        previewEl.scrollTop = Math.max(0, target.offsetTop - previewEl.clientHeight / 3);
-        return;
+    if (searchText && searchText.length >= 3) {
+      const cleanText = searchText
+        .replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/\*/g, '')
+        .replace(/`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim();
+      if (cleanText && cleanText.length >= 3) {
+        const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          if (node.textContent.includes(cleanText.slice(0, 30))) {
+            previewEl.scrollTop = Math.max(0, node.parentElement.offsetTop - previewEl.clientHeight / 3);
+            return;
+          }
+        }
       }
     }
+    // Fallback: line-based fraction
+    const fraction = cursorLine.number / view.state.doc.lines;
+    previewEl.scrollTop = Math.round(fraction * (previewEl.scrollHeight - previewEl.clientHeight));
   }
 }
 
