@@ -810,10 +810,18 @@ body {
   font-size: 14px; line-height: 1.7;
 }
 .fullpage-resize-handle {
-  width: 6px; flex-shrink: 0; cursor: ew-resize;
-  background: transparent; transition: background 0.15s;
+  width: 8px; flex-shrink: 0; cursor: col-resize;
+  background: var(--border-soft); transition: background 0.15s;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
 }
 .fullpage-resize-handle:hover { background: var(--accent-soft); }
+.fullpage-resize-handle::after {
+  content: '⋮';
+  color: var(--text-dim);
+  font-size: 14px;
+  pointer-events: none;
+}
 .fullpage-content h1 { font-size: 24px; margin: 20px 0 10px; color: var(--text-bright); }
 .fullpage-content h2 { font-size: 18px; margin: 18px 0 8px; color: var(--text-bright); }
 .fullpage-content h3 { font-size: 15px; margin: 14px 0 6px; color: var(--text-bright); }
