@@ -2687,7 +2687,13 @@ async function toggleFullPageEdit(overlay, path) {
   const meta = cardMeta.get(path);
 
   if (overlay.dataset.mode === 'preview') {
-    // Switch to edit
+    // Markdown files: open split view with editor + live preview
+    if (path.endsWith('.md')) {
+      collapseFullPage();
+      openMarkdownSplitEdit(path, meta);
+      return;
+    }
+    // Non-markdown: inline textarea edit
     contentEl.classList.add('editing');
     contentEl.innerHTML = `<textarea class="fullpage-edit-area">${(meta?.content||'').replace(/</g,'&lt;')}</textarea>`;
     overlay.dataset.mode = 'edit';
@@ -2697,14 +2703,12 @@ async function toggleFullPageEdit(overlay, path) {
       const m = ev.metaKey || ev.ctrlKey;
       if (m && ev.key === '[') { ev.preventDefault(); ev.stopPropagation(); collapseFullPage(); }
     });
-    // Selection tooltip in edit mode
     editArea?.addEventListener('mouseup', () => {
       const ta = editArea;
       if (ta.selectionStart === ta.selectionEnd) return;
       const selectedText = ta.value.substring(ta.selectionStart, ta.selectionEnd);
       if (selectedText.trim().length < 5) return;
       const tooltip = document.getElementById('selection-tooltip');
-      // Position near textarea cursor — approximate with textarea bounding rect
       const rect = ta.getBoundingClientRect();
       tooltip.style.left = (rect.left + rect.width / 2 - 40) + 'px';
       tooltip.style.top = (rect.top - 30) + 'px';
@@ -2803,7 +2807,40 @@ function openSplitView(leftConfig, rightConfig) {
 
   const leftPane = makePane(leftConfig, 'left');
   const rightPane = makePane(rightConfig, 'right');
+
+  // Draggable divider between panes
+  const divider = document.createElement('div');
+  divider.className = 'split-divider';
+  divider.innerHTML = '<span class="split-divider-grip">⋮</span>';
+  let splitDragging = false;
+  divider.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    splitDragging = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!splitDragging) return;
+    const rect = overlay.getBoundingClientRect();
+    const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
+    leftPane.style.flex = 'none';
+    leftPane.style.width = pct + '%';
+    rightPane.style.flex = '1';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!splitDragging) return;
+    splitDragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+  divider.addEventListener('dblclick', () => {
+    leftPane.style.flex = '1';
+    leftPane.style.width = '';
+    rightPane.style.flex = '1';
+  });
+
   overlay.appendChild(leftPane);
+  overlay.appendChild(divider);
   overlay.appendChild(rightPane);
   document.getElementById('canvas-container').appendChild(overlay);
   splitOverlay = overlay;
@@ -2866,6 +2903,77 @@ function closeSplitView() {
         expandCardFullPage(fakeCard);
       }
     }
+  }
+}
+
+// ========================================
+// Markdown split edit — editor + live preview
+// ========================================
+function openMarkdownSplitEdit(path, meta) {
+  const content = meta?.content || '';
+  const fileName = path.split('/').pop();
+  let currentContent = content;
+  let previewDebounce = null;
+
+  const sv = openSplitView(
+    {
+      title: fileName,
+      path: path,
+      render: async (el, headerEl) => {
+        // Save button in header
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'split-back';
+        saveBtn.textContent = 'Save';
+        saveBtn.style.cssText = 'margin-left:auto;background:var(--accent);color:white;border-color:var(--accent)';
+        headerEl.querySelector('span[style*="flex"]').after(saveBtn);
+
+        saveBtn.onclick = async () => {
+          if (meta && currentContent !== meta.content) {
+            try {
+              await api.savePage(path, meta.frontmatter, currentContent);
+              meta.content = currentContent;
+              cardMeta.set(path, meta);
+              saveBtn.textContent = 'Saved';
+              setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
+            } catch { saveBtn.textContent = 'Error'; }
+          }
+        };
+
+        // CodeMirror editor
+        const view = await createCodeEditor(el, content, path);
+        // Listen for changes
+        view.dom.addEventListener('input', () => {
+          currentContent = view.state.doc.toString();
+          clearTimeout(previewDebounce);
+          previewDebounce = setTimeout(updatePreview, 300);
+        });
+        // Cmd+S to save
+        view.dom.addEventListener('keydown', (ev) => {
+          if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
+            ev.preventDefault();
+            saveBtn.click();
+          }
+        });
+      },
+    },
+    {
+      title: 'Preview',
+      path: '',
+      render: (el) => {
+        el.classList.add('padded');
+        el.innerHTML = marked.parse(content);
+        renderLatex(el);
+      },
+    }
+  );
+
+  if (sv) sv._sourcePath = path;
+
+  function updatePreview() {
+    const previewEl = sv?._rightPane?._content;
+    if (!previewEl) return;
+    previewEl.innerHTML = marked.parse(currentContent);
+    renderLatex(previewEl);
   }
 }
 
