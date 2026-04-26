@@ -18,7 +18,13 @@ HIDDEN_PATTERNS = {
     "Thumbs.db",
 }
 
-HIDDEN_EXTENSIONS = {".pyc", ".pyo", ".egg-info", ".swp", ".swo"}
+HIDDEN_EXTENSIONS = {
+    ".pyc", ".pyo", ".egg-info", ".swp", ".swo",
+    # LaTeX build artifacts
+    ".aux", ".log", ".fls", ".fdb_latexmk", ".synctex.gz", ".synctex",
+    ".bbl", ".blg", ".out", ".toc", ".lof", ".lot", ".nav", ".snm", ".vrb",
+    ".run.xml", ".bcf", ".idx", ".ilg", ".ind", ".xdv",
+}
 
 # Dotfile patterns — separate toggle from build artifacts
 DOTFILE_PATTERNS = {
