@@ -8377,7 +8377,7 @@ function openFullSettings(initialTab) {
         { key: 'accent', label: 'Card accent', desc: 'Visual indicator on the left edge of cards.', opts: ['border','dot','flat'] },
         { key: 'canvas', label: 'Canvas background', desc: 'Pattern drawn behind the infinite canvas.', opts: ['dots','grid','paper','constellation'] },
         { key: 'threads', label: 'Loom threads', desc: 'Faint lines from chat to focused card.', opts: ['off','on'] },
-        { key: 'font-size', label: 'Font size', desc: 'Scales the entire type scale — content, sidebar, chat.', type: 'slider', min: 11, max: 18, prop: '--fs-base', suffix: 'px' },
+        { key: 'font-size', label: 'Interface font size', desc: 'Toolbar, sidebar, labels, chat, settings.', type: 'slider', min: 11, max: 18, prop: '--fs-base', suffix: 'px' },
         { key: 'code-font-size', label: 'Code font size', desc: 'Size of code blocks in wiki cards.', type: 'slider', min: 10, max: 18, prop: '--code-font-size', suffix: 'px' },
         { key: 'read-font-size', label: 'Reading font size', desc: 'Fullscreen markdown preview and split editor preview.', type: 'slider', min: 12, max: 22, prop: '--read-font-size', suffix: 'px' },
         { key: 'font-ui', label: 'UI font', desc: 'Toolbar, sidebar, labels, settings.', type: 'font', prop: '--font-ui',
