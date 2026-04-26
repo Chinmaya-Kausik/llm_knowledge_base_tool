@@ -2361,14 +2361,17 @@ async function expandCardFullPage(card, highlightQuery) {
       overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const c = overlay.querySelector('.fullpage-content');
+      const handle = overlay.querySelector('.fullpage-resize-handle');
       if (w === '100') {
         c.style.width = '';
         c.style.flex = '';
+        if (handle) handle.style.display = 'none';
         localStorage.removeItem('loom-fullpage-content-width');
       } else {
         const px = Math.round(overlay.getBoundingClientRect().width * parseInt(w) / 100);
         c.style.width = px + 'px';
         c.style.flex = 'none';
+        if (handle) handle.style.display = '';
         localStorage.setItem('loom-fullpage-content-width', px);
       }
     };
@@ -2381,6 +2384,12 @@ async function expandCardFullPage(card, highlightQuery) {
   if (savedFpWidth) {
     fpContent.style.width = savedFpWidth + 'px';
     fpContent.style.flex = 'none';
+    resizeHandle.style.display = '';
+    // Update button state
+    overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
+    overlay.querySelector('.fp-width-btn[data-w="50"]')?.classList.add('active');
+  } else {
+    resizeHandle.style.display = 'none';
   }
 
   let fpResizing = false;
@@ -2407,7 +2416,10 @@ async function expandCardFullPage(card, highlightQuery) {
   resizeHandle.addEventListener('dblclick', () => {
     fpContent.style.width = '';
     fpContent.style.flex = '';
+    resizeHandle.style.display = 'none';
     localStorage.removeItem('loom-fullpage-content-width');
+    overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
+    overlay.querySelector('.fp-width-btn[data-w="100"]')?.classList.add('active');
   });
 
   // Saved chat transcripts: show "Continue" button
