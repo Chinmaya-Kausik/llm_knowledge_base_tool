@@ -556,7 +556,22 @@ body {
 .split-pane-content {
   flex: 1; overflow-y: auto; min-height: 0;
 }
-.split-pane-content.padded { padding: 20px 32px; font-size: 14px; line-height: 1.7; font-family: var(--font-read); }
+.split-pane-content.padded { padding: 24px 40px; font-size: 14px; line-height: 1.7; font-family: var(--font-read); }
+.split-pane-content.padded h1 { font-size: 24px; margin: 20px 0 10px; color: var(--text-bright); }
+.split-pane-content.padded h2 { font-size: 18px; margin: 18px 0 8px; color: var(--text-bright); }
+.split-pane-content.padded h3 { font-size: 15px; margin: 14px 0 6px; color: var(--text-bright); }
+.split-pane-content.padded p { margin: 10px 0; }
+.split-pane-content.padded a { color: var(--accent); }
+.split-pane-content.padded code { background: var(--bg-surface2); padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+.split-pane-content.padded pre { background: var(--bg-surface2); padding: 12px; border-radius: var(--radius); overflow-x: auto; margin: 10px 0; }
+.split-pane-content.padded pre code { padding: 0; background: none; }
+.split-pane-content.padded ul, .split-pane-content.padded ol { padding-left: 22px; margin: 10px 0; }
+.split-pane-content.padded blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--text-muted); }
+.split-pane-content.padded img { max-width: 100%; border-radius: var(--radius); }
+.split-pane-content.padded table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+.split-pane-content.padded th, .split-pane-content.padded td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.split-pane-content.padded th { background: var(--bg-surface); font-weight: 600; }
+.split-pane-content.padded tr:nth-child(even) { background: var(--bg-surface2); }
 .split-pane-content .pdf-container { padding: 16px; }
 
 /* TeX compilation */
