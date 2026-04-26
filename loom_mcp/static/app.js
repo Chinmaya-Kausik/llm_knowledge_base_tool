@@ -2332,7 +2332,7 @@ async function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
       <div class="fullpage-width-controls">
-        <button class="fp-width-btn active" data-w="50">50%</button>
+        <button class="fp-width-btn" data-w="50">50%</button>
         <button class="fp-width-btn" data-w="100">100%</button>
       </div>
       <button class="fullpage-toggle">Edit</button>
@@ -2388,7 +2388,7 @@ async function expandCardFullPage(card, highlightQuery) {
     overlay.querySelector('.fp-width-btn[data-w="100"]')?.classList.add('active');
   } else {
     // Default to 50% or use saved pixel width
-    const px = savedFpWidth ? parseInt(savedFpWidth) : Math.round(overlay.getBoundingClientRect().width * 0.5);
+    const px = savedFpWidth ? parseInt(savedFpWidth) : Math.round(overlay.getBoundingClientRect().width * 0.6);
     fpContent.style.width = px + 'px';
     fpContent.style.flex = 'none';
     resizeHandle.style.display = '';
