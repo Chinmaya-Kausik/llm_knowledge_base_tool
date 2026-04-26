@@ -2998,34 +2998,7 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   }
 
   function syncPreviewToEditor(view) {
-    const previewEl = sv?._rightPane?._content;
-    if (!previewEl || !view) return;
-    // Get the text of the line at the cursor
-    const cursor = view.state.selection.main.head;
-    const cursorLine = view.state.doc.lineAt(cursor);
-    const searchText = cursorLine.text.trim();
-    if (!searchText || searchText.length < 3) return;
-    // Clean markdown syntax for matching against rendered text
-    const cleanText = searchText
-      .replace(/^#+\s*/, '')        // heading markers
-      .replace(/\*\*/g, '')         // bold
-      .replace(/\*/g, '')           // italic
-      .replace(/`/g, '')            // inline code
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
-      .trim();
-    if (!cleanText || cleanText.length < 3) return;
-    // Walk preview DOM to find a text node containing this text
-    const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.textContent.includes(cleanText.slice(0, 30))) {
-        // Scroll within the preview pane only (don't shift the whole page)
-        const target = node.parentElement;
-        const targetTop = target.offsetTop;
-        previewEl.scrollTo({ top: Math.max(0, targetTop - previewEl.clientHeight / 3), behavior: 'smooth' });
-        return;
-      }
-    }
+    // No scroll sync — preview stays where user left it
   }
 }
 
