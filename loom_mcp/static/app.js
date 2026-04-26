@@ -2331,6 +2331,11 @@ async function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
+      <div class="fullpage-width-controls">
+        <button class="fp-width-btn" data-w="50" title="50% width">½</button>
+        <button class="fp-width-btn" data-w="75" title="75% width">¾</button>
+        <button class="fp-width-btn active" data-w="100" title="Full width">⬛</button>
+      </div>
       <button class="fullpage-toggle">Edit</button>
     </div>
     <div class="fullpage-body">
@@ -2349,6 +2354,26 @@ async function expandCardFullPage(card, highlightQuery) {
     sidebar.classList.add('collapsed');
   }
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
+
+  // Width preset buttons
+  overlay.querySelectorAll('.fp-width-btn').forEach(btn => {
+    btn.onclick = () => {
+      const w = btn.dataset.w;
+      overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const c = overlay.querySelector('.fullpage-content');
+      if (w === '100') {
+        c.style.width = '';
+        c.style.flex = '';
+        localStorage.removeItem('loom-fullpage-content-width');
+      } else {
+        const px = Math.round(overlay.getBoundingClientRect().width * parseInt(w) / 100);
+        c.style.width = px + 'px';
+        c.style.flex = 'none';
+        localStorage.setItem('loom-fullpage-content-width', px);
+      }
+    };
+  });
 
   // Draggable right edge to resize content pane
   const resizeHandle = overlay.querySelector('.fullpage-resize-handle');
