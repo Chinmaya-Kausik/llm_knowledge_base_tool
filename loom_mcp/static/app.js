@@ -2534,7 +2534,9 @@ async function expandCardFullPage(card, highlightQuery) {
         });
         const data = await resp.json();
         if (data.ok) {
-          // Close fullpage, open split view
+          // Close fullpage, open split view — don't restore sidebar
+          const sidebarWas = expandedCard?._sidebarWasOpen;
+          if (expandedCard) expandedCard._sidebarWasOpen = false;
           collapseFullPage();
           const sv = openSplitView(
             {
@@ -2574,7 +2576,7 @@ async function expandCardFullPage(card, highlightQuery) {
               render: (el) => renderPdfInElement(el, `/media/${data.pdf_path}?t=${Date.now()}`),
             }
           );
-          if (sv) sv._sourcePath = path;
+          if (sv) { sv._sourcePath = path; sv._sidebarWasOpen = sidebarWas; }
         } else {
           compileBtn.textContent = 'Compile (failed)';
           // Show error inline below editor
