@@ -2332,8 +2332,8 @@ async function expandCardFullPage(card, highlightQuery) {
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
       <div class="fullpage-width-controls">
-        <button class="fp-width-btn" data-w="50" title="50% width">½</button>
-        <button class="fp-width-btn active" data-w="100" title="Full width">⬛</button>
+        <button class="fp-width-btn" data-w="50">50%</button>
+        <button class="fp-width-btn active" data-w="100">100%</button>
       </div>
       <button class="fullpage-toggle">Edit</button>
     </div>
