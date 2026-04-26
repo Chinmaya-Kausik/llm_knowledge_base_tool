@@ -2325,15 +2325,21 @@ async function expandCardFullPage(card, highlightQuery) {
   overlay.id = 'fullpage-overlay';
   overlay.dataset.path = path;
   overlay.dataset.mode = 'preview';
+  const savedWidth = localStorage.getItem('loom-fullpage-width') || '100';
   overlay.innerHTML = `
     <div class="fullpage-header">
       <button class="fullpage-back" title="Back (Escape)">← Back</button>
       <span class="fullpage-title">${title}</span>
       <span class="fullpage-path">${path}</span>
       <span style="flex:1"></span>
+      <div class="fullpage-width-controls">
+        <button class="fp-width-btn${savedWidth==='50'?' active':''}" data-w="50">50%</button>
+        <button class="fp-width-btn${savedWidth==='75'?' active':''}" data-w="75">75%</button>
+        <button class="fp-width-btn${savedWidth==='100'?' active':''}" data-w="100">100%</button>
+      </div>
       <button class="fullpage-toggle">Edit</button>
     </div>
-    <div class="fullpage-content"></div>
+    <div class="fullpage-content" style="max-width:${savedWidth === '100' ? 'none' : savedWidth + '%'}"></div>
   `;
   // Append to canvas-container — fills content area, respects sidebar + toolbar
   document.getElementById('canvas-container').appendChild(overlay);
@@ -2346,6 +2352,18 @@ async function expandCardFullPage(card, highlightQuery) {
     sidebar.classList.add('collapsed');
   }
   overlay.querySelector('.fullpage-back').onclick = collapseFullPage;
+
+  // Width controls
+  overlay.querySelectorAll('.fp-width-btn').forEach(btn => {
+    btn.onclick = () => {
+      const w = btn.dataset.w;
+      overlay.querySelectorAll('.fp-width-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const contentEl = overlay.querySelector('.fullpage-content');
+      contentEl.style.maxWidth = w === '100' ? 'none' : w + '%';
+      localStorage.setItem('loom-fullpage-width', w);
+    };
+  });
 
   // Saved chat transcripts: show "Continue" button
   if (path.startsWith('raw/chats/')) {
