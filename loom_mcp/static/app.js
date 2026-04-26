@@ -2307,15 +2307,21 @@ async function expandCardFullPage(card, highlightQuery) {
 
   const path = card.dataset.path;
   // Fetch content on demand if not in cardMeta
-  if (!cardMeta.has(path) || !cardMeta.get(path)?.content) {
+  const hadMeta = cardMeta.has(path);
+  const existingLen = cardMeta.get(path)?.content?.length || 0;
+  if (!hadMeta || !existingLen) {
     try {
       const data = await api.page(path);
       cardMeta.set(path, { frontmatter: data.frontmatter, content: data.content || '' });
-    } catch {}
+      console.log(`[Fullpage] Fetched ${path}: ${(data.content||'').length} chars (was ${existingLen}, hadMeta=${hadMeta})`);
+    } catch (e) {
+      console.error(`[Fullpage] Failed to fetch ${path}:`, e);
+    }
   }
   const meta = cardMeta.get(path);
   const title = card.querySelector('.doc-title')?.textContent || path;
   const rawContent = meta?.content || '';
+  console.log(`[Fullpage] Rendering ${path}: rawContent=${rawContent.length} chars, meta=${!!meta}`);
   const overlay = document.createElement('div');
   overlay.id = 'fullpage-overlay';
   overlay.dataset.path = path;
@@ -2464,7 +2470,9 @@ async function expandCardFullPage(card, highlightQuery) {
     renderChatTranscript(contentEl, rawContent);
   } else {
     // Render markdown — marked-katex-extension handles $...$ and $$...$$ natively
-    contentEl.innerHTML = marked.parse(rawContent);
+    const html = marked.parse(rawContent);
+    console.log(`[Fullpage] marked.parse: input=${rawContent.length} output=${html.length} chars`);
+    contentEl.innerHTML = html;
     renderLatex(contentEl); // still needed for \(...\) and \[...\] delimiters
     overlay.querySelector('.fullpage-toggle').onclick = () => toggleFullPageEdit(overlay, path);
     wireFullPageLinks(overlay);
