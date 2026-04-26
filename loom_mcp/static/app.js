@@ -2442,10 +2442,38 @@ async function expandCardFullPage(card, highlightQuery) {
     // TeX file: start as normal fullpage code editor with Compile button
     overlay.querySelector('.fullpage-toggle').style.display = 'none';
 
+    // Determine the main TeX file for this folder
+    const texFolder = path.split('/').slice(0, -1).join('/');
+    const mainTexKey = `loom-main-tex:${texFolder}`;
+    const getMainTex = () => localStorage.getItem(mainTexKey) || path;
+
+    // "Set as main" / main indicator
+    const mainBtn = document.createElement('button');
+    mainBtn.className = 'fullpage-chat';
+    mainBtn.style.cssText = 'font-size:11px;opacity:0.7';
+    const updateMainBtn = () => {
+      const main = getMainTex();
+      if (main === path) {
+        mainBtn.textContent = '★ Main';
+        mainBtn.title = 'This is the main TeX file for compilation';
+      } else {
+        mainBtn.textContent = 'Set as main';
+        mainBtn.title = `Currently compiling: ${main.split('/').pop()}. Click to set this file as main.`;
+      }
+    };
+    updateMainBtn();
+    mainBtn.onclick = () => {
+      localStorage.setItem(mainTexKey, path);
+      updateMainBtn();
+    };
+    overlay.querySelector('.fullpage-header').insertBefore(
+      mainBtn, overlay.querySelector('.fullpage-toggle')
+    );
+
     const compileBtn = document.createElement('button');
     compileBtn.className = 'fullpage-chat';
     compileBtn.textContent = 'Compile';
-    compileBtn.title = 'Compile to PDF (latexmk)';
+    compileBtn.title = 'Compile main TeX file to PDF (latexmk)';
     overlay.querySelector('.fullpage-header').insertBefore(
       compileBtn, overlay.querySelector('.fullpage-toggle')
     );
@@ -2461,13 +2489,14 @@ async function expandCardFullPage(card, highlightQuery) {
     const pdfPath = path.replace(/\.tex$/, '.pdf');
 
     compileBtn.onclick = async () => {
-      compileBtn.textContent = 'Compiling...';
+      const mainTex = getMainTex();
+      compileBtn.textContent = `Compiling ${mainTex.split('/').pop()}...`;
       compileBtn.disabled = true;
       try {
         const resp = await authFetch('/api/compile-tex', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path }),
+          body: JSON.stringify({ path: mainTex }),
         });
         const data = await resp.json();
         if (data.ok) {
@@ -2484,12 +2513,13 @@ async function expandCardFullPage(card, highlightQuery) {
                 recompileBtn.title = 'Recompile to PDF';
                 headerEl.appendChild(recompileBtn);
                 recompileBtn.onclick = async () => {
+                  const mainTex = getMainTex();
                   recompileBtn.textContent = 'Compiling...';
                   recompileBtn.disabled = true;
                   try {
                     const r = await authFetch('/api/compile-tex', {
                       method: 'POST', headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({ path }),
+                      body: JSON.stringify({ path: mainTex }),
                     });
                     const d = await r.json();
                     if (d.ok && sv?._rightPane?._content) {
