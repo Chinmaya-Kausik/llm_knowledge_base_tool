@@ -3000,14 +3000,13 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   function syncPreviewToEditor(view) {
     const previewEl = sv?._rightPane?._content;
     if (!previewEl || !view) return;
-    // Calculate cursor position as a fraction of the document
-    const cursor = view.state.selection.main.head;
-    const totalChars = view.state.doc.length;
-    if (totalChars === 0) return;
-    const fraction = cursor / totalChars;
-    // Scroll preview to the same fraction
-    const scrollMax = previewEl.scrollHeight - previewEl.clientHeight;
-    previewEl.scrollTop = Math.round(fraction * scrollMax);
+    // Match the editor's scroll fraction to the preview
+    const scroller = view.scrollDOM;
+    const editorScrollMax = scroller.scrollHeight - scroller.clientHeight;
+    if (editorScrollMax <= 0) return;
+    const fraction = scroller.scrollTop / editorScrollMax;
+    const previewScrollMax = previewEl.scrollHeight - previewEl.clientHeight;
+    previewEl.scrollTop = Math.round(fraction * previewScrollMax);
   }
 }
 
