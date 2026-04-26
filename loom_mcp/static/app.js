@@ -2453,18 +2453,72 @@ async function expandCardFullPage(card, highlightQuery) {
     mainBtn.style.cssText = 'font-size:11px;opacity:0.7';
     const updateMainBtn = () => {
       const main = getMainTex();
-      if (main === path) {
-        mainBtn.textContent = '★ Main';
-        mainBtn.title = 'This is the main TeX file for compilation';
-      } else {
-        mainBtn.textContent = 'Set as main';
-        mainBtn.title = `Currently compiling: ${main.split('/').pop()}. Click to set this file as main.`;
-      }
+      mainBtn.textContent = `Main: ${main.split('/').pop()}`;
+      mainBtn.title = `Compiling: ${main}. Click to change.`;
     };
     updateMainBtn();
-    mainBtn.onclick = () => {
-      localStorage.setItem(mainTexKey, path);
-      updateMainBtn();
+    mainBtn.onclick = async () => {
+      // Fetch all .tex files in this folder tree
+      try {
+        const tree = await api.fetchTree();
+        const texFiles = [];
+        function walk(node, prefix) {
+          const p = prefix ? prefix + '/' + node.name : node.name;
+          if (node.name?.endsWith('.tex')) texFiles.push(p);
+          for (const child of (node.children || [])) walk(child, prefix ? p : node.name === tree.name ? '' : p);
+        }
+        // Find the subtree matching texFolder
+        function findFolder(node, target, prefix) {
+          const p = prefix ? prefix + '/' + node.name : node.name;
+          if (p === target || (!target && !prefix)) return node;
+          for (const child of (node.children || [])) {
+            const found = findFolder(child, target, p === tree.name ? '' : p);
+            if (found) return found;
+          }
+          return null;
+        }
+        const folder = texFolder ? findFolder(tree, texFolder, '') : tree;
+        if (folder) {
+          function collectTex(node, prefix) {
+            const p = prefix ? prefix + '/' + node.name : node.name;
+            if (node.name?.endsWith('.tex')) texFiles.push(p);
+            for (const child of (node.children || [])) collectTex(child, p);
+          }
+          collectTex(folder, texFolder);
+        }
+
+        if (texFiles.length === 0) { texFiles.push(path); }
+
+        // Show picker as a dropdown below the button
+        const existing = document.getElementById('tex-main-picker');
+        if (existing) { existing.remove(); return; }
+        const picker = document.createElement('div');
+        picker.id = 'tex-main-picker';
+        picker.style.cssText = 'position:absolute;top:100%;left:0;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow-md);z-index:400;max-height:300px;overflow-y:auto;min-width:200px';
+        const currentMain = getMainTex();
+        for (const f of texFiles) {
+          const item = document.createElement('div');
+          item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px';
+          item.innerHTML = `${f === currentMain ? '★ ' : ''}<span>${f.split('/').pop()}</span><span style="color:var(--text-dim);font-size:11px;margin-left:auto">${f}</span>`;
+          item.onmouseenter = () => { item.style.background = 'var(--bg-hover)'; };
+          item.onmouseleave = () => { item.style.background = ''; };
+          item.onclick = () => {
+            localStorage.setItem(mainTexKey, f);
+            updateMainBtn();
+            picker.remove();
+          };
+          picker.appendChild(item);
+        }
+        mainBtn.style.position = 'relative';
+        mainBtn.appendChild(picker);
+        // Close on outside click
+        setTimeout(() => {
+          const close = (e) => { if (!picker.contains(e.target) && e.target !== mainBtn) { picker.remove(); document.removeEventListener('click', close); } };
+          document.addEventListener('click', close);
+        }, 0);
+      } catch (e) {
+        console.error('Failed to load tex files:', e);
+      }
     };
     overlay.querySelector('.fullpage-header').insertBefore(
       mainBtn, overlay.querySelector('.fullpage-toggle')
