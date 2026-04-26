@@ -2998,17 +2998,7 @@ function openMarkdownSplitEdit(path, meta, sidebarWasOpen) {
   }
 
   function syncPreviewToEditor(view) {
-    const previewEl = sv?._rightPane?._content;
-    if (!previewEl || !view) return;
-    // Find what line the cursor is on, scroll preview to that % of content
-    const cursor = view.state.selection.main.head;
-    const cursorLine = view.state.doc.lineAt(cursor).number;
-    const totalLines = view.state.doc.lines;
-    if (totalLines === 0) return;
-    // Scroll preview so the cursor's relative position is centered
-    const fraction = cursorLine / totalLines;
-    const targetY = fraction * previewEl.scrollHeight;
-    previewEl.scrollTop = targetY - previewEl.clientHeight / 3; // cursor at ~1/3 from top
+    // No-op: preview stays where user scrolled it
   }
 }
 
