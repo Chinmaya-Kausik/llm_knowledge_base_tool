@@ -709,13 +709,11 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
         print(f"[adapter] has_rules={has_rules}")
-        # Don't set permission_mode when we have rules — let CLI default
-        # send can_use_tool requests via SDK control channel.
-        # When no rules: bypassPermissions for speed.
-        if not has_rules:
-            config["permission_mode"] = "bypassPermissions" main
+        # "default" = SDK calls can_use_tool for every tool use
+        # "auto" = SDK auto-approves everything, skips can_use_tool
+        config["permission_mode"] = "default" if has_rules else "auto"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
-        print(f"[adapter] permission_mode={config.get('permission_mode', 'UNSET')}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
+        print(f"[adapter] permission_mode={config['permission_mode']}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
         config["resume_session_id"] = session.get("sdk_session_id")
         config["has_run"] = session.get("has_run", False)
 
@@ -774,7 +772,6 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
     try:
         from loom_mcp.agents import AgentEvent
 
-        print(f"[query] starting for session={session_id[:8]} prompt={prompt[:50]}")
         adapter = await _get_or_create_adapter(session_id, loom_root, context_level, websocket)
 
         # Track messages for PreCompact snapshot
