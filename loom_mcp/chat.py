@@ -708,8 +708,9 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         # Claude-specific config
         print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
-        print(f"[adapter] has_rules={has_rules}, permission_mode={'default' if has_rules else 'auto'}")
-        config["permission_mode"] = "default" if has_rules else "auto"
+        print(f"[adapter] has_rules={has_rules}")
+        # Always use "auto" permission_mode — our can_use_tool callback handles enforcement
+        config["permission_mode"] = "auto"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
         config["resume_session_id"] = session.get("sdk_session_id")
         config["has_run"] = session.get("has_run", False)
