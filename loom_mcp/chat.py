@@ -139,6 +139,8 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
 
             elif msg_type == "set_permissions":
                 # Browser sends permission rules: {category: "allow"|"ask"|"deny"}
+                import logging as _logging
+                _logging.getLogger("loom.chat").info("[set_permissions] session=%s rules=%s", session_id[:8] if session_id else None, msg.get("rules"))
                 if session_id and session_id in sessions:
                     sessions[session_id]["permission_rules"] = msg.get("rules", {})
                     # Disconnect existing adapter so next query uses new rules
