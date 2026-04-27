@@ -709,9 +709,9 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
         print(f"[adapter] has_rules={has_rules}")
-        # "default" = SDK calls can_use_tool for every tool use
-        # "auto" = SDK auto-approves everything, skips can_use_tool
-        config["permission_mode"] = "default" if has_rules else "auto"
+        # "dontAsk" = don't use CLI's built-in prompting, rely on can_use_tool callback
+        # "bypassPermissions" = skip all checks (when no rules are set)
+        config["permission_mode"] = "dontAsk" if has_rules else "bypassPermissions"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
         print(f"[adapter] permission_mode={config['permission_mode']}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
         config["resume_session_id"] = session.get("sdk_session_id")
