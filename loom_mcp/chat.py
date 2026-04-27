@@ -772,6 +772,7 @@ async def stream_query(websocket: WebSocket, prompt: str, session_id: str, loom_
     try:
         from loom_mcp.agents import AgentEvent
 
+        print(f"[query] starting for session={session_id[:8]} prompt={prompt[:50]}")
         adapter = await _get_or_create_adapter(session_id, loom_root, context_level, websocket)
 
         # Track messages for PreCompact snapshot
