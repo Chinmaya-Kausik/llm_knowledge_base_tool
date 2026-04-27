@@ -705,9 +705,11 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
 
     if agent_type == "claude-code":
         # Claude-specific config
-        log.info("[adapter] rules=%s", rules)
+        import logging as _logging
+        _log = _logging.getLogger("loom.chat")
+        _log.info("[adapter] rules=%s", rules)
         has_rules = any(v != "allow" for v in rules.values())
-        log.info("[adapter] has_rules=%s, permission_mode=%s", has_rules, "default" if has_rules else "auto")
+        _log.info("[adapter] has_rules=%s, permission_mode=%s", has_rules, "default" if has_rules else "auto")
         config["permission_mode"] = "default" if has_rules else "auto"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
         config["resume_session_id"] = session.get("sdk_session_id")
