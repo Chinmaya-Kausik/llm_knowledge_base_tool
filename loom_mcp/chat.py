@@ -713,7 +713,7 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         # send can_use_tool requests via SDK control channel.
         # When no rules: bypassPermissions for speed.
         if not has_rules:
-            config["permission_mode"] = "bypassPermissions"
+            config["permission_mode"] = "bypassPermissions" main
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
         print(f"[adapter] permission_mode={config.get('permission_mode', 'UNSET')}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
         config["resume_session_id"] = session.get("sdk_session_id")
