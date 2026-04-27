@@ -709,11 +709,13 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
         print(f"[adapter] has_rules={has_rules}")
-        # "dontAsk" = don't use CLI's built-in prompting, rely on can_use_tool callback
-        # "bypassPermissions" = skip all checks (when no rules are set)
-        config["permission_mode"] = "dontAsk" if has_rules else "bypassPermissions"
+        # Don't set permission_mode when we have rules — let CLI default
+        # send can_use_tool requests via SDK control channel.
+        # When no rules: bypassPermissions for speed.
+        if not has_rules:
+            config["permission_mode"] = "bypassPermissions"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
-        print(f"[adapter] permission_mode={config['permission_mode']}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
+        print(f"[adapter] permission_mode={config.get('permission_mode', 'UNSET')}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
         config["resume_session_id"] = session.get("sdk_session_id")
         config["has_run"] = session.get("has_run", False)
 
