@@ -588,7 +588,7 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         session = sessions.get(session_id, {})
         rules = session.get("permission_rules", {})
         category = _map_tool_to_category(tool_name)
-        print(f"[perm] tool={tool_name} category={category} rule={rules.get(category, '?')}")
+        print(f"[perm] CALLED! tool={tool_name} category={category} rule={rules.get(category, '?')}")
 
         # Check for destructive commands in Bash
         if tool_name == "Bash":
@@ -709,9 +709,11 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
         print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
         print(f"[adapter] has_rules={has_rules}")
-        # Always use "auto" permission_mode — our can_use_tool callback handles enforcement
-        config["permission_mode"] = "auto"
+        # "default" = SDK calls can_use_tool for every tool use
+        # "auto" = SDK auto-approves everything, skips can_use_tool
+        config["permission_mode"] = "default" if has_rules else "auto"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
+        print(f"[adapter] permission_mode={config['permission_mode']}, can_use_tool={'SET' if config['can_use_tool'] else 'None'}")
         config["resume_session_id"] = session.get("sdk_session_id")
         config["has_run"] = session.get("has_run", False)
 
