@@ -7229,6 +7229,9 @@ function _handleChatEventInner(msg, messages) {
   // Keep the status bar at the bottom of the assistant element
   if (currentAssistantEl?._statusBar && currentAssistantEl.contains(currentAssistantEl._statusBar)) {
     currentAssistantEl.appendChild(currentAssistantEl._statusBar);
+    // Also scroll to bottom
+    const scrollTarget = chatMessagesContainer || document.getElementById('chat-messages');
+    if (scrollTarget) scrollTarget.scrollTop = scrollTarget.scrollHeight;
   }
 }
 
