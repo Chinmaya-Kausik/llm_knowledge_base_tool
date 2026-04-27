@@ -139,8 +139,7 @@ async def ws_chat(websocket: WebSocket, loom_root: Path):
 
             elif msg_type == "set_permissions":
                 # Browser sends permission rules: {category: "allow"|"ask"|"deny"}
-                import logging as _logging
-                _logging.getLogger("loom.chat").info("[set_permissions] session=%s rules=%s", session_id[:8] if session_id else None, msg.get("rules"))
+                print(f"[set_permissions] session={session_id[:8] if session_id else None} rules={msg.get('rules')}")
                 if session_id and session_id in sessions:
                     sessions[session_id]["permission_rules"] = msg.get("rules", {})
                     # Disconnect existing adapter so next query uses new rules
@@ -589,7 +588,7 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         session = sessions.get(session_id, {})
         rules = session.get("permission_rules", {})
         category = _map_tool_to_category(tool_name)
-        log.info("[perm] tool=%s category=%s rule=%s", tool_name, category, rules.get(category, "?"))
+        print(f"[perm] tool={tool_name} category={category} rule={rules.get(category, '?')}")
 
         # Check for destructive commands in Bash
         if tool_name == "Bash":
@@ -602,7 +601,7 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
                 r'git\s+branch\s+-[dD]', r'git\s+push\s+--force',
             ]
             if any(re.search(p, cmd) for p in destructive_patterns):
-                log.info("[perm] DESTRUCTIVE: %s -> destructive_git", cmd[:80])
+                print(f"[perm] DESTRUCTIVE: {cmd[:80]} -> destructive_git")
                 category = "destructive_git"
 
         # Unknown tools default to "ask" when any rules are active
@@ -610,14 +609,14 @@ def _make_permission_handler(session_id: str, websocket: WebSocket):
         rule = rules.get(category, default_rule)
 
         if rule == "allow":
-            log.info("[perm] -> ALLOW (rule=%s category=%s)", rule, category)
+            print(f"[perm] -> ALLOW rule={rule} category={category}")
             return PermissionResultAllow()
         if rule == "deny":
-            log.info("[perm] -> DENY (rule=%s category=%s)", rule, category)
+            print(f"[perm] -> DENY rule={rule} category={category}")
             return PermissionResultDeny(message=f"Denied by user permission settings ({category})")
 
         # rule == "ask" (or "unknown"): forward to browser and wait for response
-        log.info("[perm] -> ASK (rule=%s category=%s tool=%s)", rule, category, tool_name)
+        print(f"[perm] -> ASK rule={rule} category={category} tool={tool_name}")
         try:
             import uuid as _uuid
             perm_id = str(_uuid.uuid4())[:8]
@@ -664,7 +663,7 @@ def resolve_permission(session_id: str, decision: str, perm_id: str = "") -> Non
     """Called when the browser sends a permission response."""
     import logging
     log = logging.getLogger("loom.chat")
-    log.info("[perm] resolve: session=%s perm_id=%s decision=%s pending=%d", session_id[:8], perm_id, decision, len(_permission_futures))
+    print(f"[perm] resolve: session={session_id[:8]} perm_id={perm_id} decision={decision} pending={len(_permission_futures)}")
     # Try exact match first, then fall back to session-only match for backward compat
     key = (session_id, perm_id)
     future = _permission_futures.get(key)
@@ -707,11 +706,9 @@ async def _get_or_create_adapter(session_id: str, loom_root: Path, context_level
 
     if agent_type == "claude-code":
         # Claude-specific config
-        import logging as _logging
-        _log = _logging.getLogger("loom.chat")
-        _log.info("[adapter] rules=%s", rules)
+        print(f"[adapter] rules={rules}")
         has_rules = any(v != "allow" for v in rules.values())
-        _log.info("[adapter] has_rules=%s, permission_mode=%s", has_rules, "default" if has_rules else "auto")
+        print(f"[adapter] has_rules={has_rules}, permission_mode={'default' if has_rules else 'auto'}")
         config["permission_mode"] = "default" if has_rules else "auto"
         config["can_use_tool"] = _make_permission_handler(session_id, websocket) if has_rules else None
         config["resume_session_id"] = session.get("sdk_session_id")
